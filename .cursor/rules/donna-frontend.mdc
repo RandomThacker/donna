@@ -1,0 +1,30 @@
+---
+description: Next.js frontend feature and TypeScript standards
+globs: apps/web/**/*.{ts,tsx},packages/ui/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Frontend Standards
+
+Stack: Next.js, TypeScript, Tailwind, shadcn/ui.
+
+- Strict TypeScript. No `any`. No disabled ESLint rules. No inline styles.
+- No business logic in UI components. No API calls directly inside UI.
+- Keep UI files under ~250 lines; split when larger.
+
+## Feature folder
+
+```text
+Feature/
+  Feature.tsx        # UI only
+  Feature.logic.ts   # hooks, state, handlers
+  Feature.styles.ts  # Tailwind class constants
+  Feature.types.ts   # interfaces
+  index.ts
+```
+
+## UI philosophy
+
+Premium, calm, minimal, elegant. Whitespace, strong typography, smooth motion, subtle gradients. Not ChatGPT. Phone chat should feel like messaging a person (iMessage-inspired, not Apple-copied).
+
+Lazy-load heavy widgets. Avoid unnecessary renders. Stream AI responses when possible.

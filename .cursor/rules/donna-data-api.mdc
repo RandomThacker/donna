@@ -1,0 +1,15 @@
+---
+description: Postgres, migrations, and API contract conventions
+globs: "{services/api/**/*,packages/types/**/*,infra/**/*}"
+alwaysApply: false
+---
+
+# Data and API Contracts
+
+- PostgreSQL is the source of truth. Schema changes only via migrations.
+- Repositories own SQL access. Handlers never embed SQL.
+- Version all REST endpoints under `/api/v1`.
+- Shared DTOs live in `packages/types` when consumed by web.
+- Calendar and other integrations use provider interfaces from day one (Google first).
+- Login identity ≠ integration connection. Store connections separately.
+- Validate all inbound API input. Never trust the frontend.

@@ -1,0 +1,17 @@
+---
+description: FastAPI AI service boundaries and tool-calling rules
+globs: services/ai/**/*
+alwaysApply: false
+---
+
+# AI Service Standards (Python + FastAPI)
+
+Responsibilities: LLM, embeddings, memory retrieval, planning, prompts, tool calling.
+
+- Never perform database operations from the AI service.
+- All persistence goes through `services/api` HTTP APIs.
+- AI decides which tools to invoke; API executes and returns results.
+- Keep prompts versioned and explicit. Prefer structured tool schemas.
+- Stream responses when the API/web path supports it.
+- Structured logging. Never swallow exceptions.
+- Do not put product CRUD rules in prompts — encode them in API services.

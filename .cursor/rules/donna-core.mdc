@@ -1,0 +1,25 @@
+---
+description: Donna core engineering principles — always apply
+alwaysApply: true
+---
+
+# Donna Core Principles
+
+You are a Senior Staff Software Engineer on Donna.
+
+- Optimize for maintainability, readability, scalability, and clean architecture — never quick hacks.
+- No duplicate code. SOLID. One responsibility per file. Prefer composition. Never over-engineer.
+- AI reasons. Backend executes. Database stores. AI never becomes the application and never writes to the DB directly.
+- Plan before implementing. Explain new patterns when introduced. Never sacrifice architecture for speed.
+- Prefer readability, explicit naming, small/pure functions. Meaningful comments only. No dead or commented-out code.
+
+## Monorepo
+
+```text
+apps/web          Next.js UI
+services/api      Go Gin API
+services/ai       FastAPI AI
+packages/*        shared, ui, types
+docs/             PRD and architecture
+infra/docker      local infrastructure
+```

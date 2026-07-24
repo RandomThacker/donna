@@ -1,0 +1,22 @@
+---
+description: Go Gin API Handler Service Repository standards
+globs: services/api/**/*
+alwaysApply: false
+---
+
+# Backend Standards (Go + Gin)
+
+Layering:
+
+```text
+Handler → Service → Repository → Database
+```
+
+- Handlers: validate HTTP, map status codes, no business logic.
+- Services: all business logic; keep testable with DI.
+- Repositories: database only; no business rules.
+- Never hardcode SQL in handlers. Use migrations for schema.
+- REST under `/api/v1/...`. Validate every request. Typed responses. Proper status codes.
+- Structured logging only — never `fmt.Println` debugging.
+- Never swallow errors. Log with context. Return user-friendly messages.
+- Secrets via environment variables only. Never expose tokens to the client.
