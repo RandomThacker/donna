@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: var(--font-instrument-serif), "Times New Roman", serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+
+  --color-donna-void: #080605;
+  --color-donna-ink: #0f0b08;
+  --color-donna-bronze-950: #17100b;
+  --color-donna-bronze-900: #2a1b12;
+  --color-donna-bronze-800: #3d281c;
+  --color-donna-bronze-700: #5c4030;
+  --color-donna-copper-deep: #a97f4f;
+  --color-donna-copper: #cba97d;
+  --color-donna-copper-bright: #ecd3a8;
+  --color-donna-copper-dim: #8f7350;
+  --color-donna-cream: #f4ede3;
+  --color-donna-muted: #b0a08e;
+  --color-donna-faint: #6f6152;
+  --color-donna-glass: rgb(30 23 18 / 0.5);
+  --color-donna-glass-strong: rgb(38 29 22 / 0.72);
+  --color-donna-glass-border: rgb(203 169 125 / 0.16);
+  --color-donna-hairline: rgb(203 169 125 / 0.1);
+
+  --shadow-donna-glow: 0 0 90px rgb(203 169 125 / 0.24);
+  --shadow-donna-card: 0 24px 60px -30px rgb(0 0 0 / 0.85);
+  --shadow-donna-cta: 0 16px 44px -14px rgb(203 169 125 / 0.5);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-donna-void text-donna-cream font-sans antialiased;
+    min-height: 100dvh;
+    background-image:
+      radial-gradient(120% 90% at 50% -10%, rgb(203 169 125 / 0.1) 0%, transparent 55%),
+      radial-gradient(80% 60% at 100% 100%, rgb(61 40 28 / 0.35) 0%, transparent 60%);
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-donna-copper) 42%, transparent);
+    color: var(--color-donna-cream);
+  }
+}
+
+@utility text-donna-gradient {
+  background-image: linear-gradient(
+    100deg,
+    var(--color-donna-copper-bright) 0%,
+    var(--color-donna-copper) 42%,
+    var(--color-donna-copper-deep) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+@utility border-donna-hairline {
+  border-color: var(--color-donna-hairline);
+}
+
+@keyframes donna-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes donna-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes donna-float {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-2.2%) scale(1.015);
+  }
+}
+
+@keyframes donna-drift {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(2%, -1.5%) scale(1.06);
+    opacity: 0.95;
+  }
+}
+
+@keyframes donna-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes donna-ring {
+  0% {
+    transform: scale(0.9) rotate(0deg);
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1) rotate(360deg);
+    opacity: 0.5;
+  }
+}
+
+@utility animate-donna-fade-up {
+  animation: donna-fade-up 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-donna-fade {
+  animation: donna-fade 1.2s ease-out both;
+}
+
+@utility animate-donna-float {
+  animation: donna-float 8s ease-in-out infinite;
+}
+
+@utility animate-donna-drift {
+  animation: donna-drift 16s ease-in-out infinite;
+}
+
+@utility animate-donna-shimmer {
+  animation: donna-shimmer 8s ease-in-out infinite;
+}
+
+@utility animate-donna-ring {
+  animation: donna-ring 40s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
