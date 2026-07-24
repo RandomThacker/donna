@@ -59,6 +59,16 @@ docker compose up -d
 
 Postgres listens on `localhost:5432` (see `.env.example`).
 
+### Web (landing)
+
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
 ## Current milestone
 
 **M0 — Monorepo foundation** (scaffold, docs, Cursor rules, Postgres compose).
