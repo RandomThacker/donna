@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Instrument_Serif, Manrope } from "next/font/google";
 
+import { ThemeProvider } from "@/components/theme";
 import { siteMetadata } from "@/features/landing/Landing.logic";
 
 import "./globals.css";
@@ -21,14 +22,38 @@ const manrope = Manrope({
 
 export const metadata: Metadata = siteMetadata;
 
+const themeInitScript = `
+(() => {
+  try {
+    const key = "donna-theme";
+    const stored = localStorage.getItem(key);
+    const theme = stored === "light" || stored === "dark"
+      ? stored
+      : (window.matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+    document.documentElement.classList.remove("light", "dark");
+    document.documentElement.classList.add(theme);
+    document.documentElement.style.colorScheme = theme;
+  } catch {}
+})();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${instrumentSerif.variable} ${manrope.variable}`}>
-      <body>{children}</body>
+    <html
+      lang="en"
+      className={`${instrumentSerif.variable} ${manrope.variable} dark`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
+      <body>
+        <ThemeProvider>{children}</ThemeProvider>
+      </body>
     </html>
   );
 }

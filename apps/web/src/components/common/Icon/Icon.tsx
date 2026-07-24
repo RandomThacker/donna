@@ -19,7 +19,9 @@ export function Icon({ name, className }: IconProps) {
       aria-hidden
       className={cn("h-5 w-5", className)}
     >
-      <path d={iconPaths[name]} />
+      {iconPaths[name].map((d) => (
+        <path key={d} d={d} />
+      ))}
     </svg>
   );
 }
