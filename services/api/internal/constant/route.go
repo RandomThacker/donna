@@ -17,6 +17,10 @@ const (
 	PathAuthGoogleCallback = "/auth/google/callback"
 	PathAuthLogout         = "/auth/logout"
 	PathMe                 = "/me"
+
+	PathCalendarSync       = "/calendar/sync"
+	PathCalendarSyncEnsure = "/calendar/sync/ensure"
+	PathCalendarSources    = "/calendar/sources"
 )
 
 // Full paths (prefix + relative). Useful for docs, clients, and tests.

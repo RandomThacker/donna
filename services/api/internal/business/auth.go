@@ -19,6 +19,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/seal"
 	"github.com/RandomThacker/donna/services/api/internal/session"
 	"github.com/RandomThacker/donna/services/api/internal/validation"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
@@ -27,6 +28,7 @@ type GoogleOAuthClient interface {
 	AuthCodeURL(state string) string
 	ExchangeCode(ctx context.Context, code string) (googleoauth.TokenSet, error)
 	FetchProfile(ctx context.Context, accessToken string) (googleoauth.Profile, error)
+	RefreshAccessToken(ctx context.Context, refreshToken string) (googleoauth.TokenSet, error)
 }
 
 // AuthSession is the authenticated session returned to the client.
@@ -67,6 +69,8 @@ type AuthService struct {
 	sealKey    []byte
 	log        *logger.Logger
 	now        func() time.Time
+	// onGoogleAccountReady runs after Google connected_accounts upsert (e.g. calendar sync bootstrap).
+	onGoogleAccountReady func(ctx context.Context, accountID uuid.UUID) error
 }
 
 // AuthServiceDeps wires AuthService dependencies.
@@ -99,6 +103,23 @@ func NewAuthService(deps AuthServiceDeps) *AuthService {
 		sealKey:    deps.SealKey,
 		log:        deps.Log,
 		now:        time.Now,
+	}
+}
+
+// SetOnGoogleAccountReady registers a post-connect hook (wired after calendar module).
+func (s *AuthService) SetOnGoogleAccountReady(fn func(ctx context.Context, accountID uuid.UUID) error) {
+	s.onGoogleAccountReady = fn
+}
+
+func (s *AuthService) notifyGoogleAccountReady(ctx context.Context, accountID uuid.UUID) {
+	if s.onGoogleAccountReady == nil || accountID == uuid.Nil {
+		return
+	}
+	if err := s.onGoogleAccountReady(ctx, accountID); err != nil && s.log != nil {
+		s.log.Warn(ctx, "google account ready hook failed",
+			constant.LogAttrError, err,
+			"connected_account_id", accountID.String(),
+		)
 	}
 }
 
@@ -176,9 +197,11 @@ func (s *AuthService) loginExisting(
 	}
 	user.LastLoginAt = &now
 
-	if err := s.upsertConnectedAccount(ctx, user, profile, tokenSet); err != nil {
+	account, err := s.upsertConnectedAccount(ctx, user, profile, tokenSet)
+	if err != nil {
 		return AuthSession{}, err
 	}
+	s.notifyGoogleAccountReady(ctx, account.ID)
 
 	s.log.AuthEvent(ctx, logger.AuthEventLogin,
 		constant.LogAttrUserID, user.ID.String(),
@@ -199,6 +222,7 @@ func (s *AuthService) registerNew(
 	}
 
 	var created entity.User
+	var connected entity.ConnectedAccount
 	err := s.tx.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		userRepo := s.userRepo.WithTx(tx)
 		identityRepo := s.identities.WithTx(tx)
@@ -246,9 +270,11 @@ func (s *AuthService) registerNew(
 			return err
 		}
 
-		if err := s.storeConnectedAccount(ctx, accountRepo, secretRepo, user, profile, tokenSet); err != nil {
+		account, err := s.storeConnectedAccount(ctx, accountRepo, secretRepo, user, profile, tokenSet)
+		if err != nil {
 			return err
 		}
+		connected = account
 
 		if _, err := userRepo.TouchLastLogin(ctx, user.ID, now); err != nil {
 			return err
@@ -260,6 +286,8 @@ func (s *AuthService) registerNew(
 	if err != nil {
 		return AuthSession{}, err
 	}
+
+	s.notifyGoogleAccountReady(ctx, connected.ID)
 
 	s.log.AuthEvent(ctx, logger.AuthEventLogin,
 		constant.LogAttrUserID, created.ID.String(),
@@ -275,35 +303,33 @@ func (s *AuthService) upsertConnectedAccount(
 	user entity.User,
 	profile googleoauth.Profile,
 	tokenSet googleoauth.TokenSet,
-) error {
+) (entity.ConnectedAccount, error) {
 	existing, err := s.accounts.GetByProviderAccount(ctx, constant.AuthProviderGoogle, profile.Subject)
 	if errors.Is(err, apperr.ErrNotFound) {
 		return s.storeConnectedAccount(ctx, s.accounts, s.secrets, user, profile, tokenSet)
 	}
 	if err != nil {
-		return err
+		return entity.ConnectedAccount{}, err
 	}
 
 	now := s.now().UTC()
 	ciphertext, expiresAt, scopes, err := s.sealTokenSet(ctx, tokenSet, existing, now)
 	if err != nil {
-		return err
+		return entity.ConnectedAccount{}, err
 	}
 
 	_, err = s.secrets.UpdateCiphertext(ctx, existing.CredentialsRef, ciphertext, now)
 	if errors.Is(err, apperr.ErrNotFound) {
 		ref, cerr := s.createSecret(ctx, s.secrets, ciphertext, now)
 		if cerr != nil {
-			return cerr
+			return entity.ConnectedAccount{}, cerr
 		}
-		_, err = s.accounts.UpdateCredentials(ctx, existing.ID, ref, expiresAt, scopes, constant.ConnectedAccountStatusActive, now)
-		return err
+		return s.accounts.UpdateCredentials(ctx, existing.ID, ref, expiresAt, scopes, constant.ConnectedAccountStatusActive, now)
 	}
 	if err != nil {
-		return err
+		return entity.ConnectedAccount{}, err
 	}
-	_, err = s.accounts.UpdateCredentials(ctx, existing.ID, existing.CredentialsRef, expiresAt, scopes, constant.ConnectedAccountStatusActive, now)
-	return err
+	return s.accounts.UpdateCredentials(ctx, existing.ID, existing.CredentialsRef, expiresAt, scopes, constant.ConnectedAccountStatusActive, now)
 }
 
 func (s *AuthService) storeConnectedAccount(
@@ -313,26 +339,26 @@ func (s *AuthService) storeConnectedAccount(
 	user entity.User,
 	profile googleoauth.Profile,
 	tokenSet googleoauth.TokenSet,
-) error {
+) (entity.ConnectedAccount, error) {
 	now := s.now().UTC()
 	ciphertext, expiresAt, scopes, err := s.sealTokenSet(ctx, tokenSet, entity.ConnectedAccount{}, now)
 	if err != nil {
-		return err
+		return entity.ConnectedAccount{}, err
 	}
 	ref, err := s.createSecret(ctx, secrets, ciphertext, now)
 	if err != nil {
-		return err
+		return entity.ConnectedAccount{}, err
 	}
 
 	accountID, err := idgen.NewUUIDv7()
 	if err != nil {
-		return err
+		return entity.ConnectedAccount{}, err
 	}
 	var displayName *string
 	if name := strings.TrimSpace(profile.Name); name != "" {
 		displayName = &name
 	}
-	_, err = accounts.Create(ctx, entity.ConnectedAccount{
+	return accounts.Create(ctx, entity.ConnectedAccount{
 		ID:                accountID,
 		PublicID:          idgen.PublicID(constant.PublicIDPrefixConnectedAccount, accountID),
 		UserID:            user.ID,
@@ -347,7 +373,6 @@ func (s *AuthService) storeConnectedAccount(
 		CreatedAt:         now,
 		UpdatedAt:         now,
 	})
-	return err
 }
 
 func (s *AuthService) createSecret(ctx context.Context, secrets repository.CredentialSecretRepository, ciphertext []byte, now time.Time) (string, error) {
@@ -412,7 +437,11 @@ func (s *AuthService) sealTokenSet(ctx context.Context, tokenSet googleoauth.Tok
 
 	scopes := splitScopes(tokenSet.Scope)
 	if len(scopes) == 0 {
-		scopes = []string{"openid", "email", "profile"}
+		scopes = []string{
+			constant.GoogleScopeOpenID,
+			constant.GoogleScopeEmail,
+			constant.GoogleScopeProfile,
+		}
 	}
 	return ciphertext, expiresAt, scopes, nil
 }

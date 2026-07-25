@@ -13,12 +13,15 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/config"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/database"
+	"github.com/RandomThacker/donna/services/api/internal/googlecalendar"
 	"github.com/RandomThacker/donna/services/api/internal/googleoauth"
 	"github.com/RandomThacker/donna/services/api/internal/handler"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/oauthstate"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/RandomThacker/donna/services/api/internal/router"
+	"github.com/RandomThacker/donna/services/api/internal/scheduler"
+	"github.com/RandomThacker/donna/services/api/internal/scheduler/calendarsync"
 	"github.com/RandomThacker/donna/services/api/internal/seal"
 	"github.com/RandomThacker/donna/services/api/internal/server"
 	"github.com/RandomThacker/donna/services/api/internal/session"
@@ -62,18 +65,50 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		return fmt.Errorf("auth: %w", err)
 	}
 
+	calendarLog := logFactory.Module(constant.ModuleCalendar)
+	calendarParts, err := wireCalendar(cfg, pool, authParts, calendarLog)
+	if err != nil {
+		appLog.Error(ctx, "calendar wiring failed", constant.LogAttrError, err)
+		return fmt.Errorf("calendar: %w", err)
+	}
+	if calendarParts.service != nil && authParts.service != nil {
+		authParts.service.SetOnGoogleAccountReady(calendarParts.service.BootstrapCalendarSyncJob)
+	}
+
 	engine := router.New(router.Options{
-		Environment:   cfg.App.Environment,
-		CORSOrigins:   cfg.App.CORSOrigins,
-		HTTPLogger:    httpLog,
-		HealthHandler: healthHandler,
-		UserHandler:   userHandler,
-		AuthHandler:   authParts.handler,
-		MeHandler:     handler.NewMeHandler(userSvc),
-		TokenIssuer:   authParts.issuer,
+		Environment:     cfg.App.Environment,
+		CORSOrigins:     cfg.App.CORSOrigins,
+		HTTPLogger:      httpLog,
+		HealthHandler:   healthHandler,
+		UserHandler:     userHandler,
+		AuthHandler:     authParts.handler,
+		MeHandler:       handler.NewMeHandler(userSvc),
+		CalendarHandler: calendarParts.handler,
+		TokenIssuer:     authParts.issuer,
 	})
 
 	srv := server.New(cfg.App.Addr, engine, appLog)
+
+	runCtx, runCancel := context.WithCancel(ctx)
+	defer runCancel()
+	if calendarParts.service != nil {
+		jobsRepo := repository.NewSchedulerJobRepository(pool)
+		platformJobs := []scheduler.Job{
+			calendarsync.NewJob(calendarParts.service),
+			// Future: gmailsync.NewJob(...), contactsync.NewJob(...), ...
+		}
+		if err := scheduler.ValidateJobs(platformJobs); err != nil {
+			return fmt.Errorf("scheduler: %w", err)
+		}
+		runner := scheduler.NewRunner(
+			jobsRepo,
+			logFactory.Module(constant.ModuleScheduler),
+			platformJobs,
+			scheduler.Options{},
+		)
+		go runner.Run(runCtx)
+		appLog.Info(ctx, "scheduler runner started", "job_types", runner.RegisteredTypes())
+	}
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -85,11 +120,14 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 
 	select {
 	case err := <-errCh:
+		runCancel()
 		return err
 	case sig := <-sigCh:
 		appLog.Info(ctx, "shutdown signal received", constant.LogAttrSignal, sig.String())
+		runCancel()
 	case <-ctx.Done():
 		appLog.Info(ctx, "shutdown context canceled", constant.LogAttrError, ctx.Err())
+		runCancel()
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)
@@ -109,8 +147,14 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 }
 
 type authWire struct {
-	handler *handler.AuthHandler
-	issuer  *session.Issuer
+	handler      *handler.AuthHandler
+	service      *business.AuthService
+	issuer       *session.Issuer
+	googleClient business.GoogleOAuthClient
+	sealKey      []byte
+	accounts     repository.ConnectedAccountRepository
+	secrets      repository.CredentialSecretRepository
+	tx           *repository.TxManager
 }
 
 func wireAuth(
@@ -128,6 +172,10 @@ func wireAuth(
 	if err != nil {
 		return authWire{}, fmt.Errorf("jwt issuer: %w", err)
 	}
+
+	accounts := repository.NewConnectedAccountRepository(pool)
+	secrets := repository.NewCredentialSecretRepository(pool)
+	tx := repository.NewTxManager(pool)
 
 	var googleClient business.GoogleOAuthClient
 	if cfg.API.GoogleOAuth.ClientID != "" && cfg.API.GoogleOAuth.ClientSecret != "" {
@@ -154,9 +202,9 @@ func wireAuth(
 		Users:      userSvc,
 		UserRepo:   userRepo,
 		Identities: repository.NewAuthIdentityRepository(pool),
-		Accounts:   repository.NewConnectedAccountRepository(pool),
-		Secrets:    repository.NewCredentialSecretRepository(pool),
-		Tx:         repository.NewTxManager(pool),
+		Accounts:   accounts,
+		Secrets:    secrets,
+		Tx:         tx,
 		Google:     googleClient,
 		State:      oauthstate.NewManager(cfg.App.JWTSecret),
 		Tokens:     tokenIssuer,
@@ -171,6 +219,49 @@ func wireAuth(
 			CookieMaxAge:       cfg.App.JWTExpiry,
 			Tokens:             tokenIssuer,
 		}),
-		issuer: tokenIssuer,
+		service:      authSvc,
+		issuer:       tokenIssuer,
+		googleClient: googleClient,
+		sealKey:      sealKey,
+		accounts:     accounts,
+		secrets:      secrets,
+		tx:           tx,
 	}, nil
+}
+
+func wireCalendar(
+	cfg *config.Config,
+	pool *pgxpool.Pool,
+	auth authWire,
+	calendarLog *logger.Logger,
+) (calendarWire, error) {
+	if auth.googleClient == nil {
+		calendarLog.Warn(context.Background(), "calendar module disabled; google oauth not configured")
+		return calendarWire{}, nil
+	}
+
+	calClient := googlecalendar.NewClient(googlecalendar.Config{
+		BaseURL: constant.GoogleCalendarAPIBaseURL,
+		Timeout: cfg.API.GoogleOAuth.Timeout,
+	})
+	svc := business.NewCalendarService(business.CalendarServiceDeps{
+		Accounts: auth.accounts,
+		Secrets:  auth.secrets,
+		Sources:  repository.NewCalendarSourceRepository(pool),
+		Jobs:     repository.NewSchedulerJobRepository(pool),
+		Tx:       auth.tx,
+		OAuth:    auth.googleClient,
+		Calendar: calClient,
+		SealKey:  auth.sealKey,
+		Log:      calendarLog,
+	})
+	return calendarWire{
+		handler: handler.NewCalendarHandler(svc, calendarLog),
+		service: svc,
+	}, nil
+}
+
+type calendarWire struct {
+	handler *handler.CalendarHandler
+	service *business.CalendarService
 }

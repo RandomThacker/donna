@@ -202,7 +202,12 @@ func mapGoogleOAuth(in googleOAuthFile) (GoogleOAuthConfig, error) {
 	}
 	scopes := splitCSV(strings.ReplaceAll(in.Scopes, " ", ","))
 	if len(scopes) == 0 {
-		scopes = []string{"openid", "email", "profile"}
+		scopes = []string{
+			"openid",
+			"email",
+			"profile",
+			"https://www.googleapis.com/auth/calendar",
+		}
 	}
 	authURL := strings.TrimSpace(in.AuthURL)
 	if authURL == "" {

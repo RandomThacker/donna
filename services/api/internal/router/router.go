@@ -11,14 +11,15 @@ import (
 
 // Options configures the HTTP router.
 type Options struct {
-	Environment   string
-	CORSOrigins   []string
-	HTTPLogger    *logger.Logger
-	HealthHandler *handler.HealthHandler
-	UserHandler   *handler.UserHandler
-	AuthHandler   *handler.AuthHandler
-	MeHandler     *handler.MeHandler
-	TokenIssuer   *session.Issuer
+	Environment     string
+	CORSOrigins     []string
+	HTTPLogger      *logger.Logger
+	HealthHandler   *handler.HealthHandler
+	UserHandler     *handler.UserHandler
+	AuthHandler     *handler.AuthHandler
+	MeHandler       *handler.MeHandler
+	CalendarHandler *handler.CalendarHandler
+	TokenIssuer     *session.Issuer
 }
 
 // New builds a Gin engine with middleware and /api/v1 routes.
@@ -59,6 +60,13 @@ func New(opts Options) *gin.Engine {
 
 		if opts.MeHandler != nil && opts.TokenIssuer != nil {
 			v1.GET(constant.PathMe, middleware.RequireAuth(opts.TokenIssuer), opts.MeHandler.Me)
+		}
+
+		if opts.CalendarHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.POST(constant.PathCalendarSync, auth, opts.CalendarHandler.SyncSources)
+			v1.POST(constant.PathCalendarSyncEnsure, auth, opts.CalendarHandler.EnsureFreshSources)
+			v1.GET(constant.PathCalendarSources, auth, opts.CalendarHandler.ListSources)
 		}
 	}
 

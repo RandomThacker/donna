@@ -13,6 +13,13 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const connectedAccountColumns = `
+	id, public_id, user_id, provider, provider_account_id, display_name, status, scopes,
+	credentials_ref, token_expires_at, last_synced_at,
+	calendar_list_sync_token, calendar_sync_status, last_failed_sync_at, last_sync_duration_ms,
+	last_sync_created_count, last_sync_updated_count, last_sync_deleted_count,
+	provider_metadata, created_at, updated_at, deleted_at`
+
 const (
 	sqlInsertConnectedAccount = `
 INSERT INTO connected_accounts (
@@ -21,16 +28,24 @@ INSERT INTO connected_accounts (
 ) VALUES (
 	$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13
 )
-RETURNING
-	id, public_id, user_id, provider, provider_account_id, display_name, status, scopes,
-	credentials_ref, token_expires_at, last_synced_at, provider_metadata, created_at, updated_at, deleted_at`
+RETURNING` + connectedAccountColumns
 
 	sqlSelectConnectedAccountByProviderAccount = `
-SELECT
-	id, public_id, user_id, provider, provider_account_id, display_name, status, scopes,
-	credentials_ref, token_expires_at, last_synced_at, provider_metadata, created_at, updated_at, deleted_at
+SELECT` + connectedAccountColumns + `
 FROM connected_accounts
 WHERE provider = $1 AND provider_account_id = $2 AND deleted_at IS NULL`
+
+	sqlSelectConnectedAccountByUserProvider = `
+SELECT` + connectedAccountColumns + `
+FROM connected_accounts
+WHERE user_id = $1 AND provider = $2 AND deleted_at IS NULL
+ORDER BY created_at ASC
+LIMIT 1`
+
+	sqlSelectConnectedAccountByID = `
+SELECT` + connectedAccountColumns + `
+FROM connected_accounts
+WHERE id = $1 AND deleted_at IS NULL`
 
 	sqlUpdateConnectedAccountCredentials = `
 UPDATE connected_accounts SET
@@ -40,16 +55,68 @@ UPDATE connected_accounts SET
 	status = $5,
 	updated_at = $6
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING
-	id, public_id, user_id, provider, provider_account_id, display_name, status, scopes,
-	credentials_ref, token_expires_at, last_synced_at, provider_metadata, created_at, updated_at, deleted_at`
+RETURNING` + connectedAccountColumns
+
+	sqlMarkCalendarSyncRunning = `
+UPDATE connected_accounts SET
+	calendar_sync_status = $2,
+	updated_at = $3
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + connectedAccountColumns
+
+	sqlRecordCalendarSyncResult = `
+UPDATE connected_accounts SET
+	calendar_sync_status = $2,
+	last_synced_at = COALESCE($3, last_synced_at),
+	last_failed_sync_at = COALESCE($4, last_failed_sync_at),
+	last_sync_duration_ms = $5,
+	last_sync_created_count = CASE WHEN $11 THEN $6 ELSE last_sync_created_count END,
+	last_sync_updated_count = CASE WHEN $11 THEN $7 ELSE last_sync_updated_count END,
+	last_sync_deleted_count = CASE WHEN $11 THEN $8 ELSE last_sync_deleted_count END,
+	calendar_list_sync_token = CASE
+		WHEN $12 THEN NULL
+		WHEN $9::text IS NOT NULL THEN $9
+		ELSE calendar_list_sync_token
+	END,
+	updated_at = $10
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + connectedAccountColumns
+
+	sqlClearCalendarListSyncToken = `
+UPDATE connected_accounts SET
+	calendar_list_sync_token = NULL,
+	updated_at = $2
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + connectedAccountColumns
 )
+
+// CalendarSyncRecord is persistence input for sync observability.
+type CalendarSyncRecord struct {
+	Status        string
+	SuccessfulAt  *time.Time
+	FailedAt      *time.Time
+	DurationMs    int
+	CreatedCount  int
+	UpdatedCount  int
+	DeletedCount  int
+	ListSyncToken *string
+	UpdatedAt     time.Time
+	// UpdateCounts is true for successful syncs; failures preserve last success counts.
+	UpdateCounts bool
+	// ClearListSyncToken forces calendar_list_sync_token to NULL when ListSyncToken is nil.
+	ClearListSyncToken bool
+}
 
 // ConnectedAccountRepository persists integration accounts.
 type ConnectedAccountRepository interface {
 	Create(ctx context.Context, account entity.ConnectedAccount) (entity.ConnectedAccount, error)
+	GetByID(ctx context.Context, id uuid.UUID) (entity.ConnectedAccount, error)
 	GetByProviderAccount(ctx context.Context, provider, providerAccountID string) (entity.ConnectedAccount, error)
+	GetByUserAndProvider(ctx context.Context, userID uuid.UUID, provider string) (entity.ConnectedAccount, error)
 	UpdateCredentials(ctx context.Context, id uuid.UUID, credentialsRef string, tokenExpiresAt *time.Time, scopes []string, status string, updatedAt time.Time) (entity.ConnectedAccount, error)
+	MarkCalendarSyncRunning(ctx context.Context, id uuid.UUID, status string, updatedAt time.Time) (entity.ConnectedAccount, error)
+	RecordCalendarSync(ctx context.Context, id uuid.UUID, record CalendarSyncRecord) (entity.ConnectedAccount, error)
+	ClearCalendarListSyncToken(ctx context.Context, id uuid.UUID, updatedAt time.Time) (entity.ConnectedAccount, error)
 	WithTx(tx pgx.Tx) ConnectedAccountRepository
 }
 
@@ -100,6 +167,17 @@ func (r *connectedAccountRepository) Create(ctx context.Context, account entity.
 	return created, nil
 }
 
+func (r *connectedAccountRepository) GetByID(ctx context.Context, id uuid.UUID) (entity.ConnectedAccount, error) {
+	account, err := scanConnectedAccount(r.q.QueryRow(ctx, sqlSelectConnectedAccountByID, id))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.ConnectedAccount{}, apperr.ErrNotFound
+		}
+		return entity.ConnectedAccount{}, fmt.Errorf("get connected account by id: %w", err)
+	}
+	return account, nil
+}
+
 func (r *connectedAccountRepository) GetByProviderAccount(ctx context.Context, provider, providerAccountID string) (entity.ConnectedAccount, error) {
 	account, err := scanConnectedAccount(r.q.QueryRow(ctx, sqlSelectConnectedAccountByProviderAccount, provider, providerAccountID))
 	if err != nil {
@@ -107,6 +185,17 @@ func (r *connectedAccountRepository) GetByProviderAccount(ctx context.Context, p
 			return entity.ConnectedAccount{}, apperr.ErrNotFound
 		}
 		return entity.ConnectedAccount{}, fmt.Errorf("get connected account: %w", err)
+	}
+	return account, nil
+}
+
+func (r *connectedAccountRepository) GetByUserAndProvider(ctx context.Context, userID uuid.UUID, provider string) (entity.ConnectedAccount, error) {
+	account, err := scanConnectedAccount(r.q.QueryRow(ctx, sqlSelectConnectedAccountByUserProvider, userID, provider))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.ConnectedAccount{}, apperr.ErrNotFound
+		}
+		return entity.ConnectedAccount{}, fmt.Errorf("get connected account by user: %w", err)
 	}
 	return account, nil
 }
@@ -140,6 +229,52 @@ func (r *connectedAccountRepository) UpdateCredentials(
 	return account, nil
 }
 
+func (r *connectedAccountRepository) MarkCalendarSyncRunning(ctx context.Context, id uuid.UUID, status string, updatedAt time.Time) (entity.ConnectedAccount, error) {
+	account, err := scanConnectedAccount(r.q.QueryRow(ctx, sqlMarkCalendarSyncRunning, id, status, updatedAt))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.ConnectedAccount{}, apperr.ErrNotFound
+		}
+		return entity.ConnectedAccount{}, fmt.Errorf("mark calendar sync running: %w", err)
+	}
+	return account, nil
+}
+
+func (r *connectedAccountRepository) RecordCalendarSync(ctx context.Context, id uuid.UUID, record CalendarSyncRecord) (entity.ConnectedAccount, error) {
+	account, err := scanConnectedAccount(r.q.QueryRow(ctx, sqlRecordCalendarSyncResult,
+		id,
+		record.Status,
+		record.SuccessfulAt,
+		record.FailedAt,
+		record.DurationMs,
+		record.CreatedCount,
+		record.UpdatedCount,
+		record.DeletedCount,
+		record.ListSyncToken,
+		record.UpdatedAt,
+		record.UpdateCounts,
+		record.ClearListSyncToken,
+	))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.ConnectedAccount{}, apperr.ErrNotFound
+		}
+		return entity.ConnectedAccount{}, fmt.Errorf("record calendar sync: %w", err)
+	}
+	return account, nil
+}
+
+func (r *connectedAccountRepository) ClearCalendarListSyncToken(ctx context.Context, id uuid.UUID, updatedAt time.Time) (entity.ConnectedAccount, error) {
+	account, err := scanConnectedAccount(r.q.QueryRow(ctx, sqlClearCalendarListSyncToken, id, updatedAt))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.ConnectedAccount{}, apperr.ErrNotFound
+		}
+		return entity.ConnectedAccount{}, fmt.Errorf("clear calendar list sync token: %w", err)
+	}
+	return account, nil
+}
+
 func scanConnectedAccount(row scannable) (entity.ConnectedAccount, error) {
 	var a entity.ConnectedAccount
 	err := row.Scan(
@@ -154,6 +289,13 @@ func scanConnectedAccount(row scannable) (entity.ConnectedAccount, error) {
 		&a.CredentialsRef,
 		&a.TokenExpiresAt,
 		&a.LastSyncedAt,
+		&a.CalendarListSyncToken,
+		&a.CalendarSyncStatus,
+		&a.LastFailedSyncAt,
+		&a.LastSyncDurationMs,
+		&a.LastSyncCreatedCount,
+		&a.LastSyncUpdatedCount,
+		&a.LastSyncDeletedCount,
 		&a.ProviderMetadata,
 		&a.CreatedAt,
 		&a.UpdatedAt,

@@ -46,6 +46,10 @@ func (m mockGoogle) FetchProfile(context.Context, string) (googleoauth.Profile, 
 	return m.profile, nil
 }
 
+func (m mockGoogle) RefreshAccessToken(context.Context, string) (googleoauth.TokenSet, error) {
+	return m.tokenSet, nil
+}
+
 type mockIdentityRepo struct {
 	identity entity.AuthIdentity
 	err      error
@@ -78,7 +82,21 @@ func (m *mockAccountRepo) Create(_ context.Context, account entity.ConnectedAcco
 	return account, nil
 }
 
+func (m *mockAccountRepo) GetByID(context.Context, uuid.UUID) (entity.ConnectedAccount, error) {
+	if m.err != nil {
+		return entity.ConnectedAccount{}, m.err
+	}
+	return m.account, nil
+}
+
 func (m *mockAccountRepo) GetByProviderAccount(context.Context, string, string) (entity.ConnectedAccount, error) {
+	if m.err != nil {
+		return entity.ConnectedAccount{}, m.err
+	}
+	return m.account, nil
+}
+
+func (m *mockAccountRepo) GetByUserAndProvider(context.Context, uuid.UUID, string) (entity.ConnectedAccount, error) {
 	if m.err != nil {
 		return entity.ConnectedAccount{}, m.err
 	}
@@ -91,6 +109,30 @@ func (m *mockAccountRepo) UpdateCredentials(_ context.Context, id uuid.UUID, cre
 	m.account.TokenExpiresAt = tokenExpiresAt
 	m.account.Scopes = scopes
 	m.account.Status = status
+	m.account.UpdatedAt = updatedAt
+	return m.account, nil
+}
+
+func (m *mockAccountRepo) MarkCalendarSyncRunning(_ context.Context, id uuid.UUID, status string, updatedAt time.Time) (entity.ConnectedAccount, error) {
+	m.account.ID = id
+	m.account.CalendarSyncStatus = status
+	m.account.UpdatedAt = updatedAt
+	return m.account, nil
+}
+
+func (m *mockAccountRepo) RecordCalendarSync(_ context.Context, id uuid.UUID, record repository.CalendarSyncRecord) (entity.ConnectedAccount, error) {
+	m.account.ID = id
+	m.account.CalendarSyncStatus = record.Status
+	m.account.CalendarListSyncToken = record.ListSyncToken
+	m.account.LastSyncedAt = record.SuccessfulAt
+	m.account.LastFailedSyncAt = record.FailedAt
+	m.account.UpdatedAt = record.UpdatedAt
+	return m.account, nil
+}
+
+func (m *mockAccountRepo) ClearCalendarListSyncToken(_ context.Context, id uuid.UUID, updatedAt time.Time) (entity.ConnectedAccount, error) {
+	m.account.ID = id
+	m.account.CalendarListSyncToken = nil
 	m.account.UpdatedAt = updatedAt
 	return m.account, nil
 }

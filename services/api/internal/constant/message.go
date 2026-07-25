@@ -6,4 +6,5 @@ const (
 	MessageServiceNotReady   = "service not ready"
 	MessageInternalError     = "internal server error"
 	MessageUnexpectedPanic   = "unexpected panic"
+	MessageCalendarSynced    = "calendar sources synced"
 )

@@ -7,6 +7,16 @@ const (
 	PublicIDPrefixAuthIdentity     = "aid_"
 	PublicIDPrefixConnectedAccount = "acct_"
 	PublicIDPrefixCredential       = "cred_"
+	PublicIDPrefixCalendarSource   = "cal_"
+)
+
+// Google OAuth / Calendar scopes.
+const (
+	GoogleScopeOpenID        = "openid"
+	GoogleScopeEmail         = "email"
+	GoogleScopeProfile       = "profile"
+	GoogleScopeCalendar      = "https://www.googleapis.com/auth/calendar"
+	GoogleCalendarAPIBaseURL = "https://www.googleapis.com/calendar/v3"
 )
 
 // Connected account statuses.

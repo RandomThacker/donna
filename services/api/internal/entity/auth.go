@@ -22,21 +22,28 @@ type AuthIdentity struct {
 
 // ConnectedAccount is an integration OAuth account (credentials boundary).
 type ConnectedAccount struct {
-	ID                uuid.UUID
-	PublicID          string
-	UserID            uuid.UUID
-	Provider          string
-	ProviderAccountID string
-	DisplayName       *string
-	Status            string
-	Scopes            []string
-	CredentialsRef    string
-	TokenExpiresAt    *time.Time
-	LastSyncedAt      *time.Time
-	ProviderMetadata  []byte
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
-	DeletedAt         *time.Time
+	ID                     uuid.UUID
+	PublicID               string
+	UserID                 uuid.UUID
+	Provider               string
+	ProviderAccountID      string
+	DisplayName            *string
+	Status                 string
+	Scopes                 []string
+	CredentialsRef         string
+	TokenExpiresAt         *time.Time
+	LastSyncedAt           *time.Time // last successful calendar sync
+	CalendarListSyncToken  *string
+	CalendarSyncStatus     string
+	LastFailedSyncAt       *time.Time
+	LastSyncDurationMs     *int
+	LastSyncCreatedCount   int
+	LastSyncUpdatedCount   int
+	LastSyncDeletedCount   int
+	ProviderMetadata       []byte
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	DeletedAt              *time.Time
 }
 
 // CredentialSecret is a sealed provider token blob.
