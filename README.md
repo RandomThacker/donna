@@ -39,6 +39,12 @@ The AI service never writes to the database. Persistence always goes through the
 - [Engineering Standards](docs/CURSOR_RULES.md)
 - [Personality Guide](docs/DONNA_PERSONALITY.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Observability](docs/OBSERVABILITY.md)
+- [Domain Model](docs/DOMAIN_MODEL.md)
+- [Logical Data Model](docs/DATA_MODEL.md)
+- [Schema Decisions & Review](docs/SCHEMA_DECISIONS.md)
+- [Physical Database Design](docs/PHYSICAL_DATABASE_DESIGN.md)
+- [Database Standards](docs/DATABASE.md)
 - [Phase 1 Plan](docs/PHASE1_PLAN.md)
 
 ## Local prerequisites
@@ -46,18 +52,42 @@ The AI service never writes to the database. Persistence always goes through the
 Install before M1+:
 
 - Node.js 22+
-- Go 1.22+
+- Go 1.25+
 - Python 3.12+
 - Docker
 
-## Quick start (M0)
+## Quick start
 
 ```bash
+cp -n .env.example .env
 cd infra/docker
-docker compose up -d
+docker compose up --build
+# or: podman compose up --build
 ```
 
-Postgres listens on `localhost:5432` (see `.env.example`).
+Postgres listens on `localhost:5432`. API listens on `localhost:8080`.
+
+```bash
+curl -s http://localhost:8080/api/v1/health
+curl -s http://localhost:8080/api/v1/ready
+curl -s http://localhost:8080/api/v1/version
+```
+
+See [services/api/README.md](services/api/README.md) for env vars and layering.
+
+## Observability
+
+Donna’s observability source of truth is [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md).
+
+| Topic | Summary |
+| --- | --- |
+| Logging | `slog` only — text in development, JSON in staging/production |
+| Module Logger Factory | `logger.NewFactory(...).Module("calendar")` — never `slog.New` in feature packages |
+| Request IDs | `X-Request-ID` generated/propagated; attached to request context automatically |
+| Log levels | `DEBUG` / `INFO` / `WARN` / `ERROR` via `LOG_LEVEL` / `appconfig.json` |
+| Slow requests | WARN when HTTP duration ≥ 500ms |
+| Helpers | AI usage, auth, calendar, scheduler, database, worker |
+| Roadmap | OpenTelemetry, Prometheus, Grafana, Loki, Sentry — not wired yet |
 
 ### Web (landing)
 
@@ -71,6 +101,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Current milestone
 
-**M0 — Monorepo foundation** (scaffold, docs, Cursor rules, Postgres compose).
+**M1 — Go API foundation** complete (Gin, health/ready/version, migrations infra, Handler → Business → Repository, observability).
 
-Next: **M1 — Go API skeleton** (`/api/v1/health`, migrations, layering).
+**Domain modeling docs** — [DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md), [DATA_MODEL.md](docs/DATA_MODEL.md), [SCHEMA_DECISIONS.md](docs/SCHEMA_DECISIONS.md), [PHYSICAL_DATABASE_DESIGN.md](docs/PHYSICAL_DATABASE_DESIGN.md), [DATABASE.md](docs/DATABASE.md) (SQL migrations not generated yet).
+
+Next implementation track: **Auth** (Google OAuth, sessions) per [PHASE1_PLAN.md](docs/PHASE1_PLAN.md); schema follows [DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md).

@@ -1,30 +1,133 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-display: var(--font-instrument-serif), "Times New Roman", serif;
   --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
 
-  --color-donna-void: #080605;
-  --color-donna-ink: #0f0b08;
-  --color-donna-bronze-950: #17100b;
-  --color-donna-bronze-900: #2a1b12;
-  --color-donna-bronze-800: #3d281c;
-  --color-donna-bronze-700: #5c4030;
-  --color-donna-copper-deep: #a97f4f;
-  --color-donna-copper: #cba97d;
-  --color-donna-copper-bright: #ecd3a8;
-  --color-donna-copper-dim: #8f7350;
-  --color-donna-cream: #f4ede3;
-  --color-donna-muted: #b0a08e;
-  --color-donna-faint: #6f6152;
-  --color-donna-glass: rgb(30 23 18 / 0.5);
-  --color-donna-glass-strong: rgb(38 29 22 / 0.72);
-  --color-donna-glass-border: rgb(203 169 125 / 0.16);
-  --color-donna-hairline: rgb(203 169 125 / 0.1);
+  --color-donna-bg: var(--donna-bg);
+  --color-donna-surface: var(--donna-surface);
+  --color-donna-surface-2: var(--donna-surface-2);
+  --color-donna-elevated: var(--donna-elevated);
+  --color-donna-text: var(--donna-text);
+  --color-donna-muted: var(--donna-muted);
+  --color-donna-faint: var(--donna-faint);
+  --color-donna-border: var(--donna-border);
+  --color-donna-hairline: var(--donna-hairline);
+  --color-donna-accent: var(--donna-accent);
+  --color-donna-accent-bright: var(--donna-accent-bright);
+  --color-donna-accent-deep: var(--donna-accent-deep);
+  --color-donna-accent-soft: var(--donna-accent-soft);
+  --color-donna-ink: var(--donna-ink);
+  --color-donna-on-accent: var(--donna-on-accent);
 
-  --shadow-donna-glow: 0 0 90px rgb(203 169 125 / 0.24);
-  --shadow-donna-card: 0 24px 60px -30px rgb(0 0 0 / 0.85);
-  --shadow-donna-cta: 0 16px 44px -14px rgb(203 169 125 / 0.5);
+  /* Back-compat aliases used across landing + dashboard */
+  --color-donna-void: var(--donna-bg);
+  --color-donna-cream: var(--donna-text);
+  --color-donna-copper: var(--donna-accent);
+  --color-donna-copper-bright: var(--donna-accent-bright);
+  --color-donna-copper-deep: var(--donna-accent-deep);
+  --color-donna-copper-dim: var(--donna-accent-deep);
+  --color-donna-bronze-950: var(--donna-surface);
+  --color-donna-bronze-900: var(--donna-surface-2);
+  --color-donna-bronze-800: var(--donna-elevated);
+  --color-donna-bronze-700: var(--donna-accent-deep);
+  --color-donna-glass: var(--donna-accent-soft);
+  --color-donna-glass-strong: var(--donna-elevated);
+  --color-donna-glass-border: var(--donna-border);
+
+  --shadow-donna-card: var(--donna-shadow-card);
+  --shadow-donna-cta: var(--donna-shadow-cta);
+  --shadow-donna-glow: 0 0 0 transparent;
+}
+
+/* Dark — charcoal base, copper accents (not muddy brown) */
+:root,
+.dark {
+  color-scheme: dark;
+  --donna-bg: #0b0b0c;
+  --donna-surface: #141416;
+  --donna-surface-2: #1a1a1d;
+  --donna-elevated: #222226;
+  --donna-text: #f3f1ec;
+  --donna-muted: #a8a29a;
+  --donna-faint: #6e6a64;
+  --donna-border: rgb(203 169 125 / 0.16);
+  --donna-hairline: rgb(255 255 255 / 0.06);
+  --donna-accent: #c9a87c;
+  --donna-accent-bright: #e2c79a;
+  --donna-accent-deep: #9a7a4f;
+  --donna-accent-soft: rgb(201 168 124 / 0.1);
+  --donna-ink: #0b0b0c;
+  --donna-on-accent: #14110e;
+  --donna-shadow-card: 0 10px 30px -18px rgb(0 0 0 / 0.7);
+  --donna-shadow-cta: 0 12px 28px -12px rgb(201 168 124 / 0.4);
+
+  --im-bg: #000000;
+  --im-surface: #000000;
+  --im-surface-2: #1c1c1e;
+  --im-text: #ffffff;
+  --im-muted: #8e8e93;
+  --im-separator: #3a3a3c;
+  --im-bubble-in: #262628;
+  --im-bubble-in-text: #ffffff;
+  --im-bubble-in-border: transparent;
+  --im-bubble-out: #0a84ff;
+  --im-blue: #0a84ff;
+  --im-search: #1c1c1e;
+  --im-input-bg: #1c1c1e;
+  --im-input-border: #3a3a3c;
+  --im-nav: rgb(28 28 30 / 0.92);
+  --phone-frame: #111113;
+  --phone-frame-edge: rgb(255 255 255 / 0.28);
+  --phone-frame-shine: rgb(255 255 255 / 0.1);
+  --phone-island: #000000;
+  --phone-home: rgb(255 255 255 / 0.5);
+  --phone-status: #ffffff;
+}
+
+.light {
+  color-scheme: light;
+  --donna-bg: #f4f1ec;
+  --donna-surface: #ffffff;
+  --donna-surface-2: #f7f4ef;
+  --donna-elevated: #efeae3;
+  --donna-text: #1a1714;
+  --donna-muted: #6b645c;
+  --donna-faint: #9a9288;
+  --donna-border: rgb(139 115 80 / 0.18);
+  --donna-hairline: rgb(26 23 20 / 0.08);
+  --donna-accent: #a67c45;
+  --donna-accent-bright: #c49a5f;
+  --donna-accent-deep: #8a6638;
+  --donna-accent-soft: rgb(166 124 69 / 0.1);
+  --donna-ink: #1a1714;
+  --donna-on-accent: #ffffff;
+  --donna-shadow-card: 0 10px 30px -18px rgb(40 30 20 / 0.18);
+  --donna-shadow-cta: 0 12px 28px -12px rgb(166 124 69 / 0.35);
+
+  --im-bg: #ffffff;
+  --im-surface: #f2f2f7;
+  --im-surface-2: #e5e5ea;
+  --im-text: #000000;
+  --im-muted: #8e8e93;
+  --im-separator: #c6c6c8;
+  --im-bubble-in: #e9e9eb;
+  --im-bubble-in-text: #000000;
+  --im-bubble-in-border: transparent;
+  --im-bubble-out: #007aff;
+  --im-blue: #007aff;
+  --im-search: #e5e5ea;
+  --im-input-bg: #ffffff;
+  --im-input-border: #c6c6c8;
+  --im-nav: rgb(249 249 249 / 0.94);
+  --phone-frame: #1c1c1e;
+  --phone-frame-edge: rgb(0 0 0 / 0.45);
+  --phone-frame-shine: rgb(255 255 255 / 0.18);
+  --phone-island: #000000;
+  --phone-home: rgb(0 0 0 / 0.7);
+  --phone-status: #000000;
 }
 
 @layer base {
@@ -33,26 +136,22 @@
   }
 
   body {
-    @apply bg-donna-void text-donna-cream font-sans antialiased;
+    @apply bg-donna-bg text-donna-text font-sans antialiased;
     min-height: 100dvh;
-    background-image:
-      radial-gradient(120% 90% at 50% -10%, rgb(203 169 125 / 0.1) 0%, transparent 55%),
-      radial-gradient(80% 60% at 100% 100%, rgb(61 40 28 / 0.35) 0%, transparent 60%);
-    background-attachment: fixed;
   }
 
   ::selection {
-    background: color-mix(in srgb, var(--color-donna-copper) 42%, transparent);
-    color: var(--color-donna-cream);
+    background: color-mix(in srgb, var(--donna-accent) 40%, transparent);
+    color: var(--donna-text);
   }
 }
 
 @utility text-donna-gradient {
   background-image: linear-gradient(
     100deg,
-    var(--color-donna-copper-bright) 0%,
-    var(--color-donna-copper) 42%,
-    var(--color-donna-copper-deep) 100%
+    var(--donna-accent-bright) 0%,
+    var(--donna-accent) 45%,
+    var(--donna-accent-deep) 100%
   );
   background-size: 200% 100%;
   background-clip: text;
@@ -62,13 +161,13 @@
 }
 
 @utility border-donna-hairline {
-  border-color: var(--color-donna-hairline);
+  border-color: var(--donna-hairline);
 }
 
 @keyframes donna-fade-up {
   from {
     opacity: 0;
-    transform: translateY(22px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -117,26 +216,45 @@
   }
 }
 
-@keyframes donna-ring {
-  0% {
-    transform: scale(0.9) rotate(0deg);
-    opacity: 0.5;
+@keyframes donna-modal-fade {
+  from {
+    opacity: 0;
   }
-  50% {
-    opacity: 0.9;
+  to {
+    opacity: 1;
   }
+}
+
+@keyframes donna-modal-rise {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes donna-typing {
+  0%,
+  60%,
   100% {
-    transform: scale(1) rotate(360deg);
-    opacity: 0.5;
+    opacity: 0.28;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-2px);
   }
 }
 
 @utility animate-donna-fade-up {
-  animation: donna-fade-up 1s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: donna-fade-up 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @utility animate-donna-fade {
-  animation: donna-fade 1.2s ease-out both;
+  animation: donna-fade 0.8s ease-out both;
 }
 
 @utility animate-donna-float {
@@ -151,8 +269,8 @@
   animation: donna-shimmer 8s ease-in-out infinite;
 }
 
-@utility animate-donna-ring {
-  animation: donna-ring 40s linear infinite;
+@utility animate-donna-typing {
+  animation: donna-typing 1.2s ease-in-out infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -1,13 +1,28 @@
 export type ButtonVariant = "primary" | "ghost" | "outline";
 export type ButtonSize = "md" | "lg";
 
-export type ButtonProps = {
+type ButtonSharedProps = {
   children: React.ReactNode;
-  href: string;
   variant?: ButtonVariant;
   size?: ButtonSize;
   className?: string;
-  external?: boolean;
   iconLeft?: React.ReactNode;
   iconRight?: React.ReactNode;
 };
+
+export type ButtonAsLinkProps = ButtonSharedProps & {
+  href: string;
+  onClick?: never;
+  external?: boolean;
+  type?: never;
+};
+
+export type ButtonAsButtonProps = ButtonSharedProps & {
+  href?: never;
+  onClick?: () => void;
+  external?: never;
+  type?: "button" | "submit";
+  disabled?: boolean;
+};
+
+export type ButtonProps = ButtonAsLinkProps | ButtonAsButtonProps;

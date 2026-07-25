@@ -6,7 +6,22 @@ export type IconName =
   | "arrow"
   | "google"
   | "clock"
-  | "moon";
+  | "moon"
+  | "home"
+  | "tasks"
+  | "notes"
+  | "memory"
+  | "settings"
+  | "user"
+  | "mic"
+  | "send"
+  | "circle"
+  | "chevronLeft"
+  | "chevronRight"
+  | "search"
+  | "compose"
+  | "plus"
+  | "info";
 
 export type IconProps = {
   name: IconName;

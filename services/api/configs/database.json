@@ -1,0 +1,9 @@
+{
+  "url": "${DATABASE_URL}",
+  "max_conns": "${DB_MAX_CONNS:10}",
+  "min_conns": "${DB_MIN_CONNS:0}",
+  "max_conn_lifetime": "${DB_MAX_CONN_LIFETIME:1h}",
+  "max_conn_idle_time": "${DB_MAX_CONN_IDLE_TIME:30m}",
+  "connect_ping_timeout": "${DB_CONNECT_PING_TIMEOUT:5s}",
+  "migrations_path": "${MIGRATIONS_PATH:migrations}"
+}

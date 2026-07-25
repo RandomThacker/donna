@@ -1,0 +1,145 @@
+export const phoneStyles = {
+  wrap: "flex h-full w-full items-center justify-center p-5",
+  frame: [
+    "relative mx-auto h-[42rem] w-[20.25rem]",
+    "rounded-[2.85rem] p-[0.58rem]",
+    "bg-[var(--phone-frame)]",
+    "shadow-[0_28px_70px_-24px_rgb(0_0_0_/_0.65),inset_0_1px_0_var(--phone-frame-shine)]",
+    "ring-1 ring-[var(--phone-frame-edge)]",
+  ].join(" "),
+  sideBtnLeft: [
+    "pointer-events-none absolute -left-[0.15rem] top-[7.2rem] h-7 w-[0.15rem]",
+    "rounded-l-sm bg-[var(--phone-frame)] ring-1 ring-[var(--phone-frame-edge)]",
+  ].join(" "),
+  sideBtnVol: [
+    "pointer-events-none absolute -left-[0.15rem] top-[9.4rem] h-12 w-[0.15rem]",
+    "rounded-l-sm bg-[var(--phone-frame)] ring-1 ring-[var(--phone-frame-edge)]",
+  ].join(" "),
+  sideBtnRight: [
+    "pointer-events-none absolute -right-[0.15rem] top-[9.6rem] h-16 w-[0.15rem]",
+    "rounded-r-sm bg-[var(--phone-frame)] ring-1 ring-[var(--phone-frame-edge)]",
+  ].join(" "),
+  screen: [
+    "relative flex h-full w-full flex-col overflow-hidden rounded-[2.35rem]",
+    "bg-[var(--im-bg)]",
+  ].join(" "),
+  statusBar: [
+    "absolute inset-x-0 top-0 z-30 flex h-11 items-end justify-between px-7 pb-1.5",
+    "text-[0.72rem] font-semibold tracking-tight text-[var(--phone-status)]",
+  ].join(" "),
+  island: [
+    "absolute left-1/2 top-[0.55rem] z-40 h-[1.65rem] w-[5.9rem] -translate-x-1/2",
+    "rounded-full bg-[var(--phone-island)]",
+  ].join(" "),
+  homeIndicator: [
+    "absolute bottom-[0.35rem] left-1/2 z-40 h-[0.28rem] w-[7.75rem] -translate-x-1/2",
+    "rounded-full bg-[var(--phone-home)]",
+  ].join(" "),
+  content: "relative z-10 flex min-h-0 flex-1 flex-col pt-12",
+} as const;
+
+export const iMessageStyles = {
+  listRoot: "flex min-h-0 flex-1 flex-col bg-[var(--im-bg)]",
+  listHeader: "bg-[var(--im-bg)] px-4 pb-3 pt-1",
+  listTopRow: "mb-2 flex items-center justify-between",
+  edit: "text-[14px] text-[var(--im-blue)]",
+  listTitle: "text-[26px] font-bold leading-none tracking-tight text-[var(--im-text)]",
+  compose: "grid h-7 w-7 place-items-center text-[var(--im-blue)]",
+  search: [
+    "mt-3.5 flex items-center gap-2 rounded-[10px] px-2.5 py-2",
+    "bg-[var(--im-search)] text-[13px] text-[var(--im-muted)]",
+  ].join(" "),
+  listBody: "min-h-0 flex-1 overflow-y-auto bg-[var(--im-bg)] pt-1",
+  row: [
+    "flex w-full items-start gap-3 px-4 py-3 text-left",
+    "active:bg-[var(--im-surface-2)]",
+  ].join(" "),
+  avatar: [
+    "mt-0.5 grid h-[44px] w-[44px] shrink-0 place-items-center rounded-full",
+    "bg-[#c7a57a] text-[15px] font-semibold text-white",
+  ].join(" "),
+  rowMain: [
+    "min-w-0 flex-1 border-b border-[var(--im-separator)] pb-3",
+  ].join(" "),
+  rowTop: "flex items-center gap-2",
+  rowName: "min-w-0 flex-1 truncate text-[14px] font-semibold text-[var(--im-text)]",
+  rowMeta: "flex shrink-0 items-center gap-0.5",
+  rowTime: "text-[12px] text-[var(--im-muted)]",
+  chevron: "h-[12px] w-[12px] text-[var(--im-muted)] opacity-60",
+  rowBottom: "mt-1 flex items-start gap-2",
+  rowPreview: [
+    "min-w-0 flex-1 text-[12px] leading-[1.35] text-[var(--im-muted)]",
+    "line-clamp-2",
+  ].join(" "),
+  unread: [
+    "mt-0.5 grid h-[16px] min-w-[16px] shrink-0 place-items-center rounded-full",
+    "bg-[var(--im-blue)] px-[5px] text-[10px] font-semibold leading-none text-white",
+  ].join(" "),
+
+  chatRoot: "relative flex min-h-0 flex-1 flex-col bg-[var(--im-bg)]",
+  chatNav: [
+    "relative z-20 flex shrink-0 items-center justify-center",
+    "min-h-[3.25rem] border-b border-[var(--im-separator)]/50 bg-[var(--im-nav)]",
+    "px-2.5 pb-2.5 pt-1.5 backdrop-blur-xl",
+  ].join(" "),
+  back: [
+    "absolute left-2 top-1/2 flex -translate-y-1/2 items-center gap-0.5",
+    "text-[13px] leading-none text-[var(--im-blue)]",
+  ].join(" "),
+  chatTitleWrap: "flex flex-col items-center justify-center gap-0.5 text-center",
+  chatAvatar: [
+    "grid h-8 w-8 place-items-center rounded-full",
+    "bg-[#c7a57a] text-[11px] font-semibold leading-none text-white",
+  ].join(" "),
+  chatName: "w-full text-center text-[11px] font-medium leading-none text-[var(--im-text)]",
+  chatInfo: [
+    "absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center",
+    "text-[var(--im-blue)]",
+  ].join(" "),
+  chatBody: [
+    "flex min-h-0 flex-1 flex-col overflow-y-auto px-3.5 pb-3 pt-3",
+  ].join(" "),
+  stamp: "mb-3 text-center text-[10px] font-medium text-[var(--im-muted)]",
+  cluster: "flex flex-col",
+  bubbleWrap: "relative max-w-[78%] px-0",
+  bubbleWrapIn: "self-start",
+  bubbleWrapOut: "self-end",
+  bubble: "relative px-[11px] py-[7px] text-[13px] leading-[1.3]",
+  bubbleIn: [
+    "rounded-[16px] bg-[var(--im-bubble-in)] text-[var(--im-bubble-in-text)]",
+  ].join(" "),
+  bubbleOut: "rounded-[16px] bg-[var(--im-bubble-out)] text-white",
+  bubbleGrouped: "mt-[3px]",
+  bubbleSpaced: "mt-3",
+  bubbleInLast: "rounded-bl-[4px]",
+  bubbleOutLast: "rounded-br-[4px]",
+  bubbleInMiddle: "rounded-bl-[16px]",
+  bubbleOutMiddle: "rounded-br-[16px]",
+  tailIn: [
+    "pointer-events-none absolute bottom-0 -left-[4px] h-[14px] w-[10px]",
+    "text-[var(--im-bubble-in)]",
+  ].join(" "),
+  tailOut: [
+    "pointer-events-none absolute bottom-0 -right-[4px] h-[14px] w-[10px]",
+    "text-[var(--im-bubble-out)]",
+  ].join(" "),
+  composer: [
+    "relative z-20 flex shrink-0 items-end gap-2",
+    "border-t border-[var(--im-separator)]/40 bg-[var(--im-nav)]",
+    "px-2.5 pb-6 pt-2.5 backdrop-blur-xl",
+  ].join(" "),
+  plus: [
+    "mb-0.5 grid h-[28px] w-[28px] shrink-0 place-items-center rounded-full",
+    "bg-[var(--im-surface-2)] text-[var(--im-muted)]",
+  ].join(" "),
+  inputShell: [
+    "flex min-w-0 flex-1 items-center rounded-full",
+    "border border-[var(--im-input-border)] bg-[var(--im-input-bg)]",
+    "pl-3.5 pr-1",
+  ].join(" "),
+  input: [
+    "min-w-0 flex-1 bg-transparent py-1.5 text-[13px] text-[var(--im-text)]",
+    "placeholder:text-[var(--im-muted)] focus:outline-none",
+  ].join(" "),
+  mic: "grid h-7 w-7 shrink-0 place-items-center text-[var(--im-blue)]",
+} as const;

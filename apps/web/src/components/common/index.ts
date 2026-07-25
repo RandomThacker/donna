@@ -13,6 +13,9 @@ export type { IconName, IconProps } from "./Icon";
 export { Logo } from "./Logo";
 export type { LogoProps } from "./Logo";
 
+export { Modal } from "./Modal";
+export type { ModalProps } from "./Modal";
+
 export { Pill } from "./Pill";
 export type { PillProps } from "./Pill";
 

@@ -14,14 +14,14 @@ export const landingCopy: LandingCopy = {
     { label: "How she works", href: "#rhythm" },
     { label: "Capabilities", href: "#capabilities" },
   ],
-  getStarted: { label: "Get started", href: "/sign-in" },
+  getStarted: { label: "Get started", href: "#sign-in" },
   hero: {
     eyebrow: "Personal AI Operating System",
     headlineLead: "Your day, handled",
     headlineEmphasis: "before you even ask.",
     support:
       "Donna plans your mornings, guards your calendar, and remembers every commitment — a calm, proactive assistant working quietly in the background.",
-    primaryCta: { label: "Start with Google", href: "/sign-in" },
+    primaryCta: { label: "Start with Google", href: "#sign-in" },
     secondaryCta: { label: "See how she works", href: "#rhythm" },
     ctaNote: "Set up in under five minutes",
     chips: [
@@ -116,7 +116,7 @@ export const landingCopy: LandingCopy = {
   closeTitle: "Open Donna tomorrow morning.",
   closeBody:
     "Start the day with one place that already knows what matters — and quietly takes care of the rest.",
-  closeCta: { label: "Get started", href: "/sign-in" },
+  closeCta: { label: "Start with Google", href: "#sign-in" },
 };
 
 export function getLandingContent() {

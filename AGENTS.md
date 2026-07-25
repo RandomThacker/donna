@@ -7,14 +7,21 @@ Read before implementing:
 3. [docs/CURSOR_RULES.md](docs/CURSOR_RULES.md) — engineering standards
 4. [docs/DONNA_PERSONALITY.md](docs/DONNA_PERSONALITY.md) — voice and assistant behavior
 5. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system boundaries
-6. [docs/PHASE1_PLAN.md](docs/PHASE1_PLAN.md) — milestone order
+6. [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) — logging, metrics, tracing, audit, AI usage
+7. [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md) — business entities, aggregates, ownership (no SQL)
+8. [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — logical data model: fields, constraints, indexes (no SQL)
+9. [docs/SCHEMA_DECISIONS.md](docs/SCHEMA_DECISIONS.md) — schema ADRs + formal review (no SQL)
+10. [docs/PHYSICAL_DATABASE_DESIGN.md](docs/PHYSICAL_DATABASE_DESIGN.md) — PostgreSQL physical design (no CREATE TABLE yet)
+11. [docs/DATABASE.md](docs/DATABASE.md) — persistence standards (no tables yet)
+12. [docs/PHASE1_PLAN.md](docs/PHASE1_PLAN.md) — milestone order
 
 Project rules also live in `.cursor/rules/`.
 
 ## Non-negotiables
 
 - AI never writes to the database; API executes all mutations.
-- Handler → Service → Repository in Go.
+- Handler → Business → Repository in Go (models at the edge; entities in the domain).
+- Observability: module loggers from the Logger Factory only; follow [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md).
 - Feature folders in web: UI / logic / styles / types separation.
 - Pass the Donna Test: would a great human personal assistant behave this way?
 - Phase 1: no Gmail, Drive, GitHub, Voice, Telegram, WhatsApp.

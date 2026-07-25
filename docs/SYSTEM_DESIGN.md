@@ -283,16 +283,21 @@ Supabase PostgreSQL with **pgvector** for future semantic search.
 
 ### Core entities
 
-| Domain | Tables / concepts |
+Canonical vocabulary and ownership: **[DOMAIN_MODEL.md](./DOMAIN_MODEL.md)**.  
+Logical fields, constraints, indexes (no SQL): **[DATA_MODEL.md](./DATA_MODEL.md)**.  
+Persistence conventions: **[DATABASE.md](./DATABASE.md)**.
+
+| Domain | Concepts (not final table DDL) |
 | --- | --- |
-| Identity | `users`, `profiles`, `settings`, preferences |
-| Integrations | `connections`, `calendar_sources` |
-| Calendar | `calendar_events` (unified view) |
-| Work | `tasks`, `goals`, `notes` |
-| Rhythm | `daily_plans`, `daily_reviews`, `check_ins` |
-| Chat | `conversations`, `messages` |
-| Memory | `memories` (+ embeddings) |
-| Alerts | `notifications` |
+| Identity | User, profile, settings, preferences |
+| Integrations | Connected accounts, calendar sources |
+| Calendar | Unified calendar events (Donna-owned) |
+| Work | Tasks, goals, notes, reminders |
+| Rhythm | Daily plans, daily reviews, check-ins |
+| Chat | Conversations, messages |
+| Memory | Memories (+ embeddings later) |
+| Alerts | Notifications |
+| Platform | Scheduler jobs, audit logs, AI usage |
 
 PostgreSQL is the **source of truth**. The AI service does not hold authoritative state.
 
@@ -564,6 +569,8 @@ Every request should carry:
 | Errors | Failure detail for ops |
 
 Use structured logging only. No `console.log` / `fmt.Println` in production paths.
+
+**Source of truth:** [OBSERVABILITY.md](./OBSERVABILITY.md) — Logger Factory, request IDs, levels, AI usage, audit, and the metrics/tracing roadmap.
 
 ---
 

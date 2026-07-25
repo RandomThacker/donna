@@ -9,14 +9,17 @@ alwaysApply: false
 Layering:
 
 ```text
-Handler → Service → Repository → Database
+Handler → Business → Repository → Database
+     ↓         ↓
+   model    entity
 ```
 
-- Handlers: validate HTTP, map status codes, no business logic.
-- Services: all business logic; keep testable with DI.
+- Handlers: validate HTTP, map status codes, no business logic. Use `model` DTOs at the edge.
+- Business: all domain logic; keep testable with DI. Speak in `entity` types.
 - Repositories: database only; no business rules.
+- Config: JSON under `configs/` with `${ENV}` interpolation (`appconfig.json`, `database.json`, `api.json`).
 - Never hardcode SQL in handlers. Use migrations for schema.
 - REST under `/api/v1/...`. Validate every request. Typed responses. Proper status codes.
 - Structured logging only — never `fmt.Println` debugging.
 - Never swallow errors. Log with context. Return user-friendly messages.
-- Secrets via environment variables only. Never expose tokens to the client.
+- Secrets via environment variables (injected into JSON config). Never expose tokens to the client.
