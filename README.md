@@ -46,18 +46,28 @@ The AI service never writes to the database. Persistence always goes through the
 Install before M1+:
 
 - Node.js 22+
-- Go 1.22+
+- Go 1.25+
 - Python 3.12+
 - Docker
 
-## Quick start (M0)
+## Quick start
 
 ```bash
+cp -n .env.example .env
 cd infra/docker
-docker compose up -d
+docker compose up --build
+# or: podman compose up --build
 ```
 
-Postgres listens on `localhost:5432` (see `.env.example`).
+Postgres listens on `localhost:5432`. API listens on `localhost:8080`.
+
+```bash
+curl -s http://localhost:8080/api/v1/health
+curl -s http://localhost:8080/api/v1/ready
+curl -s http://localhost:8080/api/v1/version
+```
+
+See [services/api/README.md](services/api/README.md) for env vars and layering.
 
 ### Web (landing)
 
@@ -71,6 +81,6 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Current milestone
 
-**M0 — Monorepo foundation** (scaffold, docs, Cursor rules, Postgres compose).
+**M1 — Go API foundation** (Gin, health/ready/version, migrations, Handler → Service → Repository).
 
-Next: **M1 — Go API skeleton** (`/api/v1/health`, migrations, layering).
+Next: **M2 — Auth** (Google OAuth, sessions).

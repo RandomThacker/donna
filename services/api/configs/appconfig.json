@@ -1,0 +1,9 @@
+{
+  "environment": "${API_ENV:development}",
+  "addr": "${API_ADDR::8080}",
+  "log_level": "${LOG_LEVEL:info}",
+  "cors_origins": "${CORS_ORIGINS:http://localhost:3000}",
+  "shutdown_timeout": "${SHUTDOWN_TIMEOUT:15s}",
+  "jwt_secret": "${JWT_SECRET}",
+  "session_secret": "${SESSION_SECRET}"
+}

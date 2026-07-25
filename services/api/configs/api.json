@@ -1,0 +1,37 @@
+{
+  "openai": {
+    "name": "openai",
+    "base_url": "${OPENAI_BASE_URL:https://api.openai.com/v1}",
+    "path": "/chat/completions",
+    "method": "POST",
+    "timeout": "${OPENAI_TIMEOUT:30s}",
+    "api_key": "${OPENAI_API_KEY}",
+    "headers": {
+      "Content-Type": "application/json",
+      "Accept": "application/json"
+    }
+  },
+  "google_oauth": {
+    "name": "google_oauth",
+    "base_url": "${GOOGLE_OAUTH_BASE_URL:https://oauth2.googleapis.com}",
+    "path": "/token",
+    "method": "POST",
+    "timeout": "${GOOGLE_OAUTH_TIMEOUT:15s}",
+    "client_id": "${GOOGLE_CLIENT_ID}",
+    "client_secret": "${GOOGLE_CLIENT_SECRET}",
+    "headers": {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "Accept": "application/json"
+    }
+  },
+  "ai_service": {
+    "name": "ai_service",
+    "base_url": "${AI_SERVICE_URL:http://localhost:8090}",
+    "path": "/health",
+    "method": "GET",
+    "timeout": "${AI_SERVICE_TIMEOUT:10s}",
+    "headers": {
+      "Accept": "application/json"
+    }
+  }
+}
