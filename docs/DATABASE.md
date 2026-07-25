@@ -3,7 +3,8 @@
 **Status:** Source of truth for persistence conventions  
 **Companion:** [DOMAIN_MODEL.md](./DOMAIN_MODEL.md) (entities & relationships — no SQL)  
 
-This document defines **how** Donna will persist data when schema milestones begin. It does **not** define tables, columns, or migrations. Field-level logical design: [DATA_MODEL.md](./DATA_MODEL.md).
+This document defines **how** Donna will persist data when schema milestones begin. It does **not** define tables, columns, or migrations. Field-level logical design: [DATA_MODEL.md](./DATA_MODEL.md).  
+PostgreSQL physical design (types, FKs, indexes — no SQL DDL yet): [PHYSICAL_DATABASE_DESIGN.md](./PHYSICAL_DATABASE_DESIGN.md).
 
 Related: [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md), [OBSERVABILITY.md](./OBSERVABILITY.md), [ARCHITECTURE.md](./ARCHITECTURE.md), [CURSOR_RULES.md](./CURSOR_RULES.md).
 

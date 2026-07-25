@@ -10,8 +10,10 @@ Read before implementing:
 6. [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) — logging, metrics, tracing, audit, AI usage
 7. [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md) — business entities, aggregates, ownership (no SQL)
 8. [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — logical data model: fields, constraints, indexes (no SQL)
-9. [docs/DATABASE.md](docs/DATABASE.md) — persistence standards (no tables yet)
-10. [docs/PHASE1_PLAN.md](docs/PHASE1_PLAN.md) — milestone order
+9. [docs/SCHEMA_DECISIONS.md](docs/SCHEMA_DECISIONS.md) — schema ADRs + formal review (no SQL)
+10. [docs/PHYSICAL_DATABASE_DESIGN.md](docs/PHYSICAL_DATABASE_DESIGN.md) — PostgreSQL physical design (no CREATE TABLE yet)
+11. [docs/DATABASE.md](docs/DATABASE.md) — persistence standards (no tables yet)
+12. [docs/PHASE1_PLAN.md](docs/PHASE1_PLAN.md) — milestone order
 
 Project rules also live in `.cursor/rules/`.
 

@@ -29,13 +29,13 @@ Milestone order for Donna Phase 1. Each milestone must leave the monorepo builda
 - Separate connected accounts for integrations (see [DOMAIN_MODEL.md](./DOMAIN_MODEL.md))
 - Web login/callback pages
 
-**Prerequisite docs:** [DOMAIN_MODEL.md](./DOMAIN_MODEL.md), [DATA_MODEL.md](./DATA_MODEL.md), [DATABASE.md](./DATABASE.md).
+**Prerequisite docs:** [DOMAIN_MODEL.md](./DOMAIN_MODEL.md), [DATA_MODEL.md](./DATA_MODEL.md), [SCHEMA_DECISIONS.md](./SCHEMA_DECISIONS.md), [PHYSICAL_DATABASE_DESIGN.md](./PHYSICAL_DATABASE_DESIGN.md), [DATABASE.md](./DATABASE.md).
 
 **Exit:** User can sign in with Google and hit an authenticated `/api/v1/me`.
 
 ## M3 — Core domain schema
 
-Migrations implementing [DOMAIN_MODEL.md](./DOMAIN_MODEL.md) / [DATA_MODEL.md](./DATA_MODEL.md) under [DATABASE.md](./DATABASE.md) standards, including concepts such as:
+Migrations implementing [PHYSICAL_DATABASE_DESIGN.md](./PHYSICAL_DATABASE_DESIGN.md) (from [DOMAIN_MODEL.md](./DOMAIN_MODEL.md) / [DATA_MODEL.md](./DATA_MODEL.md)) under [DATABASE.md](./DATABASE.md) standards, including concepts such as:
 
 - users, profiles, settings, preferences
 - connected accounts, calendar sources, calendar events

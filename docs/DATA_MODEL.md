@@ -6,7 +6,7 @@
 
 This document translates [DOMAIN_MODEL.md](./DOMAIN_MODEL.md) into a field-level logical design. Persistence conventions remain in [DATABASE.md](./DATABASE.md). Observability correlation fields follow [OBSERVABILITY.md](./OBSERVABILITY.md).
 
-When schema implementation begins, every migration MUST map to entities here. If reality diverges, update this document deliberately.
+When schema implementation begins, every migration MUST map to entities here. Formal review and ADRs: [SCHEMA_DECISIONS.md](./SCHEMA_DECISIONS.md). If reality diverges, update this document deliberately.
 
 ---
 
