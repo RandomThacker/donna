@@ -5,6 +5,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/handler"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/middleware"
+	"github.com/RandomThacker/donna/services/api/internal/session"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,11 +16,12 @@ type Options struct {
 	HTTPLogger    *logger.Logger
 	HealthHandler *handler.HealthHandler
 	UserHandler   *handler.UserHandler
+	AuthHandler   *handler.AuthHandler
+	MeHandler     *handler.MeHandler
+	TokenIssuer   *session.Issuer
 }
 
 // New builds a Gin engine with middleware and /api/v1 routes.
-// Auth and rate-limit middleware are intentionally omitted in M1;
-// insert them here when M2/M10 land.
 func New(opts Options) *gin.Engine {
 	if opts.Environment == constant.EnvProduction || opts.Environment == constant.EnvStaging {
 		gin.SetMode(gin.ReleaseMode)
@@ -47,6 +49,16 @@ func New(opts Options) *gin.Engine {
 			v1.GET(constant.PathUserByID, opts.UserHandler.GetByID)
 			v1.PATCH(constant.PathUserByID, opts.UserHandler.Update)
 			v1.DELETE(constant.PathUserByID, opts.UserHandler.SoftDelete)
+		}
+
+		if opts.AuthHandler != nil {
+			v1.GET(constant.PathAuthGoogle, opts.AuthHandler.BeginGoogle)
+			v1.GET(constant.PathAuthGoogleCallback, opts.AuthHandler.GoogleCallback)
+			v1.POST(constant.PathAuthLogout, opts.AuthHandler.Logout)
+		}
+
+		if opts.MeHandler != nil && opts.TokenIssuer != nil {
+			v1.GET(constant.PathMe, middleware.RequireAuth(opts.TokenIssuer), opts.MeHandler.Me)
 		}
 	}
 

@@ -103,7 +103,7 @@ func assemble(appFile appconfigFile, dbFile databaseFile, apisFile apiFile) (*Co
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("openai: %v", err))
 	}
-	google, err := mapExternalAPI(apisFile.GoogleOAuth)
+	google, err := mapGoogleOAuth(apisFile.GoogleOAuth)
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("google_oauth: %v", err))
 	}
@@ -112,20 +112,39 @@ func assemble(appFile appconfigFile, dbFile databaseFile, apisFile apiFile) (*Co
 		errs = append(errs, fmt.Sprintf("ai_service: %v", err))
 	}
 
+	jwtExpiry, err := parseDuration(appFile.JWTExpiry, constant.DefaultJWTExpiry)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("jwt_expiry: %v", err))
+	}
+
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("invalid configuration:\n  - %s", strings.Join(errs, "\n  - "))
 	}
 
 	jwtSecret := firstNonEmpty(appFile.JWTSecret, appFile.SessionSecret)
+	credentialsKey := firstNonEmpty(appFile.CredentialsKey, jwtSecret)
+	frontendURL := strings.TrimSpace(appFile.FrontendSuccessURL)
+	if frontendURL == "" {
+		frontendURL = "http://localhost:3000/auth/callback"
+	}
+
+	cookieSecure := appFile.Environment == constant.EnvProduction || appFile.Environment == constant.EnvStaging
+	if v := strings.TrimSpace(strings.ToLower(appFile.CookieSecure)); v != "" {
+		cookieSecure = v == "true" || v == "1" || v == "yes"
+	}
 
 	return &Config{
 		App: AppConfig{
-			Addr:            addr,
-			Environment:     strings.ToLower(strings.TrimSpace(appFile.Environment)),
-			LogLevel:        strings.ToLower(strings.TrimSpace(appFile.LogLevel)),
-			CORSOrigins:     splitCSV(appFile.CORSOrigins),
-			JWTSecret:       jwtSecret,
-			ShutdownTimeout: shutdownTimeout,
+			Addr:               addr,
+			Environment:        strings.ToLower(strings.TrimSpace(appFile.Environment)),
+			LogLevel:           strings.ToLower(strings.TrimSpace(appFile.LogLevel)),
+			CORSOrigins:        splitCSV(appFile.CORSOrigins),
+			JWTSecret:          jwtSecret,
+			JWTExpiry:          jwtExpiry,
+			CredentialsKey:     credentialsKey,
+			FrontendSuccessURL: frontendURL,
+			CookieSecure:       cookieSecure,
+			ShutdownTimeout:    shutdownTimeout,
 		},
 		Database: DatabaseConfig{
 			URL:                strings.TrimSpace(dbFile.URL),
@@ -162,6 +181,51 @@ func mapExternalAPI(in externalAPIFile) (ExternalAPI, error) {
 		APIKey:       in.APIKey,
 		ClientID:     in.ClientID,
 		ClientSecret: in.ClientSecret,
+		Headers:      headers,
+	}, nil
+}
+
+func mapGoogleOAuth(in googleOAuthFile) (GoogleOAuthConfig, error) {
+	timeout, err := parseDuration(in.Timeout, 15*time.Second)
+	if err != nil {
+		return GoogleOAuthConfig{}, err
+	}
+	headers := in.Headers
+	if headers == nil {
+		headers = map[string]string{}
+	}
+	tokenURL := strings.TrimSpace(in.BaseURL)
+	if tokenURL != "" && strings.TrimSpace(in.Path) != "" {
+		tokenURL = strings.TrimRight(tokenURL, "/") + in.Path
+	} else if tokenURL == "" {
+		tokenURL = "https://oauth2.googleapis.com/token"
+	}
+	scopes := splitCSV(strings.ReplaceAll(in.Scopes, " ", ","))
+	if len(scopes) == 0 {
+		scopes = []string{"openid", "email", "profile"}
+	}
+	authURL := strings.TrimSpace(in.AuthURL)
+	if authURL == "" {
+		authURL = "https://accounts.google.com/o/oauth2/v2/auth"
+	}
+	userInfoURL := strings.TrimSpace(in.UserInfoURL)
+	if userInfoURL == "" {
+		userInfoURL = "https://openidconnect.googleapis.com/v1/userinfo"
+	}
+	redirect := strings.TrimSpace(in.RedirectURL)
+	if redirect == "" {
+		redirect = "http://localhost:8080/api/v1/auth/google/callback"
+	}
+	return GoogleOAuthConfig{
+		Name:         in.Name,
+		ClientID:     strings.TrimSpace(in.ClientID),
+		ClientSecret: strings.TrimSpace(in.ClientSecret),
+		RedirectURL:  redirect,
+		AuthURL:      authURL,
+		TokenURL:     tokenURL,
+		UserInfoURL:  userInfoURL,
+		Scopes:       scopes,
+		Timeout:      timeout,
 		Headers:      headers,
 	}, nil
 }

@@ -29,10 +29,15 @@ export const sidebarStyles = {
     "bg-donna-surface-2 px-3 py-3",
   ].join(" "),
   avatar: [
-    "grid h-9 w-9 shrink-0 place-items-center rounded-full",
+    "grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full",
     "bg-donna-elevated text-xs font-medium text-donna-accent",
   ].join(" "),
+  avatarImage: "h-full w-full object-cover",
   profileMeta: "min-w-0",
   profileName: "truncate text-sm text-donna-text",
   profileHint: "truncate text-xs text-donna-faint",
+  signOut: [
+    "mt-1 w-full rounded-lg px-3 py-2 text-left text-xs",
+    "text-donna-muted transition-colors hover:bg-donna-accent-soft hover:text-donna-text",
+  ].join(" "),
 } as const;

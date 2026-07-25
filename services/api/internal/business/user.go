@@ -31,8 +31,16 @@ func NewUserService(repo repository.UserRepository, log *logger.Logger) *UserSer
 }
 
 // Create registers a new Donna user.
-// email_verified is always false until an IdP verifies it (OAuth not in this module).
 func (s *UserService) Create(ctx context.Context, in CreateUserInput) (entity.User, error) {
+	return s.createWith(ctx, s.repo, in)
+}
+
+// CreateWithRepo registers a user using the provided repository (for transactions).
+func (s *UserService) CreateWithRepo(ctx context.Context, repo repository.UserRepository, in CreateUserInput) (entity.User, error) {
+	return s.createWith(ctx, repo, in)
+}
+
+func (s *UserService) createWith(ctx context.Context, repo repository.UserRepository, in CreateUserInput) (entity.User, error) {
 	if in.Email == "" {
 		return entity.User{}, fmt.Errorf("%w: email is required", apperr.ErrValidation)
 	}
@@ -50,7 +58,7 @@ func (s *UserService) Create(ctx context.Context, in CreateUserInput) (entity.Us
 		ID:            id,
 		PublicID:      idgen.PublicID(constant.PublicIDPrefixUser, id),
 		Email:         in.Email,
-		EmailVerified: false,
+		EmailVerified: in.EmailVerified,
 		DisplayName:   in.DisplayName,
 		AvatarURL:     in.AvatarURL,
 		Timezone:      in.Timezone,
@@ -60,7 +68,7 @@ func (s *UserService) Create(ctx context.Context, in CreateUserInput) (entity.Us
 		UpdatedAt:     now,
 	}
 
-	created, err := s.repo.Create(ctx, user)
+	created, err := repo.Create(ctx, user)
 	if err != nil {
 		return entity.User{}, err
 	}

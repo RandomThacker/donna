@@ -12,6 +12,11 @@ const (
 
 	PathUsers    = "/users"
 	PathUserByID = "/users/:id"
+
+	PathAuthGoogle         = "/auth/google"
+	PathAuthGoogleCallback = "/auth/google/callback"
+	PathAuthLogout         = "/auth/logout"
+	PathMe                 = "/me"
 )
 
 // Full paths (prefix + relative). Useful for docs, clients, and tests.
@@ -20,4 +25,6 @@ const (
 	EndpointReady   = APIPrefixV1 + PathReady
 	EndpointVersion = APIPrefixV1 + PathVersion
 	EndpointUsers   = APIPrefixV1 + PathUsers
+	EndpointAuthGoogle         = APIPrefixV1 + PathAuthGoogle
+	EndpointAuthGoogleCallback = APIPrefixV1 + PathAuthGoogleCallback
 )

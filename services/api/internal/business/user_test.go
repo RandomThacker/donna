@@ -15,6 +15,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type mockUserRepo struct {
@@ -58,6 +59,22 @@ func (m mockUserRepo) SoftDelete(ctx context.Context, id uuid.UUID, status strin
 		return m.softDeleteFn(ctx, id, status, deletedAt)
 	}
 	return apperr.ErrNotFound
+}
+
+func (m mockUserRepo) TouchLastLogin(ctx context.Context, id uuid.UUID, at time.Time) (entity.User, error) {
+	if m.getByIDFn != nil {
+		u, err := m.getByIDFn(ctx, id)
+		if err != nil {
+			return entity.User{}, err
+		}
+		u.LastLoginAt = &at
+		return u, nil
+	}
+	return entity.User{ID: id, LastLoginAt: &at}, nil
+}
+
+func (m mockUserRepo) WithTx(pgx.Tx) repository.UserRepository {
+	return m
 }
 
 func testIdentityLog(t *testing.T) *logger.Logger {

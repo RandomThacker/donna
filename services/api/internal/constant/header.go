@@ -12,6 +12,7 @@ const (
 	HeaderAccessControlAllowOrigin      = "Access-Control-Allow-Origin"
 	HeaderAccessControlAllowMethods     = "Access-Control-Allow-Methods"
 	HeaderAccessControlAllowHeaders     = "Access-Control-Allow-Headers"
+	HeaderAccessControlAllowCredentials = "Access-Control-Allow-Credentials"
 	HeaderAccessControlExposeHeaders    = "Access-Control-Expose-Headers"
 	HeaderAccessControlMaxAge           = "Access-Control-Max-Age"
 )

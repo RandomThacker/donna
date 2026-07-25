@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Instrument_Serif, Manrope } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme";
+import { AuthProvider } from "@/features/auth";
 import { siteMetadata } from "@/features/landing/Landing.logic";
 
 import "./globals.css";
@@ -52,7 +53,9 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

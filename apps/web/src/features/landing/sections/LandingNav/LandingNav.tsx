@@ -1,4 +1,7 @@
-import { Button, Container, Logo } from "@/components/common";
+"use client";
+
+import { Container, Logo } from "@/components/common";
+import { AuthEntryCta } from "@/features/auth";
 
 import { landingNavStyles as styles } from "./LandingNav.styles";
 import type { LandingNavProps } from "./LandingNav.types";
@@ -17,9 +20,7 @@ export function LandingNav({ navLinks, getStarted }: LandingNavProps) {
             ))}
           </nav>
           <div className={styles.actions}>
-            <Button href={getStarted.href} variant="primary">
-              {getStarted.label}
-            </Button>
+            <AuthEntryCta label={getStarted.label} />
           </div>
         </div>
       </Container>

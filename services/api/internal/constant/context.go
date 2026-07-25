@@ -3,6 +3,7 @@ package constant
 // Gin context keys.
 const (
 	ContextKeyRequestID = "request_id"
+	ContextKeyUserID    = "user_id"
 )
 
 // Structured log attribute keys.

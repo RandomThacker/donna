@@ -1,3 +1,9 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+
+import { useAuth } from "@/features/auth";
+
 import { getDashboardContent } from "./Dashboard.logic";
 import { dashboardStyles as styles } from "./Dashboard.styles";
 import { DashboardFocus } from "./sections/DashboardFocus";
@@ -8,21 +14,48 @@ import { DashboardQuickTasks } from "./sections/DashboardQuickTasks";
 import { DashboardSidebar } from "./sections/DashboardSidebar";
 import { DashboardTimeline } from "./sections/DashboardTimeline";
 
+function initialsFrom(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return "D";
+  }
+  if (parts.length === 1) {
+    return parts[0]!.slice(0, 2).toUpperCase();
+  }
+  return `${parts[0]![0] ?? ""}${parts[1]![0] ?? ""}`.toUpperCase();
+}
+
 export function Dashboard() {
+  const router = useRouter();
+  const { user, signOut } = useAuth();
   const { data } = getDashboardContent();
+
+  const profileName =
+    user?.display_name?.trim() || user?.email?.split("@")[0] || data.profileName;
+  const profileInitials = initialsFrom(profileName);
+  const greetingName = profileName.split(/\s+/)[0] || data.greeting.name;
 
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
         <DashboardSidebar
           items={data.nav}
-          profileName={data.profileName}
-          profileInitials={data.profileInitials}
+          profileName={profileName}
+          profileInitials={profileInitials}
+          profileAvatarUrl={user?.avatar_url}
+          onSignOut={() => {
+            void (async () => {
+              await signOut();
+              router.replace("/");
+            })();
+          }}
         />
         <main className={styles.workspace}>
           <div className={styles.workspaceInner}>
             <div className={styles.bento}>
-              <DashboardGreeting greeting={data.greeting} />
+              <DashboardGreeting
+                greeting={{ ...data.greeting, name: greetingName }}
+              />
               <DashboardFocus focus={data.focus} />
               <DashboardInsights insights={data.insights} />
               <DashboardTimeline items={data.timeline} />

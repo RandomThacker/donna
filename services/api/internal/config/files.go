@@ -3,13 +3,17 @@ package config
 // Raw JSON shapes (all strings so ${ENV} placeholders expand cleanly).
 
 type appconfigFile struct {
-	Environment     string `json:"environment"`
-	Addr            string `json:"addr"`
-	LogLevel        string `json:"log_level"`
-	CORSOrigins     string `json:"cors_origins"`
-	ShutdownTimeout string `json:"shutdown_timeout"`
-	JWTSecret       string `json:"jwt_secret"`
-	SessionSecret   string `json:"session_secret"`
+	Environment            string `json:"environment"`
+	Addr                   string `json:"addr"`
+	LogLevel               string `json:"log_level"`
+	CORSOrigins            string `json:"cors_origins"`
+	ShutdownTimeout        string `json:"shutdown_timeout"`
+	JWTSecret              string `json:"jwt_secret"`
+	SessionSecret          string `json:"session_secret"`
+	JWTExpiry              string `json:"jwt_expiry"`
+	CredentialsKey         string `json:"credentials_encryption_key"`
+	FrontendSuccessURL     string `json:"frontend_success_url"`
+	CookieSecure           string `json:"cookie_secure"`
 }
 
 type databaseFile struct {
@@ -23,9 +27,9 @@ type databaseFile struct {
 }
 
 type apiFile struct {
-	OpenAI      externalAPIFile `json:"openai"`
-	GoogleOAuth externalAPIFile `json:"google_oauth"`
-	AIService   externalAPIFile `json:"ai_service"`
+	OpenAI      externalAPIFile    `json:"openai"`
+	GoogleOAuth googleOAuthFile    `json:"google_oauth"`
+	AIService   externalAPIFile    `json:"ai_service"`
 }
 
 type externalAPIFile struct {
@@ -37,5 +41,20 @@ type externalAPIFile struct {
 	APIKey       string            `json:"api_key"`
 	ClientID     string            `json:"client_id"`
 	ClientSecret string            `json:"client_secret"`
+	Headers      map[string]string `json:"headers"`
+}
+
+type googleOAuthFile struct {
+	Name         string            `json:"name"`
+	BaseURL      string            `json:"base_url"`
+	Path         string            `json:"path"`
+	Method       string            `json:"method"`
+	Timeout      string            `json:"timeout"`
+	ClientID     string            `json:"client_id"`
+	ClientSecret string            `json:"client_secret"`
+	RedirectURL  string            `json:"redirect_url"`
+	AuthURL      string            `json:"auth_url"`
+	UserInfoURL  string            `json:"userinfo_url"`
+	Scopes       string            `json:"scopes"`
 	Headers      map[string]string `json:"headers"`
 }

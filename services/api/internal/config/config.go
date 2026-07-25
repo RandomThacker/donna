@@ -11,12 +11,16 @@ type Config struct {
 
 // AppConfig holds process/runtime settings from appconfig.json.
 type AppConfig struct {
-	Addr            string
-	Environment     string
-	LogLevel        string
-	CORSOrigins     []string
-	JWTSecret       string
-	ShutdownTimeout time.Duration
+	Addr               string
+	Environment        string
+	LogLevel           string
+	CORSOrigins        []string
+	JWTSecret          string
+	JWTExpiry          time.Duration
+	CredentialsKey     string
+	FrontendSuccessURL string
+	CookieSecure       bool
+	ShutdownTimeout    time.Duration
 }
 
 // DatabaseConfig holds Postgres pool settings from database.json.
@@ -33,7 +37,7 @@ type DatabaseConfig struct {
 // ExternalAPIConfig holds outbound HTTP client definitions from api.json.
 type ExternalAPIConfig struct {
 	OpenAI      ExternalAPI
-	GoogleOAuth ExternalAPI
+	GoogleOAuth GoogleOAuthConfig
 	AIService   ExternalAPI
 }
 
@@ -47,5 +51,19 @@ type ExternalAPI struct {
 	APIKey       string
 	ClientID     string
 	ClientSecret string
+	Headers      map[string]string
+}
+
+// GoogleOAuthConfig holds Google login OAuth settings.
+type GoogleOAuthConfig struct {
+	Name         string
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+	AuthURL      string
+	TokenURL     string
+	UserInfoURL  string
+	Scopes       []string
+	Timeout      time.Duration
 	Headers      map[string]string
 }

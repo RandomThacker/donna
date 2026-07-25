@@ -61,6 +61,13 @@ UPDATE users SET
 	deleted_at = $3,
 	updated_at = $3
 WHERE id = $1 AND deleted_at IS NULL`
+
+	sqlTouchLastLogin = `
+UPDATE users SET last_login_at = $2, updated_at = $2
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING
+	id, public_id, email, email_verified, display_name, avatar_url,
+	timezone, locale, status, last_login_at, created_at, updated_at, deleted_at`
 )
 
 // UserUpdateFields holds nullable columns for a partial update.
@@ -80,19 +87,25 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (entity.User, error)
 	Update(ctx context.Context, id uuid.UUID, fields UserUpdateFields, updatedAt time.Time) (entity.User, error)
 	SoftDelete(ctx context.Context, id uuid.UUID, status string, deletedAt time.Time) error
+	TouchLastLogin(ctx context.Context, id uuid.UUID, at time.Time) (entity.User, error)
+	WithTx(tx pgx.Tx) UserRepository
 }
 
 type userRepository struct {
-	pool *pgxpool.Pool
+	q Querier
 }
 
 // NewUserRepository constructs a UserRepository backed by pgxpool.
 func NewUserRepository(pool *pgxpool.Pool) UserRepository {
-	return &userRepository{pool: pool}
+	return &userRepository{q: pool}
+}
+
+func (r *userRepository) WithTx(tx pgx.Tx) UserRepository {
+	return &userRepository{q: tx}
 }
 
 func (r *userRepository) Create(ctx context.Context, user entity.User) (entity.User, error) {
-	row := r.pool.QueryRow(ctx, sqlInsertUser,
+	row := r.q.QueryRow(ctx, sqlInsertUser,
 		user.ID,
 		user.PublicID,
 		user.Email,
@@ -116,7 +129,7 @@ func (r *userRepository) Create(ctx context.Context, user entity.User) (entity.U
 }
 
 func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (entity.User, error) {
-	user, err := scanUser(r.pool.QueryRow(ctx, sqlSelectUserByID, id))
+	user, err := scanUser(r.q.QueryRow(ctx, sqlSelectUserByID, id))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return entity.User{}, apperr.ErrNotFound
@@ -127,7 +140,7 @@ func (r *userRepository) GetByID(ctx context.Context, id uuid.UUID) (entity.User
 }
 
 func (r *userRepository) GetByEmail(ctx context.Context, email string) (entity.User, error) {
-	user, err := scanUser(r.pool.QueryRow(ctx, sqlSelectUserByEmail, email))
+	user, err := scanUser(r.q.QueryRow(ctx, sqlSelectUserByEmail, email))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return entity.User{}, apperr.ErrNotFound
@@ -138,7 +151,7 @@ func (r *userRepository) GetByEmail(ctx context.Context, email string) (entity.U
 }
 
 func (r *userRepository) Update(ctx context.Context, id uuid.UUID, fields UserUpdateFields, updatedAt time.Time) (entity.User, error) {
-	user, err := scanUser(r.pool.QueryRow(ctx, sqlUpdateUser,
+	user, err := scanUser(r.q.QueryRow(ctx, sqlUpdateUser,
 		id,
 		fields.DisplayName,
 		fields.AvatarURL,
@@ -157,7 +170,7 @@ func (r *userRepository) Update(ctx context.Context, id uuid.UUID, fields UserUp
 }
 
 func (r *userRepository) SoftDelete(ctx context.Context, id uuid.UUID, status string, deletedAt time.Time) error {
-	tag, err := r.pool.Exec(ctx, sqlSoftDeleteUser, id, status, deletedAt)
+	tag, err := r.q.Exec(ctx, sqlSoftDeleteUser, id, status, deletedAt)
 	if err != nil {
 		return fmt.Errorf("soft delete user: %w", err)
 	}
@@ -165,6 +178,17 @@ func (r *userRepository) SoftDelete(ctx context.Context, id uuid.UUID, status st
 		return apperr.ErrNotFound
 	}
 	return nil
+}
+
+func (r *userRepository) TouchLastLogin(ctx context.Context, id uuid.UUID, at time.Time) (entity.User, error) {
+	user, err := scanUser(r.q.QueryRow(ctx, sqlTouchLastLogin, id, at))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.User{}, apperr.ErrNotFound
+		}
+		return entity.User{}, fmt.Errorf("touch last login: %w", err)
+	}
+	return user, nil
 }
 
 type scannable interface {

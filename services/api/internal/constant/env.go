@@ -46,6 +46,7 @@ const (
 	DefaultDBMinConns      = int32(0)
 	DefaultJWTPlaceholder  = "change-me-to-a-long-random-string"
 	DefaultShutdownTimeout = 15 * time.Second
+	DefaultJWTExpiry       = 24 * time.Hour
 )
 
 // Timeouts for infrastructure operations.

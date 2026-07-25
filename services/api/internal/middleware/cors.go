@@ -24,9 +24,11 @@ func CORS(origins []string) gin.HandlerFunc {
 		origin := c.GetHeader(constant.HeaderOrigin)
 		if origin != "" {
 			if allowAll {
+				// Credentials cannot be used with wildcard origins.
 				c.Header(constant.HeaderAccessControlAllowOrigin, constant.CORSAllowOriginAll)
 			} else if _, ok := allowed[origin]; ok {
 				c.Header(constant.HeaderAccessControlAllowOrigin, origin)
+				c.Header(constant.HeaderAccessControlAllowCredentials, "true")
 				c.Header(constant.HeaderVary, constant.HeaderOrigin)
 			}
 		}

@@ -1,6 +1,5 @@
-import { redirect } from "next/navigation";
+import { SignInView } from "@/features/auth";
 
-/** Temporary stand-in until Google OAuth (M2). */
 export default function SignInPage() {
-  redirect("/dashboard");
+  return <SignInView />;
 }

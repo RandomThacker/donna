@@ -1,4 +1,7 @@
+"use client";
+
 import { Button, Container, Icon, Pill } from "@/components/common";
+import { AuthEntryCta } from "@/features/auth";
 
 import { LandingHeroArc } from "../LandingHeroArc";
 import { landingHeroStyles as styles } from "./LandingHero.styles";
@@ -28,13 +31,11 @@ export function LandingHero({
           </h1>
           <p className={styles.support}>{support}</p>
           <div className={styles.actions}>
-            <Button
-              href={primaryCta.href}
+            <AuthEntryCta
+              label={primaryCta.label}
               size="lg"
-              iconLeft={<Icon name="google" className="h-5 w-5" />}
-            >
-              {primaryCta.label}
-            </Button>
+              withGoogleIcon
+            />
             <Button
               href={secondaryCta.href}
               size="lg"

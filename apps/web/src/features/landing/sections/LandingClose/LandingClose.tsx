@@ -1,4 +1,7 @@
-import { Button, Container, Icon, Logo, Pill } from "@/components/common";
+"use client";
+
+import { Container, Logo, Pill } from "@/components/common";
+import { AuthEntryCta } from "@/features/auth";
 
 import { landingCloseStyles as styles } from "./LandingClose.styles";
 import type { LandingCloseProps } from "./LandingClose.types";
@@ -19,14 +22,12 @@ export function LandingClose({ eyebrow, title, body, cta, brand }: LandingCloseP
               {title}
             </h2>
             <p className={styles.body}>{body}</p>
-            <Button
-              href={cta.href}
+            <AuthEntryCta
+              label={cta.label}
               size="lg"
               className={styles.action}
-              iconRight={<Icon name="arrow" className="h-4 w-4" />}
-            >
-              {cta.label}
-            </Button>
+              withArrowIcon
+            />
           </div>
         </div>
         <footer className={styles.footer}>

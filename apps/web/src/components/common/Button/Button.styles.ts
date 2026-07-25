@@ -3,7 +3,7 @@ import type { ButtonSize, ButtonVariant } from "./Button.types";
 export const buttonStyles = {
   base: [
     "group relative inline-flex items-center justify-center gap-2.5 overflow-hidden",
-    "rounded-full font-sans font-semibold tracking-wide",
+    "rounded-full font-sans font-semibold tracking-wide cursor-pointer",
     "transition-[background-color,color,border-color,transform,box-shadow] duration-300 ease-out",
     "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
     "focus-visible:outline-donna-accent active:scale-[0.97]",

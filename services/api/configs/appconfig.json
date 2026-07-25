@@ -5,5 +5,9 @@
   "cors_origins": "${CORS_ORIGINS:http://localhost:3000}",
   "shutdown_timeout": "${SHUTDOWN_TIMEOUT:15s}",
   "jwt_secret": "${JWT_SECRET}",
-  "session_secret": "${SESSION_SECRET}"
+  "session_secret": "${SESSION_SECRET}",
+  "jwt_expiry": "${JWT_EXPIRY:24h}",
+  "credentials_encryption_key": "${CREDENTIALS_ENCRYPTION_KEY}",
+  "frontend_success_url": "${AUTH_FRONTEND_SUCCESS_URL:http://localhost:3000/auth/callback}",
+  "cookie_secure": "${COOKIE_SECURE:false}"
 }
