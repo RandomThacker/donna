@@ -39,6 +39,7 @@ The AI service never writes to the database. Persistence always goes through the
 - [Engineering Standards](docs/CURSOR_RULES.md)
 - [Personality Guide](docs/DONNA_PERSONALITY.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Observability](docs/OBSERVABILITY.md)
 - [Phase 1 Plan](docs/PHASE1_PLAN.md)
 
 ## Local prerequisites
@@ -69,6 +70,20 @@ curl -s http://localhost:8080/api/v1/version
 
 See [services/api/README.md](services/api/README.md) for env vars and layering.
 
+## Observability
+
+Donna’s observability source of truth is [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md).
+
+| Topic | Summary |
+| --- | --- |
+| Logging | `slog` only — text in development, JSON in staging/production |
+| Module Logger Factory | `logger.NewFactory(...).Module("calendar")` — never `slog.New` in feature packages |
+| Request IDs | `X-Request-ID` generated/propagated; attached to request context automatically |
+| Log levels | `DEBUG` / `INFO` / `WARN` / `ERROR` via `LOG_LEVEL` / `appconfig.json` |
+| Slow requests | WARN when HTTP duration ≥ 500ms |
+| Helpers | AI usage, auth, calendar, scheduler, database, worker |
+| Roadmap | OpenTelemetry, Prometheus, Grafana, Loki, Sentry — not wired yet |
+
 ### Web (landing)
 
 ```bash
@@ -81,6 +96,6 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Current milestone
 
-**M1 — Go API foundation** (Gin, health/ready/version, migrations, Handler → Service → Repository).
+**M1 — Go API foundation** (Gin, health/ready/version, migrations, Handler → Business → Repository, observability foundation).
 
 Next: **M2 — Auth** (Google OAuth, sessions).

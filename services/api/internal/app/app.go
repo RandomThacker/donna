@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,6 +14,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/database"
 	"github.com/RandomThacker/donna/services/api/internal/handler"
+	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/RandomThacker/donna/services/api/internal/router"
 	"github.com/RandomThacker/donna/services/api/internal/server"
@@ -23,13 +23,19 @@ import (
 // Run wires dependencies, starts the HTTP server, and blocks until shutdown.
 //
 // Data flow: Handler → Business → Repository → Database
-// Transport models live in model/; domain types live in entity/.
-func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
+// Observability: all modules obtain loggers from the Logger Factory.
+func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) error {
+	appLog := logFactory.Module(constant.ModuleApp)
+	httpLog := logFactory.Module(constant.ModuleHTTP)
+	dbLog := logFactory.Module(constant.ModuleDatabase)
+
 	pool, err := database.Connect(ctx, cfg)
 	if err != nil {
+		appLog.Error(ctx, "database connect failed", constant.LogAttrError, err)
 		return fmt.Errorf("database: %w", err)
 	}
 	defer pool.Close()
+	dbLog.Info(ctx, "database pool ready")
 
 	healthRepo := repository.NewHealthRepository(pool)
 	healthSvc := business.NewHealthService(healthRepo, business.BuildInfo{
@@ -42,11 +48,11 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 	engine := router.New(router.Options{
 		Environment:   cfg.App.Environment,
 		CORSOrigins:   cfg.App.CORSOrigins,
-		Logger:        log,
+		HTTPLogger:    httpLog,
 		HealthHandler: healthHandler,
 	})
 
-	srv := server.New(cfg.App.Addr, engine, log)
+	srv := server.New(cfg.App.Addr, engine, appLog)
 
 	errCh := make(chan error, 1)
 	go func() {
@@ -60,15 +66,16 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 	case err := <-errCh:
 		return err
 	case sig := <-sigCh:
-		log.Info("shutdown signal received", constant.LogAttrSignal, sig.String())
+		appLog.Info(ctx, "shutdown signal received", constant.LogAttrSignal, sig.String())
 	case <-ctx.Done():
-		log.Info("shutdown context canceled", constant.LogAttrError, ctx.Err())
+		appLog.Info(ctx, "shutdown context canceled", constant.LogAttrError, ctx.Err())
 	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.App.ShutdownTimeout)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
+		appLog.Error(shutdownCtx, "shutdown failed", constant.LogAttrError, err)
 		return fmt.Errorf("shutdown: %w", err)
 	}
 
@@ -76,6 +83,6 @@ func Run(ctx context.Context, cfg *config.Config, log *slog.Logger) error {
 		return err
 	}
 
-	log.Info("application stopped cleanly")
+	appLog.Info(context.Background(), "application stopped cleanly")
 	return nil
 }

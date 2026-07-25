@@ -1,26 +1,38 @@
 package middleware
 
 import (
-	"log/slog"
 	"time"
 
 	"github.com/RandomThacker/donna/services/api/internal/constant"
+	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/gin-gonic/gin"
 )
 
-// RequestLogging logs method, path, status, duration, client IP, and request ID.
-func RequestLogging(log *slog.Logger) gin.HandlerFunc {
+// RequestLogging logs every HTTP request with correlation fields.
+// Requests slower than SlowRequestThreshold are logged at WARN.
+func RequestLogging(log *logger.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 		c.Next()
 
-		log.Info("request",
-			constant.LogAttrRequestID, GetRequestID(c),
+		duration := time.Since(start)
+		ctx := c.Request.Context()
+		status := c.Writer.Status()
+
+		args := []any{
 			constant.LogAttrMethod, c.Request.Method,
 			constant.LogAttrPath, c.Request.URL.Path,
-			constant.LogAttrStatus, c.Writer.Status(),
-			constant.LogAttrDurationMS, time.Since(start).Milliseconds(),
+			constant.LogAttrStatus, status,
+			constant.LogAttrDurationMS, duration.Milliseconds(),
 			constant.LogAttrClientIP, c.ClientIP(),
-		)
+			constant.LogAttrUserAgent, c.Request.UserAgent(),
+		}
+
+		switch {
+		case duration >= constant.SlowRequestThreshold:
+			log.Warn(ctx, "slow request", args...)
+		default:
+			log.Info(ctx, "request", args...)
+		}
 	}
 }

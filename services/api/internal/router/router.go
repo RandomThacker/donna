@@ -1,10 +1,9 @@
 package router
 
 import (
-	"log/slog"
-
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/handler"
+	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -13,7 +12,7 @@ import (
 type Options struct {
 	Environment   string
 	CORSOrigins   []string
-	Logger        *slog.Logger
+	HTTPLogger    *logger.Logger
 	HealthHandler *handler.HealthHandler
 }
 
@@ -29,9 +28,9 @@ func New(opts Options) *gin.Engine {
 
 	r := gin.New()
 	r.Use(
-		middleware.Recovery(opts.Logger),
+		middleware.Recovery(opts.HTTPLogger),
 		middleware.RequestID(),
-		middleware.RequestLogging(opts.Logger),
+		middleware.RequestLogging(opts.HTTPLogger),
 		middleware.CORS(opts.CORSOrigins),
 	)
 

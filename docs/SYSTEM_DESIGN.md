@@ -565,6 +565,8 @@ Every request should carry:
 
 Use structured logging only. No `console.log` / `fmt.Println` in production paths.
 
+**Source of truth:** [OBSERVABILITY.md](./OBSERVABILITY.md) — Logger Factory, request IDs, levels, AI usage, audit, and the metrics/tracing roadmap.
+
 ---
 
 ## 20. Security

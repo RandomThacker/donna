@@ -107,6 +107,26 @@ curl -s http://localhost:8080/api/v1/version
 
 Order: Recovery → Request ID → Request logging → CORS.
 
+## Observability
+
+Follow [docs/OBSERVABILITY.md](../../docs/OBSERVABILITY.md).
+
+```go
+factory := logger.NewFactory(logger.Options{
+  Service:     constant.ServiceAPI,
+  Environment: cfg.App.Environment,
+  Level:       cfg.App.LogLevel,
+})
+calendarLog := factory.Module(constant.ModuleCalendar)
+calendarLog.Info(ctx, "sync started")
+```
+
+- Module loggers always include `module`, `service`, `environment`
+- Request middleware sets `request_id` on context and response header
+- HTTP requests log method, path, status, duration, IP, user agent (WARN if ≥ 500ms)
+- Helpers: `AIUsage`, `AuthEvent`, `CalendarEvent`, `SchedulerEvent`, `DatabaseQuery`, `WorkerEvent`
+- Never log secrets; use `logger.RedactMap` for header-like maps
+
 ## Migrations
 
 Infra-only in M1: enables `pgcrypto`. No domain tables.

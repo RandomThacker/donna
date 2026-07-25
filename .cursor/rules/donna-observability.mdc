@@ -1,0 +1,16 @@
+---
+description: Observability — Logger Factory, request context, no ad-hoc loggers
+globs: services/api/**/*
+alwaysApply: false
+---
+
+# Observability
+
+Source of truth: `docs/OBSERVABILITY.md`.
+
+- Use `log/slog` via `logger.Factory.Module(...)` only. Never `slog.New` / `fmt.Println` / `log.Println` in modules.
+- Pass `context.Context` into log calls so `request_id` and related fields attach.
+- HTTP: request ID middleware + request logging (WARN ≥ 500ms).
+- Prefer domain helpers (`AIUsage`, `AuthEvent`, `CalendarEvent`, `SchedulerEvent`, `DatabaseQuery`, `WorkerEvent`).
+- Never log passwords, JWTs, OAuth tokens, API keys, or secrets.
+- Do not add Prometheus / OTel / Sentry until the observability doc says so.
