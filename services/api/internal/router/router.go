@@ -14,6 +14,7 @@ type Options struct {
 	CORSOrigins   []string
 	HTTPLogger    *logger.Logger
 	HealthHandler *handler.HealthHandler
+	UserHandler   *handler.UserHandler
 }
 
 // New builds a Gin engine with middleware and /api/v1 routes.
@@ -39,6 +40,14 @@ func New(opts Options) *gin.Engine {
 		v1.GET(constant.PathHealth, opts.HealthHandler.Health)
 		v1.GET(constant.PathReady, opts.HealthHandler.Ready)
 		v1.GET(constant.PathVersion, opts.HealthHandler.Version)
+
+		if opts.UserHandler != nil {
+			v1.POST(constant.PathUsers, opts.UserHandler.Create)
+			v1.GET(constant.PathUsers, opts.UserHandler.GetByEmail)
+			v1.GET(constant.PathUserByID, opts.UserHandler.GetByID)
+			v1.PATCH(constant.PathUserByID, opts.UserHandler.Update)
+			v1.DELETE(constant.PathUserByID, opts.UserHandler.SoftDelete)
+		}
 	}
 
 	return r

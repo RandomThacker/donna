@@ -9,6 +9,9 @@ const (
 	PathHealth  = "/health"
 	PathReady   = "/ready"
 	PathVersion = "/version"
+
+	PathUsers    = "/users"
+	PathUserByID = "/users/:id"
 )
 
 // Full paths (prefix + relative). Useful for docs, clients, and tests.
@@ -16,4 +19,5 @@ const (
 	EndpointHealth  = APIPrefixV1 + PathHealth
 	EndpointReady   = APIPrefixV1 + PathReady
 	EndpointVersion = APIPrefixV1 + PathVersion
+	EndpointUsers   = APIPrefixV1 + PathUsers
 )

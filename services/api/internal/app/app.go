@@ -45,11 +45,17 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	})
 	healthHandler := handler.NewHealthHandler(healthSvc)
 
+	identityLog := logFactory.Module(constant.ModuleIdentity)
+	userRepo := repository.NewUserRepository(pool)
+	userSvc := business.NewUserService(userRepo, identityLog)
+	userHandler := handler.NewUserHandler(userSvc, identityLog)
+
 	engine := router.New(router.Options{
 		Environment:   cfg.App.Environment,
 		CORSOrigins:   cfg.App.CORSOrigins,
 		HTTPLogger:    httpLog,
 		HealthHandler: healthHandler,
+		UserHandler:   userHandler,
 	})
 
 	srv := server.New(cfg.App.Addr, engine, appLog)

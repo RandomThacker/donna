@@ -42,6 +42,7 @@ const (
 	ModuleHTTP         = "http"
 	ModuleDatabase     = "database"
 	ModuleAuth         = "auth"
+	ModuleIdentity     = "identity"
 	ModuleCalendar     = "calendar"
 	ModuleChat         = "chat"
 	ModuleDashboard    = "dashboard"
