@@ -26,21 +26,23 @@ Milestone order for Donna Phase 1. Each milestone must leave the monorepo builda
 
 - Google OAuth for Donna account creation
 - Profiles, sessions, secure cookies/JWT
-- Separate `connections` table for integrations
+- Separate connected accounts for integrations (see [DOMAIN_MODEL.md](./DOMAIN_MODEL.md))
 - Web login/callback pages
+
+**Prerequisite docs:** [DOMAIN_MODEL.md](./DOMAIN_MODEL.md), [DATA_MODEL.md](./DATA_MODEL.md), [DATABASE.md](./DATABASE.md).
 
 **Exit:** User can sign in with Google and hit an authenticated `/api/v1/me`.
 
 ## M3 — Core domain schema
 
-Migrations for:
+Migrations implementing [DOMAIN_MODEL.md](./DOMAIN_MODEL.md) / [DATA_MODEL.md](./DATA_MODEL.md) under [DATABASE.md](./DATABASE.md) standards, including concepts such as:
 
 - users, profiles, settings, preferences
-- connections, calendar_sources, calendar_events
-- tasks, goals, daily_plans, daily_reviews, check_ins
+- connected accounts, calendar sources, calendar events
+- tasks, goals, reminders, daily_plans, daily_reviews, check_ins
 - notes, memories
 - conversations, messages
-- notifications
+- notifications, scheduler jobs, audit logs
 
 **Exit:** Schema migrated; repositories stubbed for tasks and conversations.
 

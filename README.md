@@ -40,6 +40,9 @@ The AI service never writes to the database. Persistence always goes through the
 - [Personality Guide](docs/DONNA_PERSONALITY.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Observability](docs/OBSERVABILITY.md)
+- [Domain Model](docs/DOMAIN_MODEL.md)
+- [Logical Data Model](docs/DATA_MODEL.md)
+- [Database Standards](docs/DATABASE.md)
 - [Phase 1 Plan](docs/PHASE1_PLAN.md)
 
 ## Local prerequisites
@@ -96,6 +99,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Current milestone
 
-**M1 — Go API foundation** (Gin, health/ready/version, migrations, Handler → Business → Repository, observability foundation).
+**M1 — Go API foundation** complete (Gin, health/ready/version, migrations infra, Handler → Business → Repository, observability).
 
-Next: **M2 — Auth** (Google OAuth, sessions).
+**Domain modeling docs** — [DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md), [DATA_MODEL.md](docs/DATA_MODEL.md), [DATABASE.md](docs/DATABASE.md) (no SQL yet).
+
+Next implementation track: **Auth** (Google OAuth, sessions) per [PHASE1_PLAN.md](docs/PHASE1_PLAN.md); schema follows [DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md).
