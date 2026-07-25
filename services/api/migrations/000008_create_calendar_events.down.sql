@@ -1,0 +1,2 @@
+-- Rollback: calendar_events
+DROP TABLE IF EXISTS calendar_events;
