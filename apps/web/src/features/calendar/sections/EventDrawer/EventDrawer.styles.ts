@@ -1,0 +1,26 @@
+export const drawerStyles = {
+  root: "fixed inset-0 z-50 flex justify-end",
+  backdrop: "absolute inset-0 bg-black/45 backdrop-blur-[2px]",
+  panel: [
+    "relative flex h-full w-full max-w-md flex-col",
+    "border-l border-donna-hairline bg-donna-surface shadow-donna-card",
+    "animate-donna-fade-up",
+  ].join(" "),
+  header: "flex items-start gap-3 border-b border-donna-hairline px-5 py-4",
+  colorBar: "mt-1.5 h-10 w-1.5 shrink-0 rounded-full",
+  headerText: "min-w-0 flex-1",
+  title: "font-display text-2xl italic leading-snug text-donna-text",
+  subtitle: "mt-1 text-sm text-donna-muted",
+  close: [
+    "grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+    "text-donna-muted hover:bg-donna-accent-soft hover:text-donna-text",
+  ].join(" "),
+  body: "flex-1 space-y-5 overflow-y-auto px-5 py-5",
+  field: "space-y-1",
+  label: "text-[11px] font-semibold uppercase tracking-[0.12em] text-donna-faint",
+  value: "text-sm text-donna-text whitespace-pre-wrap",
+  muted: "text-sm text-donna-muted",
+  chip: "inline-flex rounded-full bg-donna-elevated px-2.5 py-1 text-xs text-donna-muted",
+  list: "space-y-1.5",
+  footer: "border-t border-donna-hairline px-5 py-3 text-xs text-donna-faint",
+} as const;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import { Icon } from "@/components/common";
 import { ThemeToggle } from "@/components/theme";
@@ -26,15 +27,15 @@ export function DashboardSidebar({
 
   return (
     <aside className={styles.aside} aria-label="Primary">
-      <a href="/dashboard" className={styles.brand} aria-label="Donna home">
+      <Link href="/dashboard" className={styles.brand} aria-label="Donna home">
         <span className={styles.brandMark} aria-hidden>
           <span className={styles.brandCore} />
         </span>
         <span className={styles.brandWord}>Donna</span>
-      </a>
+      </Link>
       <nav className={styles.nav}>
         {items.map((item) => (
-          <a
+          <Link
             key={item.id}
             href={item.href}
             aria-current={item.active ? "page" : undefined}
@@ -42,7 +43,7 @@ export function DashboardSidebar({
           >
             <Icon name={item.icon} className={cn("h-4 w-4", styles.itemIcon)} />
             {item.label}
-          </a>
+          </Link>
         ))}
       </nav>
       <div className={styles.footer}>

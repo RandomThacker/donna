@@ -1,32 +1,15 @@
 import { apiRequest } from "@/lib/api/client";
 
-export type CalendarSyncFailure = {
-  calendar_source_id?: string;
-  provider_calendar_id?: string;
-  name?: string;
-  stage: string;
-  error: string;
-};
+import type {
+  CalendarEventsResponse,
+  CalendarSourcesResponse,
+  CalendarSyncResult,
+} from "./Calendar.types";
 
-export type CalendarSyncResult = {
-  run_id?: string;
-  trigger: string;
-  status: string;
-  started_at: string;
-  finished_at: string;
-  duration_ms: number;
-  calendars_processed: number;
-  sources_created: number;
-  sources_updated: number;
-  sources_deleted: number;
-  events_created: number;
-  events_updated: number;
-  events_deleted: number;
-  failures: CalendarSyncFailure[];
-  sources: unknown[];
-  incremental: boolean;
-  skipped: boolean;
-  sync_status: string;
+export type ListEventsParams = {
+  from: string;
+  to: string;
+  signal?: AbortSignal;
 };
 
 /** Manual sync — orchestrates sources + events into Donna DB. */
@@ -39,13 +22,35 @@ export function syncCalendarSources(signal?: AbortSignal): Promise<CalendarSyncR
 
 /**
  * Startup / on-demand freshness: full pipeline when last success is older than 2 minutes.
- * AI workflows that need calendar data should call this first.
  */
 export function ensureCalendarSourcesFresh(
   signal?: AbortSignal,
 ): Promise<CalendarSyncResult> {
   return apiRequest<CalendarSyncResult>("/api/v1/calendar/sync/ensure", {
     method: "POST",
+    signal,
+  });
+}
+
+/** List unified calendar events from Donna DB. Never hits Google. */
+export function listCalendarEvents(
+  params: ListEventsParams,
+): Promise<CalendarEventsResponse> {
+  const query = new URLSearchParams({
+    from: params.from,
+    to: params.to,
+  });
+  return apiRequest<CalendarEventsResponse>(
+    `/api/v1/calendar/events?${query.toString()}`,
+    { signal: params.signal },
+  );
+}
+
+/** List calendar sources + account sync observability from Donna DB. */
+export function listCalendarSources(
+  signal?: AbortSignal,
+): Promise<CalendarSourcesResponse> {
+  return apiRequest<CalendarSourcesResponse>("/api/v1/calendar/sources", {
     signal,
   });
 }

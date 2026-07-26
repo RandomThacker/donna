@@ -21,7 +21,12 @@ export type IconName =
   | "search"
   | "compose"
   | "plus"
-  | "info";
+  | "info"
+  | "refresh"
+  | "close"
+  | "mapPin"
+  | "repeat"
+  | "sun";
 
 export type IconProps = {
   name: IconName;

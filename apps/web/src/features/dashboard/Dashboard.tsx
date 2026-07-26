@@ -1,10 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { useAuth } from "@/features/auth";
 
 import { getDashboardContent } from "./Dashboard.logic";
+import { navItemsForPath } from "./dashboardNav";
 import { dashboardStyles as styles } from "./Dashboard.styles";
 import { DashboardFocus } from "./sections/DashboardFocus";
 import { DashboardGreeting } from "./sections/DashboardGreeting";
@@ -27,8 +28,10 @@ function initialsFrom(name: string): string {
 
 export function Dashboard() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, signOut } = useAuth();
   const { data } = getDashboardContent();
+  const nav = navItemsForPath(pathname);
 
   const profileName =
     user?.display_name?.trim() || user?.email?.split("@")[0] || data.profileName;
@@ -39,7 +42,7 @@ export function Dashboard() {
     <div className={styles.page}>
       <div className={styles.shell}>
         <DashboardSidebar
-          items={data.nav}
+          items={nav}
           profileName={profileName}
           profileInitials={profileInitials}
           profileAvatarUrl={user?.avatar_url}

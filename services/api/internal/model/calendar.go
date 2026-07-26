@@ -61,8 +61,28 @@ type CalendarSyncFailureResponse struct {
 
 // CalendarSourcesResponse is returned by GET /calendar/sources.
 type CalendarSourcesResponse struct {
-	Sources []CalendarSourceResponse     `json:"sources"`
-	Sync    *CalendarAccountSyncResponse `json:"sync,omitempty"`
+	Sources []CalendarSourceResponse            `json:"sources"`
+	Account *CalendarConnectedAccountResponse   `json:"account,omitempty"`
+	Sync    *CalendarAccountSyncResponse        `json:"sync,omitempty"`
+}
+
+// CalendarConnectedAccountResponse is the parent Google account for calendar sources.
+type CalendarConnectedAccountResponse struct {
+	ID          string  `json:"id"`
+	Provider    string  `json:"provider"`
+	DisplayName *string `json:"display_name,omitempty"`
+}
+
+// CalendarConnectedAccountFromEntity maps a connected account brief for the sources UI.
+func CalendarConnectedAccountFromEntity(account entity.ConnectedAccount) *CalendarConnectedAccountResponse {
+	if account.ID == uuid.Nil {
+		return nil
+	}
+	return &CalendarConnectedAccountResponse{
+		ID:          account.ID.String(),
+		Provider:    account.Provider,
+		DisplayName: account.DisplayName,
+	}
 }
 
 // CalendarAccountSyncResponse exposes connected-account sync observability (Donna DB).
