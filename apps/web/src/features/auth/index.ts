@@ -14,5 +14,8 @@ export type {
   SignInProviderDefinition,
   SignInProviderActions,
 } from "./SignInModal";
-export { getGoogleOAuthStartUrl } from "@/lib/api/config";
+export {
+  getGoogleOAuthStartUrl,
+  getMicrosoftOAuthStartUrl,
+} from "@/lib/api/config";
 export type { AuthUser, AuthStatus, AuthContextValue } from "./Auth.types";

@@ -40,6 +40,7 @@ export async function apiRequest<T>(
     method: options.method ?? "GET",
     headers,
     credentials: "include",
+    cache: "no-store",
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
     signal: options.signal,
   });

@@ -19,12 +19,19 @@ import {
 } from "date-fns";
 
 import type { CalendarEvent, CalendarView } from "./Calendar.types";
+import {
+  endOfZonedDay,
+  formatZonedTime,
+  resolveCalendarTimeZone,
+  startOfZonedDay,
+} from "./Calendar.timezone";
 
 export const calendarQueryKeys = {
   all: ["calendar"] as const,
-  sources: ["calendar", "sources"] as const,
+  // v2: bust stale caches after multi-account calendar connect fixes
+  sources: ["calendar", "sources", "v2"] as const,
   events: (from: string, to: string) =>
-    ["calendar", "events", from, to] as const,
+    ["calendar", "events", "v2", from, to] as const,
 };
 
 export function startOfViewWeek(date: Date): Date {
@@ -40,6 +47,7 @@ export function queryRangeForView(
   view: CalendarView,
   cursor: Date,
   agendaHorizonDays = 60,
+  timeZone = resolveCalendarTimeZone(null),
 ): { from: Date; to: Date } {
   switch (view) {
     case "day": {
@@ -58,8 +66,9 @@ export function queryRangeForView(
       return { from: subDays(gridStart, 1), to: addDays(gridEnd, 1) };
     }
     case "agenda": {
-      const from = startOfDay(cursor);
-      const to = endOfDay(addDays(cursor, agendaHorizonDays));
+      // Agenda starts at the cursor's civil day in the calendar timezone (IST by default).
+      const from = startOfZonedDay(cursor, timeZone);
+      const to = endOfZonedDay(addDays(cursor, agendaHorizonDays), timeZone);
       return { from, to };
     }
   }
@@ -100,13 +109,19 @@ export function titleForView(view: CalendarView, cursor: Date): string {
   }
 }
 
-export function formatEventTime(event: CalendarEvent): string {
+export function formatEventTime(
+  event: CalendarEvent,
+  timeZone = resolveCalendarTimeZone(null),
+): string {
   if (event.all_day) {
     return "All day";
   }
   const start = parseISO(event.start_time);
   const end = parseISO(event.end_time);
-  return `${format(start, "h:mm a")} – ${format(end, "h:mm a")}`;
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return "Time unavailable";
+  }
+  return `${formatZonedTime(start, timeZone)} – ${formatZonedTime(end, timeZone)}`;
 }
 
 export function formatEventDate(event: CalendarEvent): string {

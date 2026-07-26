@@ -13,4 +13,4 @@ const (
 )
 
 // Default user timezone when omitted on create.
-const DefaultUserTimezone = "UTC"
+const DefaultUserTimezone = "Asia/Kolkata"

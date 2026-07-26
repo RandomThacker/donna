@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import {
   clearClientAuthFlags,
@@ -18,6 +19,7 @@ import {
   markNewUser,
   parseOAuthCallback,
   startGoogleOAuth,
+  startMicrosoftOAuth,
 } from "./Auth.logic";
 import type { AuthContextValue, AuthStatus, AuthUser } from "./Auth.types";
 import {
@@ -29,6 +31,7 @@ import {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [status, setStatus] = useState<AuthStatus>("loading");
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
@@ -58,24 +61,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearClientAuthFlags();
       setUser(null);
       setStatus("unauthenticated");
-      throw new Error(parsed.error || "Google sign-in did not complete");
+      throw new Error(parsed.error || "Sign-in did not complete");
     }
 
     markNewUser(parsed.isNewUser);
     setIsNewUser(parsed.isNewUser);
 
-    const me = await fetchCurrentUser();
-    setUser(me);
-    setStatus("authenticated");
+    try {
+      const me = await fetchCurrentUser();
+      setUser(me);
+      setStatus("authenticated");
+    } catch (err) {
+      // Stale cookie after a DB wipe — clear local state so Try again starts fresh OAuth.
+      await logoutSession();
+      clearClientAuthFlags();
+      setUser(null);
+      setStatus("unauthenticated");
+      setIsNewUser(false);
+      throw err;
+    }
   }, []);
 
   const signOut = useCallback(async () => {
     await logoutSession();
     clearClientAuthFlags();
+    queryClient.clear();
     setUser(null);
     setStatus("unauthenticated");
     setIsNewUser(false);
-  }, []);
+  }, [queryClient]);
 
   const openSignIn = useCallback(() => {
     setIsSignInOpen(true);
@@ -88,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleSelectProvider = useCallback((id: SignInProviderId) => {
     startSignInProvider(id, {
       google: startGoogleOAuth,
+      microsoft: startMicrosoftOAuth,
     });
   }, []);
 
@@ -100,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       openSignIn,
       closeSignIn,
       signInWithGoogle: startGoogleOAuth,
+      signInWithMicrosoft: startMicrosoftOAuth,
       signOut,
       completeOAuthCallback,
       refreshSession,

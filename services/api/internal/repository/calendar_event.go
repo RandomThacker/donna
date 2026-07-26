@@ -94,6 +94,14 @@ WHERE calendar_source_id = $1
   AND deleted_at IS NULL
   AND provider_event_id IS NOT NULL
   AND NOT (provider_event_id = ANY($2::text[]))`
+
+	sqlCountLiveCalendarEventsByAccount = `
+SELECT COUNT(*)
+FROM calendar_events e
+JOIN calendar_sources s ON s.id = e.calendar_source_id
+WHERE s.connected_account_id = $1
+  AND e.deleted_at IS NULL
+  AND s.deleted_at IS NULL`
 )
 
 // CalendarEventRepository persists calendar events.
@@ -104,6 +112,7 @@ type CalendarEventRepository interface {
 	UpdateFromSync(ctx context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error)
 	SoftDeleteByProviderEventID(ctx context.Context, sourceID uuid.UUID, providerEventID string, deletedAt time.Time) (entity.CalendarEvent, error)
 	SoftDeleteMissing(ctx context.Context, sourceID uuid.UUID, keepProviderIDs []string, deletedAt time.Time) (int64, error)
+	CountLiveByConnectedAccountID(ctx context.Context, accountID uuid.UUID) (int64, error)
 	WithTx(tx pgx.Tx) CalendarEventRepository
 }
 
@@ -271,6 +280,14 @@ func (r *calendarEventRepository) SoftDeleteMissing(
 		return 0, fmt.Errorf("soft-delete missing calendar events: %w", err)
 	}
 	return tag.RowsAffected(), nil
+}
+
+func (r *calendarEventRepository) CountLiveByConnectedAccountID(ctx context.Context, accountID uuid.UUID) (int64, error) {
+	var n int64
+	if err := r.q.QueryRow(ctx, sqlCountLiveCalendarEventsByAccount, accountID).Scan(&n); err != nil {
+		return 0, fmt.Errorf("count live calendar events by account: %w", err)
+	}
+	return n, nil
 }
 
 func collectCalendarEvents(rows pgx.Rows) ([]entity.CalendarEvent, error) {

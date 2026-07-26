@@ -18,12 +18,7 @@ export const sidebarStyles = {
   ].join(" "),
   itemActive: "bg-donna-accent-soft text-donna-text",
   itemIcon: "shrink-0 text-current opacity-80",
-  footer: "mt-auto space-y-2 p-3",
-  themeToggle: [
-    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm",
-    "text-donna-muted transition-colors duration-150",
-    "hover:bg-donna-accent-soft hover:text-donna-text",
-  ].join(" "),
+  footer: "mt-auto p-3",
   profile: [
     "flex items-center gap-3 rounded-xl border border-donna-border",
     "bg-donna-surface-2 px-3 py-3",
@@ -36,8 +31,4 @@ export const sidebarStyles = {
   profileMeta: "min-w-0",
   profileName: "truncate text-sm text-donna-text",
   profileHint: "truncate text-xs text-donna-faint",
-  signOut: [
-    "mt-1 w-full rounded-lg px-3 py-2 text-left text-xs",
-    "text-donna-muted transition-colors hover:bg-donna-accent-soft hover:text-donna-text",
-  ].join(" "),
 } as const;

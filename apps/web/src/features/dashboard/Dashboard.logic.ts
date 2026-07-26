@@ -7,6 +7,12 @@ export const dashboardData: DashboardData = {
     { id: "tasks", label: "Tasks", icon: "tasks", href: "/dashboard/tasks" },
     { id: "notes", label: "Notes", icon: "notes", href: "/dashboard/notes" },
     { id: "memories", label: "Memories", icon: "memory", href: "/dashboard/memories" },
+    {
+      id: "integrations",
+      label: "Integrations",
+      icon: "link",
+      href: "/dashboard/integrations",
+    },
     { id: "settings", label: "Settings", icon: "settings", href: "/dashboard/settings" },
   ],
   profileName: "Aryan Thacker",

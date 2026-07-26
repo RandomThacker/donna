@@ -19,7 +19,7 @@ export const calendarStyles = {
     "animate-donna-fade-up lg:hidden",
   ].join(" "),
   mobileBackdrop: "absolute inset-0 z-20 bg-black/40 lg:hidden",
-  viewPane: "min-h-0 flex-1 overflow-auto",
+  viewPane: "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto",
   syncBar: "h-0.5 w-full overflow-hidden bg-donna-hairline",
   syncBarFill: "h-full w-1/3 animate-pulse bg-donna-accent",
 } as const;

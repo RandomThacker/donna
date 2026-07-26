@@ -3,7 +3,7 @@ import { cn } from "@/lib/cn";
 import { iconPaths } from "./Icon.paths";
 import type { IconProps } from "./Icon.types";
 
-const filledIcons = new Set(["google"]);
+const filledIcons = new Set(["google", "microsoft"]);
 
 export function Icon({ name, className }: IconProps) {
   const isFilled = filledIcons.has(name);

@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/RandomThacker/donna/services/api/internal/apperr"
+	"github.com/RandomThacker/donna/services/api/internal/calendarprovider"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
-	"github.com/RandomThacker/donna/services/api/internal/googlecalendar"
 	"github.com/RandomThacker/donna/services/api/internal/idgen"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/google/uuid"
@@ -35,55 +35,75 @@ func (s *CalendarService) ListEvents(ctx context.Context, userID uuid.UUID, from
 	return s.events.ListByUserInRange(ctx, userID, from.UTC(), to.UTC())
 }
 
-// SyncEvents syncs events for every active sync_enabled calendar source.
+// SyncEvents syncs events for every active sync_enabled calendar source across all syncable accounts.
 func (s *CalendarService) SyncEvents(ctx context.Context, userID uuid.UUID) (CalendarEventSyncResult, error) {
 	started := s.now().UTC()
-	account, err := s.requireGoogleAccount(ctx, userID)
+	accounts, err := s.listSyncableAccounts(ctx, userID)
 	if err != nil {
 		return CalendarEventSyncResult{}, err
+	}
+	if len(accounts) == 0 {
+		return CalendarEventSyncResult{}, fmt.Errorf("%w: connect a calendar provider and grant Calendar access first", apperr.ErrNotFound)
 	}
 	if s.events == nil {
 		return CalendarEventSyncResult{}, fmt.Errorf("%w: calendar events are not configured", apperr.ErrInvalid)
 	}
 
-	accessToken, err := s.resolveAccessToken(ctx, account)
-	if err != nil {
-		return CalendarEventSyncResult{}, err
-	}
-
-	sources, err := s.sources.ListByUserID(ctx, userID)
-	if err != nil {
-		return CalendarEventSyncResult{}, err
-	}
-
 	result := CalendarEventSyncResult{SyncedAt: started}
 	var failures []CalendarSyncFailure
-	for _, source := range sources {
-		if !source.SyncEnabled || source.DeletedAt != nil {
-			continue
-		}
-		result.SourceCount++
-		partial, syncErr := s.syncSourceEvents(ctx, account, source, accessToken)
-		if syncErr != nil {
+
+	for _, account := range accounts {
+		accessToken, tokenErr := s.resolveAccessToken(ctx, account)
+		if tokenErr != nil {
 			failures = append(failures, CalendarSyncFailure{
-				CalendarSourceID:   source.ID.String(),
-				ProviderCalendarID: source.ProviderCalendarID,
-				Name:               source.Name,
-				Stage:              "events",
-				Error:              syncErr.Error(),
+				Stage: "events",
+				Error: tokenErr.Error(),
 			})
 			if s.log != nil {
-				s.log.Warn(ctx, "calendar events sync failed for source",
+				s.log.Warn(ctx, "calendar events sync token resolve failed",
 					constant.LogAttrUserID, userID.String(),
-					"calendar_source_id", source.ID.String(),
-					constant.LogAttrError, syncErr,
+					"provider", account.Provider,
+					constant.LogAttrError, tokenErr,
 				)
 			}
 			continue
 		}
-		result.CreatedCount += partial.CreatedCount
-		result.UpdatedCount += partial.UpdatedCount
-		result.RemovedCount += partial.RemovedCount
+
+		sources, listErr := s.sources.ListByConnectedAccountID(ctx, account.ID)
+		if listErr != nil {
+			return CalendarEventSyncResult{}, listErr
+		}
+
+		for _, source := range sources {
+			if source.ConnectedAccountID != account.ID {
+				continue
+			}
+			if !source.SyncEnabled || source.DeletedAt != nil {
+				continue
+			}
+			result.SourceCount++
+			partial, syncErr := s.syncSourceEvents(ctx, account, source, accessToken)
+			if syncErr != nil {
+				failures = append(failures, CalendarSyncFailure{
+					CalendarSourceID:   source.ID.String(),
+					ProviderCalendarID: source.ProviderCalendarID,
+					Name:               source.Name,
+					Stage:              "events",
+					Error:              syncErr.Error(),
+				})
+				if s.log != nil {
+					s.log.Warn(ctx, "calendar events sync failed for source",
+						constant.LogAttrUserID, userID.String(),
+						"calendar_source_id", source.ID.String(),
+						constant.LogAttrError, syncErr,
+					)
+				}
+				continue
+			}
+			result.CreatedCount += partial.CreatedCount
+			result.UpdatedCount += partial.UpdatedCount
+			result.RemovedCount += partial.RemovedCount
+		}
 	}
 	_ = failures
 
@@ -131,46 +151,56 @@ func (s *CalendarService) syncSourceEvents(
 	var out partialCounts
 	now := s.now().UTC()
 
+	provider, err := s.providerFor(account)
+	if err != nil {
+		return out, err
+	}
+
 	syncToken := ""
 	if source.SyncCursor != nil {
 		syncToken = strings.TrimSpace(*source.SyncCursor)
 	}
 
-	listed, listErr := s.calendar.ListEvents(ctx, accessToken, source.ProviderCalendarID, googlecalendar.EventListOptions{
+	listed, listErr := provider.ListEvents(ctx, accessToken, source.ProviderCalendarID, calendarprovider.ListEventsOptions{
 		SyncToken: syncToken,
 		TimeMin:   now.Add(-constant.CalendarEventSyncLookback),
 		TimeMax:   now.Add(constant.CalendarEventSyncLookahead),
 	})
 	if listErr != nil {
-		var gone *googlecalendar.GoneError
+		var gone *calendarprovider.SyncCursorInvalidError
 		if errors.As(listErr, &gone) {
 			if s.log != nil {
 				s.log.Warn(ctx, "calendar events sync token invalid; recovering with full sync",
 					constant.LogAttrUserID, account.UserID.String(),
 					"calendar_source_id", source.ID.String(),
+					"provider", account.Provider,
 				)
 			}
 			if _, clearErr := s.sources.ClearEventSyncCursor(ctx, source.ID, now); clearErr != nil {
 				return out, clearErr
 			}
 			source.SyncCursor = nil
-			listed, listErr = s.calendar.ListEvents(ctx, accessToken, source.ProviderCalendarID, googlecalendar.EventListOptions{
+			listed, listErr = provider.ListEvents(ctx, accessToken, source.ProviderCalendarID, calendarprovider.ListEventsOptions{
 				TimeMin: now.Add(-constant.CalendarEventSyncLookback),
 				TimeMax: now.Add(constant.CalendarEventSyncLookahead),
 			})
 		}
 	}
 	if listErr != nil {
-		var authErr *googlecalendar.AuthError
+		var authErr *calendarprovider.AuthError
 		if errors.As(listErr, &authErr) {
-			return out, fmt.Errorf("%w: google calendar events denied (%d): %s", apperr.ErrForbidden, authErr.Status, authErr.Body)
+			return out, fmt.Errorf("%w: calendar provider events denied (%d): %s", apperr.ErrForbidden, authErr.Status, authErr.Body)
 		}
-		return out, fmt.Errorf("list google events: %w", listErr)
+		return out, fmt.Errorf("list calendar events from provider: %w", listErr)
 	}
 
 	txErr := s.tx.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		eventsRepo := s.events.WithTx(tx)
+		keepIDs := make([]string, 0, len(listed.Events))
 		for _, remote := range listed.Events {
+			if remote.ID != "" {
+				keepIDs = append(keepIDs, remote.ID)
+			}
 			if remote.Deleted || remote.Status == constant.CalendarEventStatusCancelled {
 				_, delErr := eventsRepo.SoftDeleteByProviderEventID(ctx, source.ID, remote.ID, now)
 				if delErr != nil && !errors.Is(delErr, apperr.ErrNotFound) {
@@ -191,8 +221,15 @@ func (s *CalendarService) syncSourceEvents(
 				out.UpdatedCount++
 			}
 		}
-		// Full sync is windowed (timeMin/timeMax); do not soft-delete "missing" ids —
-		// that would tombstone events outside the window. Deletes come via deleted/cancelled.
+		// ReplaceAll providers (ICS) return the full feed truth — soft-delete missing UIDs.
+		// Windowed OAuth sync must not do this; deletes arrive as cancelled/deleted rows.
+		if listed.ReplaceAll {
+			removed, delErr := eventsRepo.SoftDeleteMissing(ctx, source.ID, keepIDs, now)
+			if delErr != nil {
+				return delErr
+			}
+			out.RemovedCount += int(removed)
+		}
 		return nil
 	})
 	if txErr != nil {
@@ -216,7 +253,7 @@ func (s *CalendarService) upsertEvent(
 	ctx context.Context,
 	repo repository.CalendarEventRepository,
 	source entity.CalendarSource,
-	remote googlecalendar.RemoteEvent,
+	remote calendarprovider.RemoteEvent,
 	now time.Time,
 ) (entity.CalendarEvent, bool, error) {
 	mapped, err := mapRemoteEventEntity(source, remote, now)
@@ -275,7 +312,7 @@ func (s *CalendarService) resolveRecurringParent(
 	return &id, nil
 }
 
-func mapRemoteEventEntity(source entity.CalendarSource, remote googlecalendar.RemoteEvent, now time.Time) (entity.CalendarEvent, error) {
+func mapRemoteEventEntity(source entity.CalendarSource, remote calendarprovider.RemoteEvent, now time.Time) (entity.CalendarEvent, error) {
 	status := normalizeEventStatus(remote.Status)
 	attendees, err := json.Marshal(remote.Attendees)
 	if err != nil {
@@ -297,9 +334,28 @@ func mapRemoteEventEntity(source entity.CalendarSource, remote googlecalendar.Re
 		}
 	}
 
-	payload, err := json.Marshal(remote.Raw)
+	raw := remote.Raw
+	if meetingURL := strings.TrimSpace(remote.OnlineMeetingURL); meetingURL != "" {
+		if raw == nil {
+			raw = map[string]any{}
+		} else {
+			cloned := make(map[string]any, len(raw)+1)
+			for k, v := range raw {
+				cloned[k] = v
+			}
+			raw = cloned
+		}
+		if _, exists := raw["online_meeting_url"]; !exists {
+			raw["online_meeting_url"] = meetingURL
+		}
+	}
+
+	payload, err := json.Marshal(raw)
 	if err != nil {
 		return entity.CalendarEvent{}, err
+	}
+	if len(payload) == 0 || string(payload) == "null" {
+		payload = []byte("{}")
 	}
 
 	providerID := remote.ID
@@ -323,6 +379,8 @@ func mapRemoteEventEntity(source entity.CalendarSource, remote googlecalendar.Re
 	}
 	if l := strings.TrimSpace(remote.Location); l != "" {
 		event.Location = &l
+	} else if meeting := strings.TrimSpace(remote.OnlineMeetingURL); meeting != "" {
+		event.Location = &meeting
 	}
 	if tz := strings.TrimSpace(remote.Timezone); tz != "" {
 		event.Timezone = &tz

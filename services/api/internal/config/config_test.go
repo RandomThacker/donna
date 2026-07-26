@@ -125,3 +125,55 @@ func TestLoadRejectsInvalidEnv(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestMicrosoftOAuthForcesCommonAuthority(t *testing.T) {
+	dir := t.TempDir()
+	writeConfigs(t, dir,
+		`{"environment":"development","addr":":8080","log_level":"info","cors_origins":"","shutdown_timeout":"15s","jwt_secret":"secret","session_secret":""}`,
+		`{"url":"postgres://x","max_conns":"10","min_conns":"0","max_conn_lifetime":"1h","max_conn_idle_time":"30m","connect_ping_timeout":"5s","migrations_path":"migrations"}`,
+		`{
+  "openai": {"name":"openai","base_url":"https://api.openai.com/v1","path":"/chat/completions","method":"POST","timeout":"30s","headers":{}},
+  "google_oauth": {"name":"google_oauth","base_url":"https://oauth2.googleapis.com","path":"/token","method":"POST","timeout":"15s","headers":{}},
+  "microsoft_oauth": {
+    "name":"microsoft_oauth",
+    "base_url":"https://login.microsoftonline.com/410843a6-cdfc-4799-8542-e298c30fed78/oauth2/v2.0",
+    "path":"/token",
+    "method":"POST",
+    "timeout":"15s",
+    "client_id":"ms-id",
+    "client_secret":"ms-secret",
+    "redirect_url":"http://localhost:8080/api/v1/auth/microsoft/callback",
+    "integration_redirect_url":"http://localhost:8080/api/v1/integrations/microsoft/callback",
+    "tenant":"410843a6-cdfc-4799-8542-e298c30fed78",
+    "auth_url":"https://login.microsoftonline.com/410843a6-cdfc-4799-8542-e298c30fed78/oauth2/v2.0/authorize",
+    "token_url":"https://login.microsoftonline.com/410843a6-cdfc-4799-8542-e298c30fed78/oauth2/v2.0/token",
+    "graph_me_url":"https://graph.microsoft.com/v1.0/me",
+    "scopes":"openid,email,profile,User.Read",
+    "integration_scopes":"openid,profile,email,offline_access,User.Read,Calendars.ReadWrite",
+    "headers":{}
+  },
+  "ai_service": {"name":"ai_service","base_url":"http://localhost:8090","path":"/health","method":"GET","timeout":"10s","headers":{}}
+}`,
+	)
+
+	cfg, err := config.LoadFromDir(dir)
+	if err != nil {
+		t.Fatalf("LoadFromDir: %v", err)
+	}
+	ms := cfg.API.MicrosoftOAuth
+	if ms.AuthURL != constant.MicrosoftOAuthAuthorizeURL {
+		t.Fatalf("AuthURL = %q, want common authority", ms.AuthURL)
+	}
+	if ms.TokenURL != constant.MicrosoftOAuthTokenURL {
+		t.Fatalf("TokenURL = %q, want common authority", ms.TokenURL)
+	}
+	if ms.Tenant != "410843a6-cdfc-4799-8542-e298c30fed78" {
+		t.Fatalf("Tenant should be preserved for future use, got %q", ms.Tenant)
+	}
+	if ms.RedirectURL != "http://localhost:8080/api/v1/auth/microsoft/callback" {
+		t.Fatalf("RedirectURL = %q", ms.RedirectURL)
+	}
+	if ms.IntegrationRedirectURL != "http://localhost:8080/api/v1/integrations/microsoft/callback" {
+		t.Fatalf("IntegrationRedirectURL = %q", ms.IntegrationRedirectURL)
+	}
+}

@@ -9,7 +9,7 @@ import { formatEventTime } from "../../Calendar.utils";
 
 export const eventCardStyles = {
   root: [
-    "group flex w-full flex-col gap-0.5 overflow-hidden rounded-lg",
+    "group flex w-full cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg",
     "border border-black/10 px-2 py-1.5 text-left shadow-sm",
     "transition hover:brightness-110 focus-visible:outline-none",
     "focus-visible:ring-2 focus-visible:ring-donna-accent/50",

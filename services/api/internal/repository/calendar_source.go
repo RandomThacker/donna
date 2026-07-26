@@ -93,6 +93,12 @@ UPDATE calendar_sources SET
 	updated_at = $2
 WHERE id = $1 AND deleted_at IS NULL
 RETURNING` + calendarSourceColumns
+
+	sqlUpdateCalendarSourcesSyncEnabledByAccount = `
+UPDATE calendar_sources SET
+	sync_enabled = $2,
+	updated_at = $3
+WHERE connected_account_id = $1 AND deleted_at IS NULL`
 )
 
 // CalendarSourceRepository persists calendar feeds.
@@ -106,6 +112,7 @@ type CalendarSourceRepository interface {
 	SoftDeleteByProviderIDs(ctx context.Context, accountID uuid.UUID, providerIDs []string, deletedAt time.Time) (int64, error)
 	UpdateEventSyncState(ctx context.Context, id uuid.UUID, syncCursor *string, lastSyncedAt, updatedAt time.Time) (entity.CalendarSource, error)
 	ClearEventSyncCursor(ctx context.Context, id uuid.UUID, updatedAt time.Time) (entity.CalendarSource, error)
+	UpdateSyncEnabledByAccount(ctx context.Context, accountID uuid.UUID, syncEnabled bool, updatedAt time.Time) (int64, error)
 	WithTx(tx pgx.Tx) CalendarSourceRepository
 }
 
@@ -273,6 +280,19 @@ func (r *calendarSourceRepository) ClearEventSyncCursor(ctx context.Context, id 
 		return entity.CalendarSource{}, fmt.Errorf("clear calendar source event sync cursor: %w", err)
 	}
 	return source, nil
+}
+
+func (r *calendarSourceRepository) UpdateSyncEnabledByAccount(
+	ctx context.Context,
+	accountID uuid.UUID,
+	syncEnabled bool,
+	updatedAt time.Time,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlUpdateCalendarSourcesSyncEnabledByAccount, accountID, syncEnabled, updatedAt)
+	if err != nil {
+		return 0, fmt.Errorf("update calendar source sync_enabled: %w", err)
+	}
+	return tag.RowsAffected(), nil
 }
 
 func collectCalendarSources(rows pgx.Rows) ([]entity.CalendarSource, error) {

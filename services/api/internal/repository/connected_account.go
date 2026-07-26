@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/RandomThacker/donna/services/api/internal/apperr"
+	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -42,6 +43,12 @@ WHERE user_id = $1 AND provider = $2 AND deleted_at IS NULL
 ORDER BY created_at ASC
 LIMIT 1`
 
+	sqlSelectConnectedAccountsByUser = `
+SELECT` + connectedAccountColumns + `
+FROM connected_accounts
+WHERE user_id = $1 AND deleted_at IS NULL
+ORDER BY created_at ASC`
+
 	sqlSelectConnectedAccountByID = `
 SELECT` + connectedAccountColumns + `
 FROM connected_accounts
@@ -54,6 +61,14 @@ UPDATE connected_accounts SET
 	scopes = $4,
 	status = $5,
 	updated_at = $6
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + connectedAccountColumns
+
+	sqlUpdateConnectedAccountProfile = `
+UPDATE connected_accounts SET
+	display_name = $2,
+	provider_metadata = $3::jsonb,
+	updated_at = $4
 WHERE id = $1 AND deleted_at IS NULL
 RETURNING` + connectedAccountColumns
 
@@ -88,6 +103,14 @@ UPDATE connected_accounts SET
 	updated_at = $2
 WHERE id = $1 AND deleted_at IS NULL
 RETURNING` + connectedAccountColumns
+
+	sqlSoftDeleteConnectedAccount = `
+UPDATE connected_accounts SET
+	status = $2,
+	deleted_at = $3,
+	updated_at = $3
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + connectedAccountColumns
 )
 
 // CalendarSyncRecord is persistence input for sync observability.
@@ -113,10 +136,13 @@ type ConnectedAccountRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (entity.ConnectedAccount, error)
 	GetByProviderAccount(ctx context.Context, provider, providerAccountID string) (entity.ConnectedAccount, error)
 	GetByUserAndProvider(ctx context.Context, userID uuid.UUID, provider string) (entity.ConnectedAccount, error)
+	ListByUserID(ctx context.Context, userID uuid.UUID) ([]entity.ConnectedAccount, error)
 	UpdateCredentials(ctx context.Context, id uuid.UUID, credentialsRef string, tokenExpiresAt *time.Time, scopes []string, status string, updatedAt time.Time) (entity.ConnectedAccount, error)
+	UpdateProfile(ctx context.Context, id uuid.UUID, displayName *string, providerMetadata []byte, updatedAt time.Time) (entity.ConnectedAccount, error)
 	MarkCalendarSyncRunning(ctx context.Context, id uuid.UUID, status string, updatedAt time.Time) (entity.ConnectedAccount, error)
 	RecordCalendarSync(ctx context.Context, id uuid.UUID, record CalendarSyncRecord) (entity.ConnectedAccount, error)
 	ClearCalendarListSyncToken(ctx context.Context, id uuid.UUID, updatedAt time.Time) (entity.ConnectedAccount, error)
+	SoftDelete(ctx context.Context, id uuid.UUID, deletedAt time.Time) (entity.ConnectedAccount, error)
 	WithTx(tx pgx.Tx) ConnectedAccountRepository
 }
 
@@ -200,6 +226,27 @@ func (r *connectedAccountRepository) GetByUserAndProvider(ctx context.Context, u
 	return account, nil
 }
 
+func (r *connectedAccountRepository) ListByUserID(ctx context.Context, userID uuid.UUID) ([]entity.ConnectedAccount, error) {
+	rows, err := r.q.Query(ctx, sqlSelectConnectedAccountsByUser, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list connected accounts by user: %w", err)
+	}
+	defer rows.Close()
+
+	out := make([]entity.ConnectedAccount, 0)
+	for rows.Next() {
+		account, scanErr := scanConnectedAccount(rows)
+		if scanErr != nil {
+			return nil, fmt.Errorf("scan connected account: %w", scanErr)
+		}
+		out = append(out, account)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list connected accounts by user: %w", err)
+	}
+	return out, nil
+}
+
 func (r *connectedAccountRepository) UpdateCredentials(
 	ctx context.Context,
 	id uuid.UUID,
@@ -225,6 +272,32 @@ func (r *connectedAccountRepository) UpdateCredentials(
 			return entity.ConnectedAccount{}, apperr.ErrNotFound
 		}
 		return entity.ConnectedAccount{}, fmt.Errorf("update connected account credentials: %w", err)
+	}
+	return account, nil
+}
+
+func (r *connectedAccountRepository) UpdateProfile(
+	ctx context.Context,
+	id uuid.UUID,
+	displayName *string,
+	providerMetadata []byte,
+	updatedAt time.Time,
+) (entity.ConnectedAccount, error) {
+	meta := providerMetadata
+	if len(meta) == 0 {
+		meta = []byte("{}")
+	}
+	account, err := scanConnectedAccount(r.q.QueryRow(ctx, sqlUpdateConnectedAccountProfile,
+		id,
+		displayName,
+		meta,
+		updatedAt,
+	))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.ConnectedAccount{}, apperr.ErrNotFound
+		}
+		return entity.ConnectedAccount{}, fmt.Errorf("update connected account profile: %w", err)
 	}
 	return account, nil
 }
@@ -271,6 +344,21 @@ func (r *connectedAccountRepository) ClearCalendarListSyncToken(ctx context.Cont
 			return entity.ConnectedAccount{}, apperr.ErrNotFound
 		}
 		return entity.ConnectedAccount{}, fmt.Errorf("clear calendar list sync token: %w", err)
+	}
+	return account, nil
+}
+
+func (r *connectedAccountRepository) SoftDelete(ctx context.Context, id uuid.UUID, deletedAt time.Time) (entity.ConnectedAccount, error) {
+	account, err := scanConnectedAccount(r.q.QueryRow(ctx, sqlSoftDeleteConnectedAccount,
+		id,
+		constant.ConnectedAccountStatusDisconnected,
+		deletedAt,
+	))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.ConnectedAccount{}, apperr.ErrNotFound
+		}
+		return entity.ConnectedAccount{}, fmt.Errorf("soft delete connected account: %w", err)
 	}
 	return account, nil
 }

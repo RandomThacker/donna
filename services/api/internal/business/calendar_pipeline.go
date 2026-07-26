@@ -3,8 +3,10 @@ package business
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/RandomThacker/donna/services/api/internal/apperr"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/idgen"
@@ -42,15 +44,84 @@ type CalendarPipelineResult struct {
 	SyncStatus         string
 }
 
-// SyncPipeline runs the full calendar sync orchestration for a user.
-// Steps: sync sources → sync events for each enabled calendar → aggregate + persist.
+// SyncPipeline runs the full calendar sync orchestration for a user across all syncable accounts.
+// Steps per account: sync sources → sync events for each enabled calendar → aggregate + persist.
 // Per-calendar event failures do not abort the run.
 func (s *CalendarService) SyncPipeline(ctx context.Context, userID uuid.UUID, trigger string) (CalendarPipelineResult, error) {
-	account, err := s.requireGoogleAccount(ctx, userID)
+	accounts, err := s.listSyncableAccounts(ctx, userID)
 	if err != nil {
 		return CalendarPipelineResult{}, err
 	}
-	return s.runPipeline(ctx, account, trigger)
+	if len(accounts) == 0 {
+		return CalendarPipelineResult{}, fmt.Errorf("%w: connect a calendar provider and grant Calendar access first", apperr.ErrNotFound)
+	}
+	if trigger == "" {
+		trigger = constant.CalendarSyncTriggerManual
+	}
+
+	started := s.now().UTC()
+	combined := CalendarPipelineResult{
+		Trigger:   trigger,
+		StartedAt: started,
+		Failures:  make([]CalendarSyncFailure, 0),
+	}
+
+	sourcesHardFails := 0
+	var lastHardErr error
+
+	for _, account := range accounts {
+		partial, runErr := s.runPipeline(ctx, account, trigger)
+		if runErr != nil && len(accounts) == 1 {
+			return partial, runErr
+		}
+
+		combined.CalendarsProcessed += partial.CalendarsProcessed
+		combined.SourcesCreated += partial.SourcesCreated
+		combined.SourcesUpdated += partial.SourcesUpdated
+		combined.SourcesDeleted += partial.SourcesDeleted
+		combined.EventsCreated += partial.EventsCreated
+		combined.EventsUpdated += partial.EventsUpdated
+		combined.EventsDeleted += partial.EventsDeleted
+		combined.Failures = append(combined.Failures, partial.Failures...)
+		if partial.Incremental {
+			combined.Incremental = true
+		}
+		if partial.RunID != uuid.Nil {
+			combined.RunID = partial.RunID
+		}
+
+		if runErr != nil {
+			sourcesHardFails++
+			lastHardErr = runErr
+		}
+	}
+
+	liveSources, listErr := s.sources.ListByUserID(ctx, userID)
+	if listErr != nil {
+		if s.log != nil {
+			s.log.Warn(ctx, "calendar pipeline completed but source readback failed", constant.LogAttrError, listErr)
+		}
+	} else {
+		combined.Sources = liveSources
+	}
+
+	finished := s.now().UTC()
+	combined.FinishedAt = finished
+	combined.DurationMs = int(finished.Sub(started).Milliseconds())
+
+	if sourcesHardFails == len(accounts) {
+		combined.Status = constant.CalendarSyncRunStatusFailed
+		combined.SyncStatus = constant.CalendarSyncStatusFailed
+		return combined, lastHardErr
+	}
+	if len(combined.Failures) == 0 {
+		combined.Status = constant.CalendarSyncRunStatusSucceeded
+		combined.SyncStatus = constant.CalendarSyncStatusSucceeded
+	} else {
+		combined.Status = constant.CalendarSyncRunStatusPartial
+		combined.SyncStatus = constant.CalendarSyncStatusSucceeded
+	}
+	return combined, nil
 }
 
 // SyncPipelineForAccount runs the full pipeline for a connected account (scheduler).
@@ -90,6 +161,7 @@ func (s *CalendarService) runPipeline(ctx context.Context, account entity.Connec
 			"trigger", trigger,
 			"run_id", result.RunID.String(),
 			"connected_account_id", account.ID.String(),
+			"provider", account.Provider,
 		)
 	}
 
@@ -114,6 +186,7 @@ func (s *CalendarService) runPipeline(ctx context.Context, account entity.Connec
 	if s.log != nil {
 		s.log.Info(ctx, "calendar sources phase complete",
 			constant.LogAttrUserID, account.UserID.String(),
+			"provider", account.Provider,
 			"created", result.SourcesCreated,
 			"updated", result.SourcesUpdated,
 			"deleted", result.SourcesDeleted,
@@ -121,8 +194,8 @@ func (s *CalendarService) runPipeline(ctx context.Context, account entity.Connec
 		)
 	}
 
-	// Re-list enabled sources after sources sync (captures added/removed calendars).
-	liveSources, listErr := s.sources.ListByUserID(ctx, account.UserID)
+	// Re-list enabled sources for this account after sources sync.
+	liveSources, listErr := s.sources.ListByConnectedAccountID(ctx, account.ID)
 	if listErr != nil {
 		result.Status = constant.CalendarSyncRunStatusFailed
 		result.SyncStatus = constant.CalendarSyncStatusFailed
@@ -149,6 +222,9 @@ func (s *CalendarService) runPipeline(ctx context.Context, account entity.Connec
 		}
 
 		for _, source := range liveSources {
+			if source.ConnectedAccountID != account.ID {
+				continue
+			}
 			if !source.SyncEnabled || source.DeletedAt != nil {
 				continue
 			}
@@ -265,6 +341,7 @@ func (s *CalendarService) finishPipeline(
 	if s.log != nil {
 		s.log.Info(ctx, "calendar sync pipeline finished",
 			constant.LogAttrUserID, account.UserID.String(),
+			"provider", account.Provider,
 			"trigger", result.Trigger,
 			"run_id", result.RunID.String(),
 			"status", result.Status,

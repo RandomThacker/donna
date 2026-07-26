@@ -61,16 +61,19 @@ type CalendarSyncFailureResponse struct {
 
 // CalendarSourcesResponse is returned by GET /calendar/sources.
 type CalendarSourcesResponse struct {
-	Sources []CalendarSourceResponse            `json:"sources"`
-	Account *CalendarConnectedAccountResponse   `json:"account,omitempty"`
-	Sync    *CalendarAccountSyncResponse        `json:"sync,omitempty"`
+	Sources  []CalendarSourceResponse          `json:"sources"`
+	Accounts []CalendarConnectedAccountResponse `json:"accounts,omitempty"`
+	Account  *CalendarConnectedAccountResponse `json:"account,omitempty"`
+	Sync     *CalendarAccountSyncResponse      `json:"sync,omitempty"`
 }
 
-// CalendarConnectedAccountResponse is the parent Google account for calendar sources.
+// CalendarConnectedAccountResponse is a connected calendar account for the sources UI.
 type CalendarConnectedAccountResponse struct {
 	ID          string  `json:"id"`
 	Provider    string  `json:"provider"`
 	DisplayName *string `json:"display_name,omitempty"`
+	Email       *string `json:"email,omitempty"`
+	AvatarURL   *string `json:"avatar_url,omitempty"`
 }
 
 // CalendarConnectedAccountFromEntity maps a connected account brief for the sources UI.
@@ -82,7 +85,24 @@ func CalendarConnectedAccountFromEntity(account entity.ConnectedAccount) *Calend
 		ID:          account.ID.String(),
 		Provider:    account.Provider,
 		DisplayName: account.DisplayName,
+		Email:       emailFromProviderMetadata(account.ProviderMetadata, account.DisplayName),
+		AvatarURL:   avatarURLFromProviderMetadata(account.ProviderMetadata),
 	}
+}
+
+// CalendarConnectedAccountsFromEntities maps connected accounts for the sources UI.
+func CalendarConnectedAccountsFromEntities(accounts []entity.ConnectedAccount) []CalendarConnectedAccountResponse {
+	out := make([]CalendarConnectedAccountResponse, 0, len(accounts))
+	for _, account := range accounts {
+		if account.ID == uuid.Nil {
+			continue
+		}
+		mapped := CalendarConnectedAccountFromEntity(account)
+		if mapped != nil {
+			out = append(out, *mapped)
+		}
+	}
+	return out
 }
 
 // CalendarAccountSyncResponse exposes connected-account sync observability (Donna DB).

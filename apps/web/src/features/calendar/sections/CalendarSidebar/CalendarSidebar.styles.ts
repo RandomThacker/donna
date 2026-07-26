@@ -30,6 +30,8 @@ export const sidebarPanelStyles = {
   checkboxOn: "border-donna-accent bg-donna-accent text-donna-on-accent",
   colorDot: "h-2.5 w-2.5 shrink-0 rounded-full",
   sourceName: "min-w-0 flex-1 truncate text-sm text-donna-text",
+  connectHint: "text-xs leading-relaxed text-donna-muted",
+  connectLink: "font-semibold text-donna-accent hover:underline",
   syncCard: "space-y-3 rounded-2xl border border-donna-border bg-donna-surface-2 p-3",
   syncMeta: "space-y-1",
   syncLabel: "text-xs text-donna-muted",

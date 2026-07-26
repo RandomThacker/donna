@@ -9,3 +9,15 @@ export function getApiBaseUrl(): string {
 export function getGoogleOAuthStartUrl(): string {
   return `${getApiBaseUrl()}/api/v1/auth/google`;
 }
+
+export function getMicrosoftOAuthStartUrl(): string {
+  return `${getApiBaseUrl()}/api/v1/auth/microsoft`;
+}
+
+export function getGoogleIntegrationStartUrl(): string {
+  return `${getApiBaseUrl()}/api/v1/integrations/google`;
+}
+
+export function getMicrosoftIntegrationStartUrl(): string {
+  return `${getApiBaseUrl()}/api/v1/integrations/microsoft`;
+}

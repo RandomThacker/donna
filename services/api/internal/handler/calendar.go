@@ -77,9 +77,10 @@ func (h *CalendarHandler) ListSources(c *gin.Context) {
 		return
 	}
 	response.OK(c, constant.MessageOK, model.CalendarSourcesResponse{
-		Sources: model.CalendarSourcesFromEntities(sources.Sources),
-		Account: model.CalendarConnectedAccountFromEntity(sources.Account),
-		Sync:    model.CalendarAccountSyncFromEntity(sources.Account),
+		Sources:  model.CalendarSourcesFromEntities(sources.Sources),
+		Accounts: model.CalendarConnectedAccountsFromEntities(sources.Accounts),
+		Account:  model.CalendarConnectedAccountFromEntity(sources.Account),
+		Sync:     model.CalendarAccountSyncFromEntity(sources.Account),
 	})
 }
 

@@ -13,24 +13,46 @@ const (
 	PathUsers    = "/users"
 	PathUserByID = "/users/:id"
 
-	PathAuthGoogle         = "/auth/google"
-	PathAuthGoogleCallback = "/auth/google/callback"
-	PathAuthLogout         = "/auth/logout"
-	PathMe                 = "/me"
+	PathAuthGoogle            = "/auth/google"
+	PathAuthGoogleCallback    = "/auth/google/callback"
+	PathAuthMicrosoft         = "/auth/microsoft"
+	PathAuthMicrosoftCallback = "/auth/microsoft/callback"
+	PathAuthLogout            = "/auth/logout"
+	PathMe                    = "/me"
 
 	PathCalendarSync       = "/calendar/sync"
 	PathCalendarSyncEnsure = "/calendar/sync/ensure"
 	PathCalendarSources    = "/calendar/sources"
 	PathCalendarEventsSync = "/calendar/events/sync"
 	PathCalendarEvents     = "/calendar/events"
+
+	PathIntegrations                  = "/integrations"
+	PathIntegrationsGoogle            = "/integrations/google"
+	PathIntegrationsGoogleCallback    = "/integrations/google/callback"
+	PathIntegrationsMicrosoft         = "/integrations/microsoft"
+	PathIntegrationsMicrosoftCallback = "/integrations/microsoft/callback"
+	PathIntegrationsICS               = "/integrations/ics"
+	PathIntegrationsICSByID           = "/integrations/ics/:id"
+	PathIntegrationsICSSync           = "/integrations/ics/:id/sync"
+	PathIntegrationsByID              = "/integrations/:id"
 )
 
 // Full paths (prefix + relative). Useful for docs, clients, and tests.
 const (
-	EndpointHealth             = APIPrefixV1 + PathHealth
-	EndpointReady              = APIPrefixV1 + PathReady
-	EndpointVersion            = APIPrefixV1 + PathVersion
-	EndpointUsers              = APIPrefixV1 + PathUsers
-	EndpointAuthGoogle         = APIPrefixV1 + PathAuthGoogle
-	EndpointAuthGoogleCallback = APIPrefixV1 + PathAuthGoogleCallback
+	EndpointHealth                        = APIPrefixV1 + PathHealth
+	EndpointReady                         = APIPrefixV1 + PathReady
+	EndpointVersion                       = APIPrefixV1 + PathVersion
+	EndpointUsers                         = APIPrefixV1 + PathUsers
+	EndpointAuthGoogle                    = APIPrefixV1 + PathAuthGoogle
+	EndpointAuthGoogleCallback            = APIPrefixV1 + PathAuthGoogleCallback
+	EndpointAuthMicrosoft                 = APIPrefixV1 + PathAuthMicrosoft
+	EndpointAuthMicrosoftCallback         = APIPrefixV1 + PathAuthMicrosoftCallback
+	EndpointIntegrations                  = APIPrefixV1 + PathIntegrations
+	EndpointIntegrationsGoogle            = APIPrefixV1 + PathIntegrationsGoogle
+	EndpointIntegrationsGoogleCallback    = APIPrefixV1 + PathIntegrationsGoogleCallback
+	EndpointIntegrationsMicrosoft         = APIPrefixV1 + PathIntegrationsMicrosoft
+	EndpointIntegrationsMicrosoftCallback = APIPrefixV1 + PathIntegrationsMicrosoftCallback
+	EndpointIntegrationsICS               = APIPrefixV1 + PathIntegrationsICS
+	EndpointIntegrationsICSByID           = APIPrefixV1 + PathIntegrationsICSByID
+	EndpointIntegrationsICSSync           = APIPrefixV1 + PathIntegrationsICSSync
 )

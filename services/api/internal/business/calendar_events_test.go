@@ -9,41 +9,15 @@ import (
 
 	"github.com/RandomThacker/donna/services/api/internal/apperr"
 	"github.com/RandomThacker/donna/services/api/internal/business"
+	"github.com/RandomThacker/donna/services/api/internal/calendarprovider"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
-	"github.com/RandomThacker/donna/services/api/internal/googlecalendar"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/RandomThacker/donna/services/api/internal/seal"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
-
-type mockEventsAPI struct {
-	byCalendar map[string]googlecalendar.EventListResult
-	calls      []string
-	goneOnce   map[string]bool
-}
-
-func (m *mockEventsAPI) ListCalendars(context.Context, string, googlecalendar.ListOptions) (googlecalendar.ListResult, error) {
-	return googlecalendar.ListResult{}, errors.New("unused")
-}
-
-func (m *mockEventsAPI) ListEvents(_ context.Context, _ string, calendarID string, opts googlecalendar.EventListOptions) (googlecalendar.EventListResult, error) {
-	m.calls = append(m.calls, calendarID+"|"+opts.SyncToken)
-	if m.goneOnce != nil && m.goneOnce[calendarID] && opts.SyncToken != "" {
-		m.goneOnce[calendarID] = false
-		return googlecalendar.EventListResult{}, &googlecalendar.GoneError{Body: "gone"}
-	}
-	result, ok := m.byCalendar[calendarID]
-	if !ok {
-		return googlecalendar.EventListResult{}, nil
-	}
-	if opts.SyncToken != "" {
-		result.Incremental = true
-	}
-	return result, nil
-}
 
 type mockEventRepo struct {
 	byKey map[string]entity.CalendarEvent
@@ -130,6 +104,16 @@ func (m *mockEventRepo) SoftDeleteMissing(_ context.Context, sourceID uuid.UUID,
 	return n, nil
 }
 
+func (m *mockEventRepo) CountLiveByConnectedAccountID(context.Context, uuid.UUID) (int64, error) {
+	var n int64
+	for _, event := range m.byKey {
+		if event.DeletedAt == nil {
+			n++
+		}
+	}
+	return n, nil
+}
+
 func (m *mockEventRepo) WithTx(pgx.Tx) repository.CalendarEventRepository { return m }
 
 type mockEventSourceRepo struct {
@@ -145,8 +129,14 @@ func (m *mockEventSourceRepo) GetByAccountAndProviderCalendar(context.Context, u
 func (m *mockEventSourceRepo) ListByUserID(context.Context, uuid.UUID) ([]entity.CalendarSource, error) {
 	return m.sources, nil
 }
-func (m *mockEventSourceRepo) ListByConnectedAccountID(context.Context, uuid.UUID) ([]entity.CalendarSource, error) {
-	return m.sources, nil
+func (m *mockEventSourceRepo) ListByConnectedAccountID(_ context.Context, accountID uuid.UUID) ([]entity.CalendarSource, error) {
+	out := make([]entity.CalendarSource, 0)
+	for _, source := range m.sources {
+		if source.ConnectedAccountID == accountID {
+			out = append(out, source)
+		}
+	}
+	return out, nil
 }
 func (m *mockEventSourceRepo) UpdateFromSync(context.Context, entity.CalendarSource) (entity.CalendarSource, error) {
 	return entity.CalendarSource{}, errors.New("unused")
@@ -178,10 +168,23 @@ func (m *mockEventSourceRepo) ClearEventSyncCursor(_ context.Context, id uuid.UU
 	}
 	return entity.CalendarSource{}, apperr.ErrNotFound
 }
+func (m *mockEventSourceRepo) UpdateSyncEnabledByAccount(_ context.Context, accountID uuid.UUID, syncEnabled bool, updatedAt time.Time) (int64, error) {
+	var n int64
+	for i := range m.sources {
+		if m.sources[i].ConnectedAccountID != accountID || m.sources[i].DeletedAt != nil {
+			continue
+		}
+		m.sources[i].SyncEnabled = syncEnabled
+		m.sources[i].UpdatedAt = updatedAt
+		n++
+	}
+	return n, nil
+}
 func (m *mockEventSourceRepo) WithTx(pgx.Tx) repository.CalendarSourceRepository { return m }
 
 type mockEventAccountRepo struct {
-	account entity.ConnectedAccount
+	account  entity.ConnectedAccount
+	accounts []entity.ConnectedAccount
 }
 
 func (m *mockEventAccountRepo) Create(context.Context, entity.ConnectedAccount) (entity.ConnectedAccount, error) {
@@ -196,7 +199,19 @@ func (m *mockEventAccountRepo) GetByProviderAccount(context.Context, string, str
 func (m *mockEventAccountRepo) GetByUserAndProvider(context.Context, uuid.UUID, string) (entity.ConnectedAccount, error) {
 	return m.account, nil
 }
+func (m *mockEventAccountRepo) ListByUserID(context.Context, uuid.UUID) ([]entity.ConnectedAccount, error) {
+	if len(m.accounts) > 0 {
+		return m.accounts, nil
+	}
+	if m.account.ID == uuid.Nil {
+		return []entity.ConnectedAccount{}, nil
+	}
+	return []entity.ConnectedAccount{m.account}, nil
+}
 func (m *mockEventAccountRepo) UpdateCredentials(context.Context, uuid.UUID, string, *time.Time, []string, string, time.Time) (entity.ConnectedAccount, error) {
+	return m.account, nil
+}
+func (m *mockEventAccountRepo) UpdateProfile(context.Context, uuid.UUID, *string, []byte, time.Time) (entity.ConnectedAccount, error) {
 	return m.account, nil
 }
 func (m *mockEventAccountRepo) MarkCalendarSyncRunning(context.Context, uuid.UUID, string, time.Time) (entity.ConnectedAccount, error) {
@@ -206,6 +221,9 @@ func (m *mockEventAccountRepo) RecordCalendarSync(context.Context, uuid.UUID, re
 	return m.account, nil
 }
 func (m *mockEventAccountRepo) ClearCalendarListSyncToken(context.Context, uuid.UUID, time.Time) (entity.ConnectedAccount, error) {
+	return m.account, nil
+}
+func (m *mockEventAccountRepo) SoftDelete(context.Context, uuid.UUID, time.Time) (entity.ConnectedAccount, error) {
 	return m.account, nil
 }
 func (m *mockEventAccountRepo) WithTx(pgx.Tx) repository.ConnectedAccountRepository { return m }
@@ -222,7 +240,7 @@ func newEventSyncService(
 	secrets *mockCalendarSecretRepo,
 	sources *mockEventSourceRepo,
 	events *mockEventRepo,
-	api *mockEventsAPI,
+	provider *mockCalendarProvider,
 	key []byte,
 ) *business.CalendarService {
 	t.Helper()
@@ -232,10 +250,14 @@ func newEventSyncService(
 		Sources:  sources,
 		Events:   events,
 		Tx:       fakeCalendarTx{},
-		OAuth:    mockCalendarOAuth{},
-		Calendar: api,
-		SealKey:  key,
-		Log:      eventTestLog(),
+		Providers: map[string]calendarprovider.Provider{
+			constant.AuthProviderGoogle: provider,
+		},
+		Tokens: map[string]calendarprovider.TokenRefresher{
+			constant.AuthProviderGoogle: mockTokenRefresher{},
+		},
+		SealKey: key,
+		Log:     eventTestLog(),
 	})
 }
 
@@ -272,14 +294,14 @@ func TestSyncEventsFullIncrementalUpdateDelete(t *testing.T) {
 	events := &mockEventRepo{byKey: map[string]entity.CalendarEvent{}}
 	start := time.Date(2026, 7, 25, 10, 0, 0, 0, time.UTC)
 	end := start.Add(time.Hour)
-	api := &mockEventsAPI{byCalendar: map[string]googlecalendar.EventListResult{
+	api := &mockCalendarProvider{eventsByCal: map[string]calendarprovider.ListEventsResult{
 		"primary": {
 			NextSyncToken: "evt-sync-1",
-			Events: []googlecalendar.RemoteEvent{
+			Events: []calendarprovider.RemoteEvent{
 				{
 					ID: "evt-1", Title: "Standup", StartsAt: start, EndsAt: end,
 					Status: "confirmed", OrganizerEmail: "a@example.com",
-					Attendees: []googlecalendar.RemoteAttendee{{Email: "b@example.com"}},
+					Attendees: []calendarprovider.RemoteAttendee{{Email: "b@example.com"}},
 					UpdatedAt: start, Raw: map[string]any{"id": "evt-1"},
 				},
 				{
@@ -303,10 +325,10 @@ func TestSyncEventsFullIncrementalUpdateDelete(t *testing.T) {
 		t.Fatalf("sync cursor = %#v", sources.sources[0].SyncCursor)
 	}
 
-	api.byCalendar["primary"] = googlecalendar.EventListResult{
+	api.eventsByCal["primary"] = calendarprovider.ListEventsResult{
 		NextSyncToken: "evt-sync-2",
 		Incremental:   true,
-		Events: []googlecalendar.RemoteEvent{
+		Events: []calendarprovider.RemoteEvent{
 			{
 				ID: "evt-1", Title: "Standup Renamed", StartsAt: start, EndsAt: end,
 				Status: "confirmed", Raw: map[string]any{"id": "evt-1"},
@@ -321,8 +343,8 @@ func TestSyncEventsFullIncrementalUpdateDelete(t *testing.T) {
 	if second.CreatedCount != 0 || second.UpdatedCount != 1 || second.RemovedCount != 1 {
 		t.Fatalf("second counts = %+v", second)
 	}
-	if len(api.calls) < 2 || api.calls[1] != "primary|evt-sync-1" {
-		t.Fatalf("expected incremental token call, calls=%v", api.calls)
+	if len(api.eventCalls) < 2 || api.eventCalls[1] != "primary|evt-sync-1" {
+		t.Fatalf("expected incremental token call, calls=%v", api.eventCalls)
 	}
 	got, err := events.GetBySourceAndProviderEvent(context.Background(), sourceID, "evt-1")
 	if err != nil || got.Title != "Standup Renamed" {
@@ -356,12 +378,12 @@ func TestSyncEventsRecoversFromGoneToken(t *testing.T) {
 		ProviderCalendarID: "primary", SyncEnabled: true, SyncCursor: &tok,
 	}}}
 	start := time.Now().UTC().Truncate(time.Hour)
-	api := &mockEventsAPI{
-		goneOnce: map[string]bool{"primary": true},
-		byCalendar: map[string]googlecalendar.EventListResult{
+	api := &mockCalendarProvider{
+		eventsGoneOnce: map[string]bool{"primary": true},
+		eventsByCal: map[string]calendarprovider.ListEventsResult{
 			"primary": {
 				NextSyncToken: "fresh",
-				Events: []googlecalendar.RemoteEvent{{
+				Events: []calendarprovider.RemoteEvent{{
 					ID: "evt-9", Title: "Recovered", StartsAt: start, EndsAt: start.Add(time.Hour),
 					Status: "confirmed", Raw: map[string]any{"id": "evt-9"},
 				}},
@@ -383,6 +405,68 @@ func TestSyncEventsRecoversFromGoneToken(t *testing.T) {
 	}
 }
 
+func TestSyncEventsReplaceAllSoftDeletesMissing(t *testing.T) {
+	key, err := seal.KeyFromSecret("calendar-events-test-secret-key!!")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userID := uuid.MustParse("01900000-0000-7000-8000-000000000901")
+	accountID := uuid.MustParse("01900000-0000-7000-8000-000000000902")
+	sourceID := uuid.MustParse("01900000-0000-7000-8000-000000000903")
+	accounts := &mockEventAccountRepo{account: entity.ConnectedAccount{
+		ID: accountID, UserID: userID, Provider: constant.AuthProviderICS,
+		Status: constant.ConnectedAccountStatusActive, Scopes: []string{constant.ICSScopeCalendar},
+		CredentialsRef: "cred_ics",
+	}}
+	secrets := &mockCalendarSecretRepo{secret: entity.CredentialSecret{
+		Ref: "cred_ics", Ciphertext: sealedCred(t, key, "https://example.com/feed.ics", "", time.Now().Add(time.Hour).Unix()),
+	}}
+	sources := &mockEventSourceRepo{sources: []entity.CalendarSource{{
+		ID: sourceID, UserID: userID, ConnectedAccountID: accountID,
+		ProviderCalendarID: "ics_feed", SyncEnabled: true,
+	}}}
+	start := time.Date(2026, 7, 25, 10, 0, 0, 0, time.UTC)
+	end := start.Add(time.Hour)
+	api := &mockCalendarProvider{eventsByCal: map[string]calendarprovider.ListEventsResult{
+		"ics_feed": {
+			ReplaceAll: true,
+			Events: []calendarprovider.RemoteEvent{
+				{ID: "keep", Title: "Keep", StartsAt: start, EndsAt: end, Status: "confirmed"},
+				{ID: "gone-later", Title: "Temp", StartsAt: start, EndsAt: end, Status: "confirmed"},
+			},
+		},
+	}}
+	events := &mockEventRepo{byKey: map[string]entity.CalendarEvent{}}
+	svc := business.NewCalendarService(business.CalendarServiceDeps{
+		Accounts: accounts, Secrets: secrets, Sources: sources, Events: events,
+		Tx: fakeCalendarTx{},
+		Providers: map[string]calendarprovider.Provider{constant.AuthProviderICS: api},
+		SealKey:   key,
+		Log:       eventTestLog(),
+	})
+
+	if _, err := svc.SyncEvents(context.Background(), userID); err != nil {
+		t.Fatal(err)
+	}
+	api.eventsByCal["ics_feed"] = calendarprovider.ListEventsResult{
+		ReplaceAll: true,
+		Events: []calendarprovider.RemoteEvent{
+			{ID: "keep", Title: "Keep", StartsAt: start, EndsAt: end, Status: "confirmed"},
+		},
+	}
+	second, err := svc.SyncEvents(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.RemovedCount != 1 {
+		t.Fatalf("want soft-delete of missing event, got %+v", second)
+	}
+	deleted, err := events.GetBySourceAndProviderEvent(context.Background(), sourceID, "gone-later")
+	if err != nil || deleted.DeletedAt == nil {
+		t.Fatalf("missing event not soft-deleted: %#v err=%v", deleted, err)
+	}
+}
+
 func TestListEventsReadsLocalDB(t *testing.T) {
 	userID := uuid.MustParse("01900000-0000-7000-8000-000000000821")
 	sourceID := uuid.MustParse("01900000-0000-7000-8000-000000000822")
@@ -397,7 +481,7 @@ func TestListEventsReadsLocalDB(t *testing.T) {
 		},
 	}}
 	key, _ := seal.KeyFromSecret("calendar-events-test-secret-key!!")
-	svc := newEventSyncService(t, &mockEventAccountRepo{}, &mockCalendarSecretRepo{}, &mockEventSourceRepo{}, events, &mockEventsAPI{}, key)
+	svc := newEventSyncService(t, &mockEventAccountRepo{}, &mockCalendarSecretRepo{}, &mockEventSourceRepo{}, events, &mockCalendarProvider{}, key)
 
 	got, err := svc.ListEvents(context.Background(), userID, start.Add(-time.Hour), start.Add(2*time.Hour))
 	if err != nil {

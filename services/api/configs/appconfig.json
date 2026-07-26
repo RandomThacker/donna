@@ -9,5 +9,6 @@
   "jwt_expiry": "${JWT_EXPIRY:24h}",
   "credentials_encryption_key": "${CREDENTIALS_ENCRYPTION_KEY}",
   "frontend_success_url": "${AUTH_FRONTEND_SUCCESS_URL:http://localhost:3000/auth/callback}",
+  "integration_frontend_success_url": "${INTEGRATION_FRONTEND_SUCCESS_URL:http://localhost:3000/dashboard/settings}",
   "cookie_secure": "${COOKIE_SECURE:false}"
 }

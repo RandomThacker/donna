@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 
+import { useAuth } from "@/features/auth";
+
 import {
   listCalendarEvents,
   listCalendarSources,
@@ -11,6 +13,7 @@ import {
 import {
   allDayEventsForDay,
   colorForSource,
+  dedupeHolidayEvents,
   eventsOverlappingDay,
   layoutTimedEvents,
 } from "./Calendar.layout";
@@ -21,6 +24,7 @@ import type {
   CalendarSource,
   CalendarView,
 } from "./Calendar.types";
+import { resolveCalendarTimeZone } from "./Calendar.timezone";
 import {
   calendarQueryKeys,
   navigateCursor,
@@ -38,6 +42,9 @@ function accountLabel(
   sources: CalendarSource[],
   account?: CalendarConnectedAccount,
 ): string {
+  if (account?.email?.trim()) {
+    return account.email.trim();
+  }
   const primary = sources.find((s) => s.is_primary_on_provider);
   if (primary?.name && EMAIL_RE.test(primary.name.trim())) {
     return primary.name.trim();
@@ -49,36 +56,60 @@ function accountLabel(
   if (account?.display_name?.trim()) {
     return account.display_name.trim();
   }
-  if (primary?.name) {
-    return primary.name;
+  if (primary?.name?.trim()) {
+    return primary.name.trim();
   }
-  return sources[0]?.name ?? "Google Calendar";
+  return sources[0]?.name?.trim() || "Calendar";
 }
 
-function groupSourcesByAccount(
+function buildAccountGroups(
   sources: CalendarSource[],
-  account: CalendarConnectedAccount | undefined,
+  accounts: CalendarConnectedAccount[],
   colorFor: (sourceId: string) => string,
   visibleSourceIds: Set<string>,
 ): CalendarAccountGroup[] {
   const byAccount = new Map<string, CalendarSource[]>();
   for (const source of sources) {
     const key = source.connected_account_id;
+    if (!key) {
+      continue;
+    }
     const list = byAccount.get(key) ?? [];
     list.push(source);
     byAccount.set(key, list);
   }
 
-  return Array.from(byAccount.entries()).map(([accountId, groupSources]) => {
-    const matchedAccount =
-      account?.id === accountId ? account : undefined;
+  const accountById = new Map(accounts.map((a) => [a.id, a]));
+  const orderedIds: string[] = [];
+  for (const account of accounts) {
+    orderedIds.push(account.id);
+  }
+  for (const accountId of byAccount.keys()) {
+    if (!accountById.has(accountId)) {
+      orderedIds.push(accountId);
+    }
+  }
+
+  return orderedIds.map((accountId) => {
+    const matchedAccount = accountById.get(accountId);
+    const groupSources = byAccount.get(accountId) ?? [];
     const primary =
-      groupSources.find((s) => s.is_primary_on_provider) ?? groupSources[0]!;
+      groupSources.find((s) => s.is_primary_on_provider) ?? groupSources[0];
     const sourceIds = groupSources.map((s) => s.id);
+    const label =
+      matchedAccount?.email?.trim() ||
+      accountLabel(groupSources, matchedAccount);
+    const email =
+      matchedAccount?.email?.trim() ||
+      (EMAIL_RE.test(label) ? label : null) ||
+      groupSources.find((s) => EMAIL_RE.test(s.provider_calendar_id.trim()))
+        ?.provider_calendar_id ||
+      null;
     return {
       accountId,
-      label: accountLabel(groupSources, matchedAccount),
-      color: colorFor(primary.id),
+      label,
+      email,
+      color: primary ? colorFor(primary.id) : "#c9a87c",
       sourceIds,
       visibleCount: sourceIds.filter((id) => visibleSourceIds.has(id)).length,
     };
@@ -86,6 +117,8 @@ function groupSourcesByAccount(
 }
 
 export function useCalendarController() {
+  const { user } = useAuth();
+  const timeZone = resolveCalendarTimeZone(user?.timezone);
   const queryClient = useQueryClient();
   const [view, setView] = useState<CalendarView>("day");
   const [cursor, setCursor] = useState(() => new Date());
@@ -97,8 +130,8 @@ export function useCalendarController() {
   const [agendaDays, setAgendaDays] = useState(60);
 
   const range = useMemo(
-    () => queryRangeForView(view, cursor, agendaDays),
-    [view, cursor, agendaDays],
+    () => queryRangeForView(view, cursor, agendaDays, timeZone),
+    [view, cursor, agendaDays, timeZone],
   );
   const fromIso = range.from.toISOString();
   const toIso = range.to.toISOString();
@@ -106,6 +139,8 @@ export function useCalendarController() {
   const sourcesQuery = useQuery({
     queryKey: calendarQueryKeys.sources,
     queryFn: ({ signal }) => listCalendarSources(signal),
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const eventsQuery = useQuery({
@@ -144,8 +179,12 @@ export function useCalendarController() {
 
   const events = useMemo(() => {
     const all = normalizeEvents(eventsQuery.data?.events ?? []);
-    return all.filter((e) => visibleSourceIds.has(e.calendar_source_id));
-  }, [eventsQuery.data?.events, visibleSourceIds]);
+    const visible = all.filter((e) => visibleSourceIds.has(e.calendar_source_id));
+    const sourcesById = new Map(
+      enabledSources.map((source) => [source.id, source] as const),
+    );
+    return dedupeHolidayEvents(visible, sourcesById);
+  }, [eventsQuery.data?.events, visibleSourceIds, enabledSources]);
 
   const selectedEvent = useMemo(
     () => events.find((e) => e.id === selectedEventId) ?? null,
@@ -202,15 +241,25 @@ export function useCalendarController() {
     [],
   );
 
+  const connectedAccounts = useMemo(() => {
+    if (sourcesQuery.data?.accounts?.length) {
+      return sourcesQuery.data.accounts;
+    }
+    if (sourcesQuery.data?.account) {
+      return [sourcesQuery.data.account];
+    }
+    return [];
+  }, [sourcesQuery.data?.accounts, sourcesQuery.data?.account]);
+
   const accountGroups = useMemo(
     () =>
-      groupSourcesByAccount(
+      buildAccountGroups(
         enabledSources,
-        sourcesQuery.data?.account,
+        connectedAccounts,
         (id) => sourceColorMap.get(id) ?? "#c9a87c",
         visibleSourceIds,
       ),
-    [enabledSources, sourcesQuery.data?.account, sourceColorMap, visibleSourceIds],
+    [enabledSources, connectedAccounts, sourceColorMap, visibleSourceIds],
   );
   const openEvent = useCallback((event: CalendarEvent) => {
     setSelectedEventId(event.id);
@@ -234,6 +283,17 @@ export function useCalendarController() {
     (id: string): CalendarSource | undefined =>
       enabledSources.find((s) => s.id === id),
     [enabledSources],
+  );
+
+  const calendarLabelFor = useCallback(
+    (sourceId: string): string => {
+      const group = accountGroups.find((g) => g.sourceIds.includes(sourceId));
+      if (group?.label?.trim()) {
+        return group.label.trim();
+      }
+      return sourceById(sourceId)?.name?.trim() || "Unknown calendar";
+    },
+    [accountGroups, sourceById],
   );
 
   return {
@@ -276,7 +336,9 @@ export function useCalendarController() {
     sidebarOpen,
     setSidebarOpen,
     extendAgenda,
+    timeZone,
     sourceById,
+    calendarLabelFor,
     colorFor: (sourceId: string) =>
       sourceColorMap.get(sourceId) ?? "#c9a87c",
   };

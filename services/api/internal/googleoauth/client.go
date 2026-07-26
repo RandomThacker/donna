@@ -22,6 +22,8 @@ type Config struct {
 	Scopes       []string
 	Timeout      time.Duration
 	HTTPClient   *http.Client
+	// OfflineAccess requests a refresh token (login + calendar connect both need this).
+	OfflineAccess bool
 }
 
 // TokenSet is the Google token response we care about.
@@ -70,7 +72,6 @@ func NewClient(cfg Config) (*Client, error) {
 			"openid",
 			"email",
 			"profile",
-			"https://www.googleapis.com/auth/calendar",
 		}
 	}
 	if cfg.Timeout <= 0 {
@@ -90,9 +91,12 @@ func (c *Client) AuthCodeURL(state string) string {
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(c.cfg.Scopes, " "))
 	q.Set("state", state)
-	q.Set("access_type", "offline")
-	q.Set("prompt", "consent")
-	q.Set("include_granted_scopes", "true")
+	if c.cfg.OfflineAccess {
+		q.Set("access_type", "offline")
+		// consent: refresh token; select_account: allow connecting a different Google account.
+		// Do not set include_granted_scopes — incremental grants often omit refresh_token.
+		q.Set("prompt", "consent select_account")
+	}
 	return c.cfg.AuthURL + "?" + q.Encode()
 }
 

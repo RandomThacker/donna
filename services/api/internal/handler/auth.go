@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"net/url"
@@ -10,16 +11,24 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/apperr"
 	"github.com/RandomThacker/donna/services/api/internal/business"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
+	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/model"
 	"github.com/RandomThacker/donna/services/api/internal/response"
 	"github.com/RandomThacker/donna/services/api/internal/session"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
-// AuthHandler maps Google OAuth HTTP endpoints to the auth business layer.
+// sessionUserLookup verifies that a JWT subject still exists after DB wipes / soft-deletes.
+type sessionUserLookup interface {
+	GetByID(ctx context.Context, id uuid.UUID) (entity.User, error)
+}
+
+// AuthHandler maps multi-provider OAuth login HTTP endpoints to the auth business layer.
 type AuthHandler struct {
 	svc                *business.AuthService
+	users              sessionUserLookup
 	tokens             *session.Issuer
 	log                *logger.Logger
 	frontendSuccessURL string
@@ -33,6 +42,7 @@ type AuthHandlerConfig struct {
 	CookieSecure       bool
 	CookieMaxAge       time.Duration
 	Tokens             *session.Issuer
+	Users              sessionUserLookup
 }
 
 // NewAuthHandler constructs an AuthHandler.
@@ -43,6 +53,7 @@ func NewAuthHandler(svc *business.AuthService, log *logger.Logger, cfg AuthHandl
 	}
 	return &AuthHandler{
 		svc:                svc,
+		users:              cfg.Users,
 		tokens:             cfg.Tokens,
 		log:                log,
 		frontendSuccessURL: cfg.FrontendSuccessURL,
@@ -52,9 +63,9 @@ func NewAuthHandler(svc *business.AuthService, log *logger.Logger, cfg AuthHandl
 }
 
 // BeginGoogle redirects the browser to Google's consent screen.
-// If a valid Donna session cookie already exists, skip Google and send the user back to the app.
+// If a live Donna session exists, skip Google and send the user back to the app.
 func (h *AuthHandler) BeginGoogle(c *gin.Context) {
-	if h.hasValidSession(c) {
+	if h.hasLiveSession(c) {
 		h.redirectAlreadyAuthenticated(c)
 		return
 	}
@@ -87,6 +98,53 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		return
 	}
 
+	h.finishLogin(c, session)
+}
+
+// BeginMicrosoft redirects the browser to Microsoft's consent screen.
+func (h *AuthHandler) BeginMicrosoft(c *gin.Context) {
+	if h.hasLiveSession(c) {
+		h.redirectAlreadyAuthenticated(c)
+		return
+	}
+
+	authURL, _, err := h.svc.BeginMicrosoftLogin(c.Request.Context())
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	c.Redirect(http.StatusFound, authURL)
+}
+
+// MicrosoftCallback handles the OAuth redirect from Microsoft (login).
+func (h *AuthHandler) MicrosoftCallback(c *gin.Context) {
+	if errParam := c.Query("error"); errParam != "" {
+		response.Error(
+			c,
+			http.StatusBadRequest,
+			"microsoft oauth denied",
+			constant.ErrorCodeOAuthFailed,
+			errParam,
+		)
+		return
+	}
+
+	session, err := h.svc.CompleteMicrosoftLogin(c.Request.Context(), c.Query("code"), c.Query("state"))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+
+	h.finishLogin(c, session)
+}
+
+// Logout clears the session cookie.
+func (h *AuthHandler) Logout(c *gin.Context) {
+	h.clearSessionCookie(c)
+	response.OK(c, "logged out", nil)
+}
+
+func (h *AuthHandler) finishLogin(c *gin.Context, session business.AuthSession) {
 	h.setSessionCookie(c, session.AccessToken)
 
 	// Programmatic clients may request JSON; browsers get a cookie + redirect.
@@ -116,20 +174,6 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	c.Redirect(http.StatusFound, redirectTo.String())
 }
 
-// Logout clears the session cookie.
-func (h *AuthHandler) Logout(c *gin.Context) {
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     constant.CookieSession,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   h.cookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
-	response.OK(c, "logged out", nil)
-}
-
 func (h *AuthHandler) setSessionCookie(c *gin.Context, token string) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     constant.CookieSession,
@@ -142,7 +186,21 @@ func (h *AuthHandler) setSessionCookie(c *gin.Context, token string) {
 	})
 }
 
-func (h *AuthHandler) hasValidSession(c *gin.Context) bool {
+func (h *AuthHandler) clearSessionCookie(c *gin.Context) {
+	http.SetCookie(c.Writer, &http.Cookie{
+		Name:     constant.CookieSession,
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
+// hasLiveSession is true only when the cookie JWT is valid AND the user still exists.
+// Stale cookies after a DB wipe must not short-circuit OAuth.
+func (h *AuthHandler) hasLiveSession(c *gin.Context) bool {
 	if h.tokens == nil {
 		return false
 	}
@@ -150,8 +208,24 @@ func (h *AuthHandler) hasValidSession(c *gin.Context) bool {
 	if err != nil || strings.TrimSpace(raw) == "" {
 		return false
 	}
-	_, err = h.tokens.Parse(raw)
-	return err == nil
+	claims, err := h.tokens.Parse(raw)
+	if err != nil {
+		h.clearSessionCookie(c)
+		return false
+	}
+	if h.users == nil {
+		return true
+	}
+	userID, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		h.clearSessionCookie(c)
+		return false
+	}
+	if _, err := h.users.GetByID(c.Request.Context(), userID); err != nil {
+		h.clearSessionCookie(c)
+		return false
+	}
+	return true
 }
 
 func (h *AuthHandler) redirectAlreadyAuthenticated(c *gin.Context) {

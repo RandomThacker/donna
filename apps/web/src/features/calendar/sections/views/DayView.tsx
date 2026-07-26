@@ -125,26 +125,28 @@ export function DayView({
               <div className={styles.lane} />
             </div>
           ))}
-          {timed.map((item) => (
-            <div
-              key={item.event.id}
-              className={styles.eventAbs}
-              style={{
-                top: item.top,
-                height: item.height,
-                left: `calc(3.5rem + ${item.left}%)`,
-                width: `calc(${item.width}% - 0.25rem)`,
-              }}
-            >
-              <EventCard
-                event={item.event}
-                color={colorFor(item.event.calendar_source_id)}
-                className="h-full"
-                onClick={() => onEventClick(item.event)}
-              />
-            </div>
-          ))}
-          <NowIndicator day={day} />
+          <div className={styles.eventsLayer}>
+            {timed.map((item) => (
+              <div
+                key={item.event.id}
+                className={styles.eventAbs}
+                style={{
+                  top: item.top,
+                  height: item.height,
+                  left: `${item.left}%`,
+                  width: `calc(${item.width}% - 0.25rem)`,
+                }}
+              >
+                <EventCard
+                  event={item.event}
+                  color={colorFor(item.event.calendar_source_id)}
+                  className="h-full"
+                  onClick={() => onEventClick(item.event)}
+                />
+              </div>
+            ))}
+            <NowIndicator day={day} />
+          </div>
         </div>
       </div>
     </div>

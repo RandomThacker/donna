@@ -2,7 +2,7 @@
 
 import { addMonths } from "date-fns";
 import { useMemo } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/features/auth";
 import { navItemsForPath } from "@/features/dashboard/dashboardNav";
@@ -36,9 +36,8 @@ function initialsFrom(name: string): string {
 }
 
 export function Calendar() {
-  const router = useRouter();
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const cal = useCalendarController();
 
   const profileName =
@@ -65,13 +64,8 @@ export function Calendar() {
           items={nav}
           profileName={profileName}
           profileInitials={profileInitials}
+          profileEmail={user?.email}
           profileAvatarUrl={user?.avatar_url}
-          onSignOut={() => {
-            void (async () => {
-              await signOut();
-              router.replace("/");
-            })();
-          }}
         />
 
         <main className={styles.workspace}>
@@ -176,6 +170,8 @@ export function Calendar() {
                         colorFor={cal.colorFor}
                         onEventClick={cal.openEvent}
                         onNearEnd={cal.extendAgenda}
+                        fromDate={cal.cursor}
+                        timeZone={cal.timeZone}
                       />
                     ) : null}
                   </>
@@ -193,11 +189,17 @@ export function Calendar() {
             ? cal.sourceById(cal.selectedEvent.calendar_source_id)
             : undefined
         }
+        calendarLabel={
+          cal.selectedEvent
+            ? cal.calendarLabelFor(cal.selectedEvent.calendar_source_id)
+            : undefined
+        }
         color={
           cal.selectedEvent
             ? cal.colorFor(cal.selectedEvent.calendar_source_id)
             : "#c9a87c"
         }
+        timeZone={cal.timeZone}
         onClose={cal.closeEvent}
       />
     </div>

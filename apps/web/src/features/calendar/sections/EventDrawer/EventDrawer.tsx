@@ -6,6 +6,7 @@ import { createPortal } from "react-dom";
 import { Icon } from "@/components/common";
 
 import type { CalendarEvent, CalendarSource } from "../../Calendar.types";
+import { resolveCalendarTimeZone } from "../../Calendar.timezone";
 import {
   formatEventDate,
   formatEventTime,
@@ -14,12 +15,16 @@ import {
 } from "../../Calendar.utils";
 import { isRecurring } from "../../Calendar.layout";
 import { drawerStyles as styles } from "./EventDrawer.styles";
+import { linkifyPlainText } from "./EventDrawer.linkify";
 
 type EventDrawerProps = {
   event: CalendarEvent | null;
   source?: CalendarSource;
+  /** Prefer account label (e.g. ICS feed name) over generic source.name. */
+  calendarLabel?: string;
   color: string;
   onClose: () => void;
+  timeZone?: string;
 };
 
 function Field({
@@ -40,9 +45,25 @@ function Field({
   );
 }
 
-export function EventDrawer({ event, source, color, onClose }: EventDrawerProps) {
+function DescriptionField({ text }: { text: string }) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return null;
+  }
+  return <Field label="Description">{linkifyPlainText(trimmed)}</Field>;
+}
+
+export function EventDrawer({
+  event,
+  source,
+  calendarLabel,
+  color,
+  onClose,
+  timeZone: timeZoneProp,
+}: EventDrawerProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
+  const timeZone = resolveCalendarTimeZone(timeZoneProp);
 
   useEffect(() => {
     if (!event) {
@@ -97,7 +118,7 @@ export function EventDrawer({ event, source, color, onClose }: EventDrawerProps)
               {event.title || "(No title)"}
             </h2>
             <p className={styles.subtitle}>
-              {formatEventDate(event)} · {formatEventTime(event)}
+              {formatEventDate(event)} · {formatEventTime(event, timeZone)}
             </p>
           </div>
           <button
@@ -112,11 +133,15 @@ export function EventDrawer({ event, source, color, onClose }: EventDrawerProps)
 
         <div className={styles.body}>
           <Field label="Timezone">
-            {event.timezone || "UTC"}
+            {event.timezone || timeZone}
           </Field>
-          <Field label="Calendar">{source?.name ?? "Unknown calendar"}</Field>
+          <Field label="Calendar">
+            {calendarLabel || source?.name || "Unknown calendar"}
+          </Field>
           <Field label="Location">{event.location}</Field>
-          <Field label="Description">{event.description}</Field>
+          {event.description ? (
+            <DescriptionField text={event.description} />
+          ) : null}
           <Field label="Organizer">
             {organizer
               ? organizer.displayName || organizer.email

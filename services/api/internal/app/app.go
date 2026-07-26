@@ -10,13 +10,17 @@ import (
 
 	"github.com/RandomThacker/donna/services/api/internal/buildinfo"
 	"github.com/RandomThacker/donna/services/api/internal/business"
+	"github.com/RandomThacker/donna/services/api/internal/calendarprovider"
 	"github.com/RandomThacker/donna/services/api/internal/config"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/database"
 	"github.com/RandomThacker/donna/services/api/internal/googlecalendar"
 	"github.com/RandomThacker/donna/services/api/internal/googleoauth"
 	"github.com/RandomThacker/donna/services/api/internal/handler"
+	"github.com/RandomThacker/donna/services/api/internal/icscalendar"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
+	"github.com/RandomThacker/donna/services/api/internal/microsoftcalendar"
+	"github.com/RandomThacker/donna/services/api/internal/microsoftoauth"
 	"github.com/RandomThacker/donna/services/api/internal/oauthstate"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/RandomThacker/donna/services/api/internal/router"
@@ -25,6 +29,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/seal"
 	"github.com/RandomThacker/donna/services/api/internal/server"
 	"github.com/RandomThacker/donna/services/api/internal/session"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -71,20 +76,25 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		appLog.Error(ctx, "calendar wiring failed", constant.LogAttrError, err)
 		return fmt.Errorf("calendar: %w", err)
 	}
-	if calendarParts.service != nil && authParts.service != nil {
-		authParts.service.SetOnGoogleAccountReady(calendarParts.service.BootstrapCalendarSyncJob)
+	if calendarParts.service != nil && calendarParts.integrations != nil {
+		calendarParts.integrations.SetOnAccountReady(calendarParts.service.BootstrapCalendarSyncJob)
+		calendarParts.integrations.SetSyncAccount(func(ctx context.Context, accountID uuid.UUID) (business.CalendarPipelineResult, error) {
+			return calendarParts.service.SyncPipelineForAccount(ctx, accountID, constant.CalendarSyncTriggerManual)
+		})
+		authParts.service.SetLoginCalendarLinker(calendarParts.integrations)
 	}
 
 	engine := router.New(router.Options{
-		Environment:     cfg.App.Environment,
-		CORSOrigins:     cfg.App.CORSOrigins,
-		HTTPLogger:      httpLog,
-		HealthHandler:   healthHandler,
-		UserHandler:     userHandler,
-		AuthHandler:     authParts.handler,
-		MeHandler:       handler.NewMeHandler(userSvc),
-		CalendarHandler: calendarParts.handler,
-		TokenIssuer:     authParts.issuer,
+		Environment:        cfg.App.Environment,
+		CORSOrigins:        cfg.App.CORSOrigins,
+		HTTPLogger:         httpLog,
+		HealthHandler:      healthHandler,
+		UserHandler:        userHandler,
+		AuthHandler:        authParts.handler,
+		MeHandler:          handler.NewMeHandler(userSvc),
+		CalendarHandler:    calendarParts.handler,
+		IntegrationHandler: calendarParts.integrationHandler,
+		TokenIssuer:        authParts.issuer,
 	})
 
 	srv := server.New(cfg.App.Addr, engine, appLog)
@@ -95,7 +105,6 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		jobsRepo := repository.NewSchedulerJobRepository(pool)
 		platformJobs := []scheduler.Job{
 			calendarsync.NewJob(calendarParts.service),
-			// Future: gmailsync.NewJob(...), contactsync.NewJob(...), ...
 		}
 		if err := scheduler.ValidateJobs(platformJobs); err != nil {
 			return fmt.Errorf("scheduler: %w", err)
@@ -147,14 +156,14 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 }
 
 type authWire struct {
-	handler      *handler.AuthHandler
-	service      *business.AuthService
-	issuer       *session.Issuer
-	googleClient business.GoogleOAuthClient
-	sealKey      []byte
-	accounts     repository.ConnectedAccountRepository
-	secrets      repository.CredentialSecretRepository
-	tx           *repository.TxManager
+	handler  *handler.AuthHandler
+	service  *business.AuthService
+	issuer   *session.Issuer
+	state    *oauthstate.Manager
+	sealKey  []byte
+	accounts repository.ConnectedAccountRepository
+	secrets  repository.CredentialSecretRepository
+	tx       *repository.TxManager
 }
 
 func wireAuth(
@@ -176,39 +185,60 @@ func wireAuth(
 	accounts := repository.NewConnectedAccountRepository(pool)
 	secrets := repository.NewCredentialSecretRepository(pool)
 	tx := repository.NewTxManager(pool)
+	state := oauthstate.NewManager(cfg.App.JWTSecret)
 
-	var googleClient business.GoogleOAuthClient
+	var googleLogin business.GoogleOAuthClient
 	if cfg.API.GoogleOAuth.ClientID != "" && cfg.API.GoogleOAuth.ClientSecret != "" {
 		client, err := googleoauth.NewClient(googleoauth.Config{
-			ClientID:     cfg.API.GoogleOAuth.ClientID,
-			ClientSecret: cfg.API.GoogleOAuth.ClientSecret,
-			RedirectURL:  cfg.API.GoogleOAuth.RedirectURL,
-			AuthURL:      cfg.API.GoogleOAuth.AuthURL,
-			TokenURL:     cfg.API.GoogleOAuth.TokenURL,
-			UserInfoURL:  cfg.API.GoogleOAuth.UserInfoURL,
-			Scopes:       cfg.API.GoogleOAuth.Scopes,
-			Timeout:      cfg.API.GoogleOAuth.Timeout,
+			ClientID:      cfg.API.GoogleOAuth.ClientID,
+			ClientSecret:  cfg.API.GoogleOAuth.ClientSecret,
+			RedirectURL:   cfg.API.GoogleOAuth.RedirectURL,
+			AuthURL:       cfg.API.GoogleOAuth.AuthURL,
+			TokenURL:      cfg.API.GoogleOAuth.TokenURL,
+			UserInfoURL:   cfg.API.GoogleOAuth.UserInfoURL,
+			Scopes:        cfg.API.GoogleOAuth.Scopes,
+			Timeout:       cfg.API.GoogleOAuth.Timeout,
+			OfflineAccess: true,
 		})
 		if err != nil {
-			return authWire{}, fmt.Errorf("google oauth client: %w", err)
+			return authWire{}, fmt.Errorf("google login oauth client: %w", err)
 		}
-		googleClient = client
-		authLog.Info(context.Background(), "google oauth client configured")
+		googleLogin = client
+		authLog.Info(context.Background(), "google login oauth client configured")
 	} else {
 		authLog.Warn(context.Background(), "google oauth not configured; /auth/google will reject requests")
+	}
+
+	var microsoftLogin business.MicrosoftOAuthClient
+	if cfg.API.MicrosoftOAuth.ClientID != "" && cfg.API.MicrosoftOAuth.ClientSecret != "" {
+		client, err := microsoftoauth.NewClient(microsoftoauth.Config{
+			ClientID:     cfg.API.MicrosoftOAuth.ClientID,
+			ClientSecret: cfg.API.MicrosoftOAuth.ClientSecret,
+			RedirectURL:  cfg.API.MicrosoftOAuth.RedirectURL,
+			AuthURL:      cfg.API.MicrosoftOAuth.AuthURL,
+			TokenURL:     cfg.API.MicrosoftOAuth.TokenURL,
+			GraphMeURL:   cfg.API.MicrosoftOAuth.GraphMeURL,
+			Scopes:       cfg.API.MicrosoftOAuth.Scopes,
+			Timeout:      cfg.API.MicrosoftOAuth.Timeout,
+		})
+		if err != nil {
+			return authWire{}, fmt.Errorf("microsoft login oauth client: %w", err)
+		}
+		microsoftLogin = client
+		authLog.Info(context.Background(), "microsoft login oauth client configured")
+	} else {
+		authLog.Warn(context.Background(), "microsoft oauth not configured; /auth/microsoft will reject requests")
 	}
 
 	authSvc := business.NewAuthService(business.AuthServiceDeps{
 		Users:      userSvc,
 		UserRepo:   userRepo,
 		Identities: repository.NewAuthIdentityRepository(pool),
-		Accounts:   accounts,
-		Secrets:    secrets,
 		Tx:         tx,
-		Google:     googleClient,
-		State:      oauthstate.NewManager(cfg.App.JWTSecret),
+		Google:     googleLogin,
+		Microsoft:  microsoftLogin,
+		State:      state,
 		Tokens:     tokenIssuer,
-		SealKey:    sealKey,
 		Log:        authLog,
 	})
 
@@ -218,14 +248,15 @@ func wireAuth(
 			CookieSecure:       cfg.App.CookieSecure,
 			CookieMaxAge:       cfg.App.JWTExpiry,
 			Tokens:             tokenIssuer,
+			Users:              userSvc,
 		}),
-		service:      authSvc,
-		issuer:       tokenIssuer,
-		googleClient: googleClient,
-		sealKey:      sealKey,
-		accounts:     accounts,
-		secrets:      secrets,
-		tx:           tx,
+		service:  authSvc,
+		issuer:   tokenIssuer,
+		state:    state,
+		sealKey:  sealKey,
+		accounts: accounts,
+		secrets:  secrets,
+		tx:       tx,
 	}, nil
 }
 
@@ -235,35 +266,121 @@ func wireCalendar(
 	auth authWire,
 	calendarLog *logger.Logger,
 ) (calendarWire, error) {
-	if auth.googleClient == nil {
-		calendarLog.Warn(context.Background(), "calendar module disabled; google oauth not configured")
+	providers := map[string]calendarprovider.Provider{}
+	tokens := map[string]calendarprovider.TokenRefresher{}
+
+	var googleIntegration business.GoogleOAuthClient
+	if cfg.API.GoogleOAuth.ClientID != "" && cfg.API.GoogleOAuth.ClientSecret != "" {
+		client, err := googleoauth.NewClient(googleoauth.Config{
+			ClientID:      cfg.API.GoogleOAuth.ClientID,
+			ClientSecret:  cfg.API.GoogleOAuth.ClientSecret,
+			RedirectURL:   cfg.API.GoogleOAuth.IntegrationRedirectURL,
+			AuthURL:       cfg.API.GoogleOAuth.AuthURL,
+			TokenURL:      cfg.API.GoogleOAuth.TokenURL,
+			UserInfoURL:   cfg.API.GoogleOAuth.UserInfoURL,
+			Scopes:        cfg.API.GoogleOAuth.IntegrationScopes,
+			Timeout:       cfg.API.GoogleOAuth.Timeout,
+			OfflineAccess: true,
+		})
+		if err != nil {
+			return calendarWire{}, fmt.Errorf("google integration oauth client: %w", err)
+		}
+		googleIntegration = client
+		calClient := googlecalendar.NewClient(googlecalendar.Config{
+			BaseURL: constant.GoogleCalendarAPIBaseURL,
+			Timeout: cfg.API.GoogleOAuth.Timeout,
+		})
+		providers[constant.AuthProviderGoogle] = googlecalendar.NewProvider(calClient)
+		tokens[constant.AuthProviderGoogle] = business.GoogleTokenRefresher(client)
+		calendarLog.Info(context.Background(), "google calendar provider configured")
+	}
+
+	var microsoftIntegration business.MicrosoftOAuthClient
+	if cfg.API.MicrosoftOAuth.ClientID != "" && cfg.API.MicrosoftOAuth.ClientSecret != "" {
+		client, err := microsoftoauth.NewClient(microsoftoauth.Config{
+			ClientID:     cfg.API.MicrosoftOAuth.ClientID,
+			ClientSecret: cfg.API.MicrosoftOAuth.ClientSecret,
+			RedirectURL:  cfg.API.MicrosoftOAuth.IntegrationRedirectURL,
+			AuthURL:      cfg.API.MicrosoftOAuth.AuthURL,
+			TokenURL:     cfg.API.MicrosoftOAuth.TokenURL,
+			GraphMeURL:   cfg.API.MicrosoftOAuth.GraphMeURL,
+			Scopes:       cfg.API.MicrosoftOAuth.IntegrationScopes,
+			Timeout:      cfg.API.MicrosoftOAuth.Timeout,
+		})
+		if err != nil {
+			return calendarWire{}, fmt.Errorf("microsoft integration oauth client: %w", err)
+		}
+		microsoftIntegration = client
+		msCal := microsoftcalendar.NewClient(microsoftcalendar.Config{
+			BaseURL: constant.MicrosoftGraphAPIBaseURL,
+			Timeout: cfg.API.MicrosoftOAuth.Timeout,
+		})
+		providers[constant.AuthProviderMicrosoft] = microsoftcalendar.NewProvider(msCal)
+		tokens[constant.AuthProviderMicrosoft] = business.MicrosoftTokenRefresher(client.RefreshAsProvider)
+		calendarLog.Info(context.Background(), "microsoft calendar provider configured")
+	} else {
+		calendarLog.Warn(context.Background(), "microsoft oauth not configured; outlook connect disabled")
+	}
+
+	// ICS is always available — provider-independent calendar feeds need no OAuth app.
+	icsClient := icscalendar.NewClient(icscalendar.Config{
+		UA: constant.ICSHTTPUserAgent,
+	})
+	providers[constant.AuthProviderICS] = icscalendar.NewProvider(icsClient)
+	calendarLog.Info(context.Background(), "ics calendar provider configured")
+
+	if len(providers) == 0 {
+		calendarLog.Warn(context.Background(), "calendar module disabled; no calendar providers configured")
 		return calendarWire{}, nil
 	}
 
-	calClient := googlecalendar.NewClient(googlecalendar.Config{
-		BaseURL: constant.GoogleCalendarAPIBaseURL,
-		Timeout: cfg.API.GoogleOAuth.Timeout,
-	})
+	sourcesRepo := repository.NewCalendarSourceRepository(pool)
+	eventsRepo := repository.NewCalendarEventRepository(pool)
+
 	svc := business.NewCalendarService(business.CalendarServiceDeps{
-		Accounts: auth.accounts,
-		Secrets:  auth.secrets,
-		Sources:  repository.NewCalendarSourceRepository(pool),
-		Events:   repository.NewCalendarEventRepository(pool),
-		SyncRuns: repository.NewCalendarSyncRunRepository(pool),
-		Jobs:     repository.NewSchedulerJobRepository(pool),
-		Tx:       auth.tx,
-		OAuth:    auth.googleClient,
-		Calendar: calClient,
-		SealKey:  auth.sealKey,
-		Log:      calendarLog,
+		Accounts:  auth.accounts,
+		Secrets:   auth.secrets,
+		Sources:   sourcesRepo,
+		Events:    eventsRepo,
+		SyncRuns:  repository.NewCalendarSyncRunRepository(pool),
+		Jobs:      repository.NewSchedulerJobRepository(pool),
+		Tx:        auth.tx,
+		Providers: providers,
+		Tokens:    tokens,
+		SealKey:   auth.sealKey,
+		Log:       calendarLog,
 	})
-	return calendarWire{
+
+	out := calendarWire{
 		handler: handler.NewCalendarHandler(svc, calendarLog),
 		service: svc,
-	}, nil
+	}
+
+	integrations := business.NewIntegrationService(business.IntegrationServiceDeps{
+		Accounts:  auth.accounts,
+		Secrets:   auth.secrets,
+		Sources:   sourcesRepo,
+		Events:    eventsRepo,
+		Tx:        auth.tx,
+		Google:    googleIntegration,
+		Microsoft: microsoftIntegration,
+		State:     auth.state,
+		SealKey:   auth.sealKey,
+		Log:       calendarLog,
+	})
+	out.integrations = integrations
+	out.integrationHandler = handler.NewIntegrationHandler(
+		integrations,
+		calendarLog,
+		cfg.App.IntegrationFrontendSuccessURL,
+	)
+
+	return out, nil
 }
 
 type calendarWire struct {
-	handler *handler.CalendarHandler
-	service *business.CalendarService
+	handler            *handler.CalendarHandler
+	service            *business.CalendarService
+	integrations       *business.IntegrationService
+	integrationHandler *handler.IntegrationHandler
 }

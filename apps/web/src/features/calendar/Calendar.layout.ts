@@ -158,15 +158,38 @@ export function eventsOverlappingDay(
   events: CalendarEvent[],
   day: Date,
 ): CalendarEvent[] {
-  const start = new Date(day);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(day);
-  end.setHours(23, 59, 59, 999);
+  const dayStart = new Date(day);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = new Date(day);
+  dayEnd.setHours(23, 59, 59, 999);
+  const dayKey = localDateKey(dayStart);
+
   return events.filter((event) => {
-    const s = new Date(event.start_time);
-    const e = new Date(event.end_time);
-    return s <= end && e >= start;
+    if (event.all_day) {
+      // Google/Microsoft all-day ends are exclusive (event on the 25th → end = 26th).
+      // Compare civil dates from the stored UTC midnight values.
+      const startKey = utcDateKey(new Date(event.start_time));
+      const endKey = utcDateKey(new Date(event.end_time));
+      return startKey <= dayKey && endKey > dayKey;
+    }
+    const start = new Date(event.start_time);
+    const end = new Date(event.end_time);
+    return start <= dayEnd && end > dayStart;
   });
+}
+
+function localDateKey(day: Date): string {
+  const y = day.getFullYear();
+  const m = String(day.getMonth() + 1).padStart(2, "0");
+  const d = String(day.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function utcDateKey(day: Date): string {
+  const y = day.getUTCFullYear();
+  const m = String(day.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(day.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
 
 export function allDayEventsForDay(
@@ -174,6 +197,63 @@ export function allDayEventsForDay(
   day: Date,
 ): CalendarEvent[] {
   return eventsOverlappingDay(events, day).filter((e) => e.all_day);
+}
+
+/** Google subscribed holiday feeds (often duplicated across accounts / locales). */
+export function isHolidaySource(source: {
+  provider_calendar_id?: string;
+  name?: string;
+}): boolean {
+  const providerId = source.provider_calendar_id?.trim().toLowerCase() ?? "";
+  if (providerId.includes("holiday@group.v.calendar.google.com")) {
+    return true;
+  }
+  const name = source.name?.trim().toLowerCase() ?? "";
+  return name.startsWith("holidays in ");
+}
+
+/**
+ * Collapse identical holiday chips when the same feed is connected more than once
+ * (e.g. en + en-in India holidays, or the same holidays under two Google accounts).
+ */
+export function dedupeHolidayEvents<
+  T extends {
+    id: string;
+    title: string;
+    start_time: string;
+    end_time: string;
+    all_day: boolean;
+    calendar_source_id: string;
+  },
+>(
+  events: T[],
+  sourcesById: Map<string, { provider_calendar_id?: string; name?: string }>,
+): T[] {
+  const seenHolidayKeys = new Set<string>();
+  const out: T[] = [];
+
+  for (const event of events) {
+    const source = sourcesById.get(event.calendar_source_id);
+    if (!source || !isHolidaySource(source)) {
+      out.push(event);
+      continue;
+    }
+
+    const startKey = event.all_day
+      ? utcDateKey(new Date(event.start_time))
+      : event.start_time;
+    const endKey = event.all_day
+      ? utcDateKey(new Date(event.end_time))
+      : event.end_time;
+    const key = `${event.title.trim().toLowerCase()}|${startKey}|${endKey}|${event.all_day ? "1" : "0"}`;
+    if (seenHolidayKeys.has(key)) {
+      continue;
+    }
+    seenHolidayKeys.add(key);
+    out.push(event);
+  }
+
+  return out;
 }
 
 export function isSameDay(a: Date, b: Date): boolean {

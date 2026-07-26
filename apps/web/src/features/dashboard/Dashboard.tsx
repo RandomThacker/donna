@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/features/auth";
 
@@ -27,9 +27,8 @@ function initialsFrom(name: string): string {
 }
 
 export function Dashboard() {
-  const router = useRouter();
   const pathname = usePathname();
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const { data } = getDashboardContent();
   const nav = navItemsForPath(pathname);
 
@@ -45,13 +44,8 @@ export function Dashboard() {
           items={nav}
           profileName={profileName}
           profileInitials={profileInitials}
+          profileEmail={user?.email}
           profileAvatarUrl={user?.avatar_url}
-          onSignOut={() => {
-            void (async () => {
-              await signOut();
-              router.replace("/");
-            })();
-          }}
         />
         <main className={styles.workspace}>
           <div className={styles.workspaceInner}>

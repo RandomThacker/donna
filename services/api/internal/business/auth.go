@@ -2,7 +2,6 @@ package business
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -14,16 +13,16 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/googleoauth"
 	"github.com/RandomThacker/donna/services/api/internal/idgen"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
+	"github.com/RandomThacker/donna/services/api/internal/microsoftoauth"
 	"github.com/RandomThacker/donna/services/api/internal/oauthstate"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
-	"github.com/RandomThacker/donna/services/api/internal/seal"
 	"github.com/RandomThacker/donna/services/api/internal/session"
 	"github.com/RandomThacker/donna/services/api/internal/validation"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
 
-// GoogleOAuthClient is the outbound Google OAuth port.
+// GoogleOAuthClient is the outbound Google OAuth port (login or integration).
 type GoogleOAuthClient interface {
 	AuthCodeURL(state string) string
 	ExchangeCode(ctx context.Context, code string) (googleoauth.TokenSet, error)
@@ -41,36 +40,41 @@ type AuthSession struct {
 	IsNewUser   bool
 }
 
-// sealedTokens is the JSON payload stored in credential_secrets.
-type sealedTokens struct {
-	AccessToken  string `json:"access_token"`
-	RefreshToken string `json:"refresh_token,omitempty"`
-	TokenType    string `json:"token_type,omitempty"`
-	ExpiryUnix   int64  `json:"expiry_unix,omitempty"`
-	Scope        string `json:"scope,omitempty"`
-}
-
 // TxRunner runs work inside a database transaction.
 type TxRunner interface {
 	WithinTx(ctx context.Context, fn func(ctx context.Context, tx pgx.Tx) error) error
 }
 
-// AuthService orchestrates Google OAuth login and account linking.
+// loginProfile is a provider-normalized identity used for login linking.
+type loginProfile struct {
+	Provider      string
+	Subject       string
+	Email         string
+	EmailVerified bool
+	Name          string
+	Picture       string
+}
+
+// loginCalendarLinker auto-connects the signed-in provider account for calendar sync.
+type loginCalendarLinker interface {
+	LinkGoogleFromLogin(ctx context.Context, userID uuid.UUID, profile googleoauth.Profile, tokenSet googleoauth.TokenSet) (entity.ConnectedAccount, error)
+	LinkMicrosoftFromLogin(ctx context.Context, userID uuid.UUID, profile microsoftoauth.Profile, tokenSet microsoftoauth.TokenSet) (entity.ConnectedAccount, error)
+}
+
+// AuthService orchestrates multi-provider OAuth login (auth_identities + JWT).
+// The signed-in provider account is also linked as a calendar connected_account when a linker is configured.
 type AuthService struct {
 	users      *UserService
 	userRepo   repository.UserRepository
 	identities repository.AuthIdentityRepository
-	accounts   repository.ConnectedAccountRepository
-	secrets    repository.CredentialSecretRepository
 	tx         TxRunner
 	google     GoogleOAuthClient
+	microsoft  MicrosoftOAuthClient
 	state      *oauthstate.Manager
 	tokens     *session.Issuer
-	sealKey    []byte
+	linker     loginCalendarLinker
 	log        *logger.Logger
 	now        func() time.Time
-	// onGoogleAccountReady runs after Google connected_accounts upsert (e.g. calendar sync bootstrap).
-	onGoogleAccountReady func(ctx context.Context, accountID uuid.UUID) error
 }
 
 // AuthServiceDeps wires AuthService dependencies.
@@ -78,13 +82,11 @@ type AuthServiceDeps struct {
 	Users      *UserService
 	UserRepo   repository.UserRepository
 	Identities repository.AuthIdentityRepository
-	Accounts   repository.ConnectedAccountRepository
-	Secrets    repository.CredentialSecretRepository
 	Tx         TxRunner
 	Google     GoogleOAuthClient
+	Microsoft  MicrosoftOAuthClient
 	State      *oauthstate.Manager
 	Tokens     *session.Issuer
-	SealKey    []byte
 	Log        *logger.Logger
 }
 
@@ -94,33 +96,19 @@ func NewAuthService(deps AuthServiceDeps) *AuthService {
 		users:      deps.Users,
 		userRepo:   deps.UserRepo,
 		identities: deps.Identities,
-		accounts:   deps.Accounts,
-		secrets:    deps.Secrets,
 		tx:         deps.Tx,
 		google:     deps.Google,
+		microsoft:  deps.Microsoft,
 		state:      deps.State,
 		tokens:     deps.Tokens,
-		sealKey:    deps.SealKey,
 		log:        deps.Log,
 		now:        time.Now,
 	}
 }
 
-// SetOnGoogleAccountReady registers a post-connect hook (wired after calendar module).
-func (s *AuthService) SetOnGoogleAccountReady(fn func(ctx context.Context, accountID uuid.UUID) error) {
-	s.onGoogleAccountReady = fn
-}
-
-func (s *AuthService) notifyGoogleAccountReady(ctx context.Context, accountID uuid.UUID) {
-	if s.onGoogleAccountReady == nil || accountID == uuid.Nil {
-		return
-	}
-	if err := s.onGoogleAccountReady(ctx, accountID); err != nil && s.log != nil {
-		s.log.Warn(ctx, "google account ready hook failed",
-			constant.LogAttrError, err,
-			"connected_account_id", accountID.String(),
-		)
-	}
+// SetLoginCalendarLinker registers the integrations hook that auto-links the login account.
+func (s *AuthService) SetLoginCalendarLinker(linker loginCalendarLinker) {
+	s.linker = linker
 }
 
 // BeginGoogleLogin creates CSRF state and the Google authorization URL.
@@ -135,7 +123,7 @@ func (s *AuthService) BeginGoogleLogin(ctx context.Context) (authURL, state stri
 	return s.google.AuthCodeURL(state), state, nil
 }
 
-// CompleteGoogleLogin exchanges the code, upserts identity/account, and issues a JWT.
+// CompleteGoogleLogin exchanges the code, links auth_identity, and issues a JWT.
 func (s *AuthService) CompleteGoogleLogin(ctx context.Context, code, state string) (AuthSession, error) {
 	if s.google == nil {
 		return AuthSession{}, fmt.Errorf("%w: google oauth is not configured", apperr.ErrInvalid)
@@ -160,32 +148,110 @@ func (s *AuthService) CompleteGoogleLogin(ctx context.Context, code, state strin
 		return AuthSession{}, fmt.Errorf("%w: google profile missing subject", apperr.ErrInvalid)
 	}
 
-	email := ""
-	if strings.TrimSpace(profile.Email) != "" {
-		normalized, emailErr := validation.EmailQuery(profile.Email)
-		if emailErr != nil {
-			return AuthSession{}, emailErr
-		}
-		email = normalized
+	email, err := normalizeLoginEmail(profile.Email)
+	if err != nil {
+		return AuthSession{}, err
 	}
 
-	identity, err := s.identities.GetByProviderSubject(ctx, constant.AuthProviderGoogle, profile.Subject)
+	session, err := s.resolveLogin(ctx, loginProfile{
+		Provider:      constant.AuthProviderGoogle,
+		Subject:       profile.Subject,
+		Email:         email,
+		EmailVerified: profile.EmailVerified,
+		Name:          profile.Name,
+		Picture:       profile.Picture,
+	})
+	if err != nil {
+		return AuthSession{}, err
+	}
+	s.autoLinkGoogleCalendar(ctx, session.User.ID, profile, tokenSet)
+	return session, nil
+}
+
+// BeginMicrosoftLogin creates CSRF state and the Microsoft authorization URL.
+func (s *AuthService) BeginMicrosoftLogin(ctx context.Context) (authURL, state string, err error) {
+	if s.microsoft == nil {
+		return "", "", fmt.Errorf("%w: microsoft oauth is not configured", apperr.ErrInvalid)
+	}
+	state, err = s.state.Create()
+	if err != nil {
+		return "", "", fmt.Errorf("oauth state: %w", err)
+	}
+	return s.microsoft.AuthCodeURL(state), state, nil
+}
+
+// CompleteMicrosoftLogin exchanges the code, links auth_identity, and issues a JWT.
+func (s *AuthService) CompleteMicrosoftLogin(ctx context.Context, code, state string) (AuthSession, error) {
+	if s.microsoft == nil {
+		return AuthSession{}, fmt.Errorf("%w: microsoft oauth is not configured", apperr.ErrInvalid)
+	}
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return AuthSession{}, fmt.Errorf("%w: code is required", apperr.ErrValidation)
+	}
+	if err := s.state.Verify(state); err != nil {
+		return AuthSession{}, fmt.Errorf("%w: %v", apperr.ErrInvalid, err)
+	}
+
+	tokenSet, profile, err := s.microsoft.Exchange(ctx, code)
+	if err != nil {
+		return AuthSession{}, fmt.Errorf("%w: token exchange failed: %v", apperr.ErrInvalid, err)
+	}
+	if strings.TrimSpace(profile.Subject) == "" {
+		return AuthSession{}, fmt.Errorf("%w: microsoft profile missing subject", apperr.ErrInvalid)
+	}
+
+	email, err := normalizeLoginEmail(profile.Email)
+	if err != nil {
+		return AuthSession{}, err
+	}
+
+	session, err := s.resolveLogin(ctx, loginProfile{
+		Provider:      constant.AuthProviderMicrosoft,
+		Subject:       profile.Subject,
+		Email:         email,
+		EmailVerified: profile.EmailVerified,
+		Name:          profile.Name,
+	})
+	if err != nil {
+		return AuthSession{}, err
+	}
+	s.autoLinkMicrosoftCalendar(ctx, session.User.ID, profile, tokenSet)
+	return session, nil
+}
+
+func (s *AuthService) resolveLogin(ctx context.Context, profile loginProfile) (AuthSession, error) {
+	identity, err := s.identities.GetByProviderSubject(ctx, profile.Provider, profile.Subject)
 	switch {
 	case err == nil:
-		return s.loginExisting(ctx, identity, profile, tokenSet)
+		return s.loginExisting(ctx, identity, profile.Provider)
 	case errors.Is(err, apperr.ErrNotFound):
-		return s.registerNew(ctx, profile, email, tokenSet)
+		return s.loginOrRegister(ctx, profile)
 	default:
 		return AuthSession{}, err
 	}
 }
 
-func (s *AuthService) loginExisting(
-	ctx context.Context,
-	identity entity.AuthIdentity,
-	profile googleoauth.Profile,
-	tokenSet googleoauth.TokenSet,
-) (AuthSession, error) {
+func (s *AuthService) loginOrRegister(ctx context.Context, profile loginProfile) (AuthSession, error) {
+	if profile.Email == "" {
+		return AuthSession{}, fmt.Errorf("%w: %s account email is required", apperr.ErrValidation, profile.Provider)
+	}
+
+	existing, err := s.users.GetByEmail(ctx, profile.Email)
+	switch {
+	case err == nil:
+		if profile.EmailVerified && existing.EmailVerified {
+			return s.linkIdentity(ctx, existing, profile)
+		}
+		return AuthSession{}, fmt.Errorf("%w: email already registered", apperr.ErrConflict)
+	case errors.Is(err, apperr.ErrNotFound):
+		return s.registerNew(ctx, profile)
+	default:
+		return AuthSession{}, err
+	}
+}
+
+func (s *AuthService) loginExisting(ctx context.Context, identity entity.AuthIdentity, provider string) (AuthSession, error) {
 	user, err := s.users.GetByID(ctx, identity.UserID)
 	if err != nil {
 		return AuthSession{}, err
@@ -197,37 +263,46 @@ func (s *AuthService) loginExisting(
 	}
 	user.LastLoginAt = &now
 
-	account, err := s.upsertConnectedAccount(ctx, user, profile, tokenSet)
-	if err != nil {
-		return AuthSession{}, err
-	}
-	s.notifyGoogleAccountReady(ctx, account.ID)
-
 	s.log.AuthEvent(ctx, logger.AuthEventLogin,
 		constant.LogAttrUserID, user.ID.String(),
-		constant.LogAttrProvider, constant.AuthProviderGoogle,
+		constant.LogAttrProvider, provider,
 	)
 
 	return s.issueSession(user, false)
 }
 
-func (s *AuthService) registerNew(
-	ctx context.Context,
-	profile googleoauth.Profile,
-	email string,
-	tokenSet googleoauth.TokenSet,
-) (AuthSession, error) {
-	if email == "" {
-		return AuthSession{}, fmt.Errorf("%w: google account email is required", apperr.ErrValidation)
+func (s *AuthService) linkIdentity(ctx context.Context, user entity.User, profile loginProfile) (AuthSession, error) {
+	now := s.now().UTC()
+	err := s.tx.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		identityRepo := s.identities.WithTx(tx)
+		userRepo := s.userRepo.WithTx(tx)
+		if err := s.createIdentity(ctx, identityRepo, user.ID, profile, now); err != nil {
+			return err
+		}
+		if _, err := userRepo.TouchLastLogin(ctx, user.ID, now); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return AuthSession{}, err
 	}
+	user.LastLoginAt = &now
 
+	s.log.AuthEvent(ctx, logger.AuthEventLogin,
+		constant.LogAttrUserID, user.ID.String(),
+		constant.LogAttrProvider, profile.Provider,
+		constant.LogAttrEvent, "auth.link_identity",
+	)
+
+	return s.issueSession(user, false)
+}
+
+func (s *AuthService) registerNew(ctx context.Context, profile loginProfile) (AuthSession, error) {
 	var created entity.User
-	var connected entity.ConnectedAccount
 	err := s.tx.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		userRepo := s.userRepo.WithTx(tx)
 		identityRepo := s.identities.WithTx(tx)
-		accountRepo := s.accounts.WithTx(tx)
-		secretRepo := s.secrets.WithTx(tx)
 
 		var displayName *string
 		if name := strings.TrimSpace(profile.Name); name != "" {
@@ -239,7 +314,7 @@ func (s *AuthService) registerNew(
 		}
 
 		user, err := s.users.CreateWithRepo(ctx, userRepo, CreateUserInput{
-			Email:         email,
+			Email:         profile.Email,
 			EmailVerified: profile.EmailVerified,
 			DisplayName:   displayName,
 			AvatarURL:     avatar,
@@ -250,32 +325,9 @@ func (s *AuthService) registerNew(
 		}
 
 		now := s.now().UTC()
-		emailCopy := email
-		identityID, err := idgen.NewUUIDv7()
-		if err != nil {
+		if err := s.createIdentity(ctx, identityRepo, user.ID, profile, now); err != nil {
 			return err
 		}
-		_, err = identityRepo.Create(ctx, entity.AuthIdentity{
-			ID:              identityID,
-			PublicID:        idgen.PublicID(constant.PublicIDPrefixAuthIdentity, identityID),
-			UserID:          user.ID,
-			Provider:        constant.AuthProviderGoogle,
-			ProviderSubject: profile.Subject,
-			Email:           &emailCopy,
-			EmailVerified:   profile.EmailVerified,
-			CreatedAt:       now,
-			UpdatedAt:       now,
-		})
-		if err != nil {
-			return err
-		}
-
-		account, err := s.storeConnectedAccount(ctx, accountRepo, secretRepo, user, profile, tokenSet)
-		if err != nil {
-			return err
-		}
-		connected = account
-
 		if _, err := userRepo.TouchLastLogin(ctx, user.ID, now); err != nil {
 			return err
 		}
@@ -287,163 +339,43 @@ func (s *AuthService) registerNew(
 		return AuthSession{}, err
 	}
 
-	s.notifyGoogleAccountReady(ctx, connected.ID)
-
 	s.log.AuthEvent(ctx, logger.AuthEventLogin,
 		constant.LogAttrUserID, created.ID.String(),
-		constant.LogAttrProvider, constant.AuthProviderGoogle,
+		constant.LogAttrProvider, profile.Provider,
 		constant.LogAttrEvent, "auth.signup",
 	)
 
 	return s.issueSession(created, true)
 }
 
-func (s *AuthService) upsertConnectedAccount(
+func (s *AuthService) createIdentity(
 	ctx context.Context,
-	user entity.User,
-	profile googleoauth.Profile,
-	tokenSet googleoauth.TokenSet,
-) (entity.ConnectedAccount, error) {
-	existing, err := s.accounts.GetByProviderAccount(ctx, constant.AuthProviderGoogle, profile.Subject)
-	if errors.Is(err, apperr.ErrNotFound) {
-		return s.storeConnectedAccount(ctx, s.accounts, s.secrets, user, profile, tokenSet)
-	}
+	identityRepo repository.AuthIdentityRepository,
+	userID uuid.UUID,
+	profile loginProfile,
+	now time.Time,
+) error {
+	identityID, err := idgen.NewUUIDv7()
 	if err != nil {
-		return entity.ConnectedAccount{}, err
+		return err
 	}
-
-	now := s.now().UTC()
-	ciphertext, expiresAt, scopes, err := s.sealTokenSet(ctx, tokenSet, existing, now)
-	if err != nil {
-		return entity.ConnectedAccount{}, err
+	var emailCopy *string
+	if profile.Email != "" {
+		email := profile.Email
+		emailCopy = &email
 	}
-
-	_, err = s.secrets.UpdateCiphertext(ctx, existing.CredentialsRef, ciphertext, now)
-	if errors.Is(err, apperr.ErrNotFound) {
-		ref, cerr := s.createSecret(ctx, s.secrets, ciphertext, now)
-		if cerr != nil {
-			return entity.ConnectedAccount{}, cerr
-		}
-		return s.accounts.UpdateCredentials(ctx, existing.ID, ref, expiresAt, scopes, constant.ConnectedAccountStatusActive, now)
-	}
-	if err != nil {
-		return entity.ConnectedAccount{}, err
-	}
-	return s.accounts.UpdateCredentials(ctx, existing.ID, existing.CredentialsRef, expiresAt, scopes, constant.ConnectedAccountStatusActive, now)
-}
-
-func (s *AuthService) storeConnectedAccount(
-	ctx context.Context,
-	accounts repository.ConnectedAccountRepository,
-	secrets repository.CredentialSecretRepository,
-	user entity.User,
-	profile googleoauth.Profile,
-	tokenSet googleoauth.TokenSet,
-) (entity.ConnectedAccount, error) {
-	now := s.now().UTC()
-	ciphertext, expiresAt, scopes, err := s.sealTokenSet(ctx, tokenSet, entity.ConnectedAccount{}, now)
-	if err != nil {
-		return entity.ConnectedAccount{}, err
-	}
-	ref, err := s.createSecret(ctx, secrets, ciphertext, now)
-	if err != nil {
-		return entity.ConnectedAccount{}, err
-	}
-
-	accountID, err := idgen.NewUUIDv7()
-	if err != nil {
-		return entity.ConnectedAccount{}, err
-	}
-	var displayName *string
-	if name := strings.TrimSpace(profile.Name); name != "" {
-		displayName = &name
-	}
-	return accounts.Create(ctx, entity.ConnectedAccount{
-		ID:                accountID,
-		PublicID:          idgen.PublicID(constant.PublicIDPrefixConnectedAccount, accountID),
-		UserID:            user.ID,
-		Provider:          constant.AuthProviderGoogle,
-		ProviderAccountID: profile.Subject,
-		DisplayName:       displayName,
-		Status:            constant.ConnectedAccountStatusActive,
-		Scopes:            scopes,
-		CredentialsRef:    ref,
-		TokenExpiresAt:    expiresAt,
-		ProviderMetadata:  []byte("{}"),
-		CreatedAt:         now,
-		UpdatedAt:         now,
+	_, err = identityRepo.Create(ctx, entity.AuthIdentity{
+		ID:              identityID,
+		PublicID:        idgen.PublicID(constant.PublicIDPrefixAuthIdentity, identityID),
+		UserID:          userID,
+		Provider:        profile.Provider,
+		ProviderSubject: profile.Subject,
+		Email:           emailCopy,
+		EmailVerified:   profile.EmailVerified,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	})
-}
-
-func (s *AuthService) createSecret(ctx context.Context, secrets repository.CredentialSecretRepository, ciphertext []byte, now time.Time) (string, error) {
-	id, err := idgen.NewUUIDv7()
-	if err != nil {
-		return "", err
-	}
-	ref := idgen.PublicID(constant.PublicIDPrefixCredential, id)
-	_, err = secrets.Create(ctx, entity.CredentialSecret{
-		ID:         id,
-		Ref:        ref,
-		Ciphertext: ciphertext,
-		CreatedAt:  now,
-		UpdatedAt:  now,
-	})
-	if err != nil {
-		return "", err
-	}
-	return ref, nil
-}
-
-func (s *AuthService) sealTokenSet(ctx context.Context, tokenSet googleoauth.TokenSet, existing entity.ConnectedAccount, now time.Time) ([]byte, *time.Time, []string, error) {
-	refresh := tokenSet.RefreshToken
-	if refresh == "" && existing.CredentialsRef != "" {
-		// Preserve previously sealed refresh token when Google omits a new one.
-		prev, err := s.secrets.GetByRef(ctx, existing.CredentialsRef)
-		if err == nil {
-			if plain, derr := seal.Decrypt(s.sealKey, prev.Ciphertext); derr == nil {
-				var old sealedTokens
-				if json.Unmarshal(plain, &old) == nil && old.RefreshToken != "" {
-					refresh = old.RefreshToken
-				}
-			}
-		}
-	}
-	if refresh == "" {
-		return nil, nil, nil, fmt.Errorf("%w: google did not return a refresh token", apperr.ErrInvalid)
-	}
-
-	var expiresAt *time.Time
-	expiryUnix := int64(0)
-	if tokenSet.ExpiresIn > 0 {
-		t := now.Add(time.Duration(tokenSet.ExpiresIn) * time.Second)
-		expiresAt = &t
-		expiryUnix = t.Unix()
-	}
-
-	payload, err := json.Marshal(sealedTokens{
-		AccessToken:  tokenSet.AccessToken,
-		RefreshToken: refresh,
-		TokenType:    tokenSet.TokenType,
-		ExpiryUnix:   expiryUnix,
-		Scope:        tokenSet.Scope,
-	})
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("marshal tokens: %w", err)
-	}
-	ciphertext, err := seal.Encrypt(s.sealKey, payload)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	scopes := splitScopes(tokenSet.Scope)
-	if len(scopes) == 0 {
-		scopes = []string{
-			constant.GoogleScopeOpenID,
-			constant.GoogleScopeEmail,
-			constant.GoogleScopeProfile,
-		}
-	}
-	return ciphertext, expiresAt, scopes, nil
+	return err
 }
 
 func (s *AuthService) issueSession(user entity.User, isNew bool) (AuthSession, error) {
@@ -461,6 +393,47 @@ func (s *AuthService) issueSession(user entity.User, isNew bool) (AuthSession, e
 	}, nil
 }
 
+func (s *AuthService) autoLinkGoogleCalendar(
+	ctx context.Context,
+	userID uuid.UUID,
+	profile googleoauth.Profile,
+	tokenSet googleoauth.TokenSet,
+) {
+	if s.linker == nil {
+		return
+	}
+	if _, err := s.linker.LinkGoogleFromLogin(ctx, userID, profile, tokenSet); err != nil && s.log != nil {
+		s.log.Warn(ctx, "auto-link google calendar from login failed",
+			constant.LogAttrError, err,
+			constant.LogAttrUserID, userID.String(),
+		)
+	}
+}
+
+func (s *AuthService) autoLinkMicrosoftCalendar(
+	ctx context.Context,
+	userID uuid.UUID,
+	profile microsoftoauth.Profile,
+	tokenSet microsoftoauth.TokenSet,
+) {
+	if s.linker == nil {
+		return
+	}
+	if _, err := s.linker.LinkMicrosoftFromLogin(ctx, userID, profile, tokenSet); err != nil && s.log != nil {
+		s.log.Warn(ctx, "auto-link microsoft calendar from login failed",
+			constant.LogAttrError, err,
+			constant.LogAttrUserID, userID.String(),
+		)
+	}
+}
+
+func normalizeLoginEmail(raw string) (string, error) {
+	if strings.TrimSpace(raw) == "" {
+		return "", nil
+	}
+	return validation.EmailQuery(raw)
+}
+
 func splitScopes(scope string) []string {
 	fields := strings.Fields(scope)
 	out := make([]string, 0, len(fields))
@@ -468,6 +441,42 @@ func splitScopes(scope string) []string {
 		f = strings.TrimSpace(f)
 		if f != "" {
 			out = append(out, f)
+		}
+	}
+	return out
+}
+
+func ensureScope(scopes []string, required string) []string {
+	required = strings.TrimSpace(required)
+	if required == "" {
+		return scopes
+	}
+	for _, scope := range scopes {
+		if strings.TrimSpace(scope) == required {
+			return scopes
+		}
+	}
+	return append(append([]string{}, scopes...), required)
+}
+
+func tokenHasCalendarScope(scope string) bool {
+	return hasCalendarScope(splitScopes(scope))
+}
+
+func unionScopes(parts ...[]string) []string {
+	seen := make(map[string]struct{})
+	out := make([]string, 0)
+	for _, list := range parts {
+		for _, scope := range list {
+			scope = strings.TrimSpace(scope)
+			if scope == "" {
+				continue
+			}
+			if _, ok := seen[scope]; ok {
+				continue
+			}
+			seen[scope] = struct{}{}
+			out = append(out, scope)
 		}
 	}
 	return out

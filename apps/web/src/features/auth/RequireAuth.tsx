@@ -1,9 +1,13 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
-import { ensureCalendarSourcesFresh } from "@/features/calendar";
+import {
+  calendarQueryKeys,
+  ensureCalendarSourcesFresh,
+} from "@/features/calendar";
 
 import { authStyles as styles } from "./Auth.styles";
 import { useAuth } from "./AuthProvider";
@@ -11,6 +15,7 @@ import { useAuth } from "./AuthProvider";
 export function RequireAuth({ children }: { children: ReactNode }) {
   const { status } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -24,11 +29,15 @@ export function RequireAuth({ children }: { children: ReactNode }) {
       return;
     }
     const controller = new AbortController();
-    void ensureCalendarSourcesFresh(controller.signal).catch(() => {
-      // Soft-fail: local DB remains source of truth; background job / manual sync retry.
-    });
+    void ensureCalendarSourcesFresh(controller.signal)
+      .then(() =>
+        queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all }),
+      )
+      .catch(() => {
+        // Soft-fail: local DB remains source of truth; background job / manual sync retry.
+      });
     return () => controller.abort();
-  }, [status]);
+  }, [status, queryClient]);
 
   if (status === "loading") {
     return (

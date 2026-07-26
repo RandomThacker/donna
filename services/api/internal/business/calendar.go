@@ -9,10 +9,9 @@ import (
 	"time"
 
 	"github.com/RandomThacker/donna/services/api/internal/apperr"
+	"github.com/RandomThacker/donna/services/api/internal/calendarprovider"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
-	"github.com/RandomThacker/donna/services/api/internal/googlecalendar"
-	"github.com/RandomThacker/donna/services/api/internal/googleoauth"
 	"github.com/RandomThacker/donna/services/api/internal/idgen"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
@@ -20,12 +19,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
-
-// GoogleCalendarClient lists calendars and events from Google Calendar API.
-type GoogleCalendarClient interface {
-	ListCalendars(ctx context.Context, accessToken string, opts googlecalendar.ListOptions) (googlecalendar.ListResult, error)
-	ListEvents(ctx context.Context, accessToken, calendarID string, opts googlecalendar.EventListOptions) (googlecalendar.EventListResult, error)
-}
 
 // CalendarSyncResult summarizes an idempotent source sync.
 type CalendarSyncResult struct {
@@ -53,57 +46,114 @@ type CalendarEventSyncResult struct {
 
 // CalendarService syncs and lists calendar sources/events (Donna DB is the query source of truth).
 type CalendarService struct {
-	accounts repository.ConnectedAccountRepository
-	secrets  repository.CredentialSecretRepository
-	sources  repository.CalendarSourceRepository
-	events   repository.CalendarEventRepository
-	syncRuns repository.CalendarSyncRunRepository
-	jobs     repository.SchedulerJobRepository
-	tx       TxRunner
-	oauth    GoogleOAuthClient
-	calendar GoogleCalendarClient
-	sealKey  []byte
-	log      *logger.Logger
-	now      func() time.Time
+	accounts  repository.ConnectedAccountRepository
+	secrets   repository.CredentialSecretRepository
+	sources   repository.CalendarSourceRepository
+	events    repository.CalendarEventRepository
+	syncRuns  repository.CalendarSyncRunRepository
+	jobs      repository.SchedulerJobRepository
+	tx        TxRunner
+	providers map[string]calendarprovider.Provider
+	tokens    map[string]calendarprovider.TokenRefresher
+	sealKey   []byte
+	log       *logger.Logger
+	now       func() time.Time
 }
 
 // CalendarServiceDeps wires CalendarService.
 type CalendarServiceDeps struct {
-	Accounts repository.ConnectedAccountRepository
-	Secrets  repository.CredentialSecretRepository
-	Sources  repository.CalendarSourceRepository
-	Events   repository.CalendarEventRepository
-	SyncRuns repository.CalendarSyncRunRepository
-	Jobs     repository.SchedulerJobRepository
-	Tx       TxRunner
-	OAuth    GoogleOAuthClient
-	Calendar GoogleCalendarClient
-	SealKey  []byte
-	Log      *logger.Logger
+	Accounts  repository.ConnectedAccountRepository
+	Secrets   repository.CredentialSecretRepository
+	Sources   repository.CalendarSourceRepository
+	Events    repository.CalendarEventRepository
+	SyncRuns  repository.CalendarSyncRunRepository
+	Jobs      repository.SchedulerJobRepository
+	Tx        TxRunner
+	Providers map[string]calendarprovider.Provider
+	Tokens    map[string]calendarprovider.TokenRefresher
+	SealKey   []byte
+	Log       *logger.Logger
 }
 
 // NewCalendarService constructs a CalendarService.
 func NewCalendarService(deps CalendarServiceDeps) *CalendarService {
-	return &CalendarService{
-		accounts: deps.Accounts,
-		secrets:  deps.Secrets,
-		sources:  deps.Sources,
-		events:   deps.Events,
-		syncRuns: deps.SyncRuns,
-		jobs:     deps.Jobs,
-		tx:       deps.Tx,
-		oauth:    deps.OAuth,
-		calendar: deps.Calendar,
-		sealKey:  deps.SealKey,
-		log:      deps.Log,
-		now:      time.Now,
+	providers := deps.Providers
+	if providers == nil {
+		providers = map[string]calendarprovider.Provider{}
 	}
+	tokens := deps.Tokens
+	if tokens == nil {
+		tokens = map[string]calendarprovider.TokenRefresher{}
+	}
+	return &CalendarService{
+		accounts:  deps.Accounts,
+		secrets:   deps.Secrets,
+		sources:   deps.Sources,
+		events:    deps.Events,
+		syncRuns:  deps.SyncRuns,
+		jobs:      deps.Jobs,
+		tx:        deps.Tx,
+		providers: providers,
+		tokens:    tokens,
+		sealKey:   deps.SealKey,
+		log:       deps.Log,
+		now:       time.Now,
+	}
+}
+
+// googleTokenAdapter adapts GoogleOAuthClient to calendarprovider.TokenRefresher.
+type googleTokenAdapter struct {
+	client GoogleOAuthClient
+}
+
+func (a googleTokenAdapter) RefreshAccessToken(ctx context.Context, refreshToken string) (calendarprovider.TokenSet, error) {
+	ts, err := a.client.RefreshAccessToken(ctx, refreshToken)
+	if err != nil {
+		return calendarprovider.TokenSet{}, err
+	}
+	return calendarprovider.TokenSet{
+		AccessToken:  ts.AccessToken,
+		RefreshToken: ts.RefreshToken,
+		TokenType:    ts.TokenType,
+		ExpiresIn:    int(ts.ExpiresIn),
+		Scope:        ts.Scope,
+	}, nil
+}
+
+// GoogleTokenRefresher wraps a GoogleOAuthClient as a provider-neutral TokenRefresher.
+func GoogleTokenRefresher(client GoogleOAuthClient) calendarprovider.TokenRefresher {
+	if client == nil {
+		return nil
+	}
+	return googleTokenAdapter{client: client}
+}
+
+// NewGoogleTokenRefresher wraps a GoogleOAuthClient as a provider-neutral TokenRefresher.
+func NewGoogleTokenRefresher(client GoogleOAuthClient) calendarprovider.TokenRefresher {
+	return GoogleTokenRefresher(client)
+}
+
+type microsoftTokenAdapter struct {
+	refresh func(ctx context.Context, refreshToken string) (calendarprovider.TokenSet, error)
+}
+
+func (a microsoftTokenAdapter) RefreshAccessToken(ctx context.Context, refreshToken string) (calendarprovider.TokenSet, error) {
+	return a.refresh(ctx, refreshToken)
+}
+
+// MicrosoftTokenRefresher adapts a Microsoft OAuth refresh function.
+func MicrosoftTokenRefresher(refresh func(ctx context.Context, refreshToken string) (calendarprovider.TokenSet, error)) calendarprovider.TokenRefresher {
+	if refresh == nil {
+		return nil
+	}
+	return microsoftTokenAdapter{refresh: refresh}
 }
 
 // CalendarSourcesView is the Donna-DB read model for sources + account sync observability.
 type CalendarSourcesView struct {
-	Sources []entity.CalendarSource
-	Account entity.ConnectedAccount
+	Sources  []entity.CalendarSource
+	Accounts []entity.ConnectedAccount
+	Account  entity.ConnectedAccount // first syncable, back-compat
 }
 
 // ListSources returns live calendar sources for the user from Donna DB only.
@@ -115,12 +165,20 @@ func (s *CalendarService) ListSources(ctx context.Context, userID uuid.UUID) (Ca
 	if err != nil {
 		return CalendarSourcesView{}, err
 	}
-	view := CalendarSourcesView{Sources: sources}
-	account, err := s.accounts.GetByUserAndProvider(ctx, userID, constant.AuthProviderGoogle)
-	if err == nil {
-		view.Account = account
-	} else if !errors.Is(err, apperr.ErrNotFound) {
+	view := CalendarSourcesView{
+		Sources:  sources,
+		Accounts: []entity.ConnectedAccount{},
+	}
+	accounts, err := s.listSyncableAccounts(ctx, userID)
+	if err != nil {
+		if errors.Is(err, apperr.ErrInvalid) {
+			return view, nil
+		}
 		return CalendarSourcesView{}, err
+	}
+	view.Accounts = accounts
+	if len(accounts) > 0 {
+		view.Account = accounts[0]
 	}
 	return view, nil
 }
@@ -135,18 +193,36 @@ func (s *CalendarService) SyncSourcesForAccount(ctx context.Context, accountID u
 	return s.SyncPipelineForAccount(ctx, accountID, constant.CalendarSyncTriggerScheduler)
 }
 
-// EnsureFresh runs the full pipeline only when last successful sync is older than maxAge.
+// EnsureFresh runs the full pipeline only when any syncable account is stale.
 // Used for app startup and AI workflows — always read Donna DB afterward.
 func (s *CalendarService) EnsureFresh(ctx context.Context, userID uuid.UUID, maxAge time.Duration) (CalendarPipelineResult, error) {
 	if maxAge <= 0 {
 		maxAge = constant.CalendarSyncStaleAfter
 	}
-	account, err := s.requireGoogleAccount(ctx, userID)
+	accounts, err := s.listSyncableAccounts(ctx, userID)
 	if err != nil {
 		return CalendarPipelineResult{}, err
 	}
+	if len(accounts) == 0 {
+		return CalendarPipelineResult{}, fmt.Errorf("%w: connect a calendar provider and grant Calendar access first", apperr.ErrNotFound)
+	}
+
 	now := s.now().UTC()
-	if account.LastSyncedAt != nil && now.Sub(account.LastSyncedAt.UTC()) < maxAge {
+	allFresh := true
+	var referenceSyncedAt *time.Time
+	var syncStatus string
+	for _, account := range accounts {
+		if account.LastSyncedAt == nil || now.Sub(account.LastSyncedAt.UTC()) >= maxAge {
+			allFresh = false
+			break
+		}
+		if referenceSyncedAt == nil || account.LastSyncedAt.After(*referenceSyncedAt) {
+			t := account.LastSyncedAt.UTC()
+			referenceSyncedAt = &t
+			syncStatus = account.CalendarSyncStatus
+		}
+	}
+	if allFresh && referenceSyncedAt != nil {
 		sources, listErr := s.sources.ListByUserID(ctx, userID)
 		if listErr != nil {
 			return CalendarPipelineResult{}, listErr
@@ -154,38 +230,71 @@ func (s *CalendarService) EnsureFresh(ctx context.Context, userID uuid.UUID, max
 		return CalendarPipelineResult{
 			Trigger:    constant.CalendarSyncTriggerEnsure,
 			Status:     constant.CalendarSyncRunStatusSkipped,
-			StartedAt:  account.LastSyncedAt.UTC(),
-			FinishedAt: account.LastSyncedAt.UTC(),
+			StartedAt:  *referenceSyncedAt,
+			FinishedAt: *referenceSyncedAt,
 			Sources:    sources,
 			Skipped:    true,
-			SyncStatus: account.CalendarSyncStatus,
+			SyncStatus: syncStatus,
 			Failures:   []CalendarSyncFailure{},
 		}, nil
 	}
-	return s.runPipeline(ctx, account, constant.CalendarSyncTriggerEnsure)
+	return s.SyncPipeline(ctx, userID, constant.CalendarSyncTriggerEnsure)
 }
 
-func (s *CalendarService) requireGoogleAccount(ctx context.Context, userID uuid.UUID) (entity.ConnectedAccount, error) {
+func (s *CalendarService) providerFor(account entity.ConnectedAccount) (calendarprovider.Provider, error) {
+	provider, ok := s.providers[account.Provider]
+	if !ok || provider == nil {
+		return nil, fmt.Errorf("%w: calendar provider %q is not configured", apperr.ErrInvalid, account.Provider)
+	}
+	return provider, nil
+}
+
+func (s *CalendarService) tokenRefresherFor(account entity.ConnectedAccount) (calendarprovider.TokenRefresher, error) {
+	refresher, ok := s.tokens[account.Provider]
+	if !ok || refresher == nil {
+		return nil, fmt.Errorf("%w: calendar token refresher for %q is not configured", apperr.ErrInvalid, account.Provider)
+	}
+	return refresher, nil
+}
+
+func (s *CalendarService) listSyncableAccounts(ctx context.Context, userID uuid.UUID) ([]entity.ConnectedAccount, error) {
 	if userID == uuid.Nil {
-		return entity.ConnectedAccount{}, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
+		return nil, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
 	}
-	if s.oauth == nil || s.calendar == nil {
-		return entity.ConnectedAccount{}, fmt.Errorf("%w: google calendar is not configured", apperr.ErrInvalid)
+	if len(s.providers) == 0 {
+		return nil, fmt.Errorf("%w: calendar is not configured", apperr.ErrInvalid)
 	}
-	account, err := s.accounts.GetByUserAndProvider(ctx, userID, constant.AuthProviderGoogle)
-	if errors.Is(err, apperr.ErrNotFound) {
-		return entity.ConnectedAccount{}, fmt.Errorf("%w: connect Google and grant Calendar access first", apperr.ErrNotFound)
+	all, err := s.accounts.ListByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
 	}
+	out := make([]entity.ConnectedAccount, 0, len(all))
+	for _, account := range all {
+		if account.Status != constant.ConnectedAccountStatusActive {
+			continue
+		}
+		// Google may omit calendar from the token `scope` string on incremental
+		// grants. Accounts that already synced calendars are still syncable.
+		if !hasCalendarScope(account.Scopes) && !calendarAccessProven(account) {
+			continue
+		}
+		if _, ok := s.providers[account.Provider]; !ok {
+			continue
+		}
+		out = append(out, account)
+	}
+	return out, nil
+}
+
+func (s *CalendarService) requireAnyCalendarAccount(ctx context.Context, userID uuid.UUID) (entity.ConnectedAccount, error) {
+	accounts, err := s.listSyncableAccounts(ctx, userID)
 	if err != nil {
 		return entity.ConnectedAccount{}, err
 	}
-	if account.Status != constant.ConnectedAccountStatusActive {
-		return entity.ConnectedAccount{}, fmt.Errorf("%w: google account needs reauthorization", apperr.ErrForbidden)
+	if len(accounts) == 0 {
+		return entity.ConnectedAccount{}, fmt.Errorf("%w: connect a calendar provider and grant Calendar access first", apperr.ErrNotFound)
 	}
-	if !hasCalendarScope(account.Scopes) {
-		return entity.ConnectedAccount{}, fmt.Errorf("%w: google calendar scope missing; sign in again to grant Calendar access", apperr.ErrForbidden)
-	}
-	return account, nil
+	return accounts[0], nil
 }
 
 func (s *CalendarService) syncAccount(ctx context.Context, account entity.ConnectedAccount, forceFull bool) (result CalendarSyncResult, err error) {
@@ -209,6 +318,12 @@ func (s *CalendarService) syncAccount(ctx context.Context, account entity.Connec
 		})
 	}()
 
+	provider, providerErr := s.providerFor(account)
+	if providerErr != nil {
+		err = providerErr
+		return CalendarSyncResult{}, err
+	}
+
 	accessToken, tokenErr := s.resolveAccessToken(ctx, account)
 	if tokenErr != nil {
 		err = tokenErr
@@ -220,13 +335,14 @@ func (s *CalendarService) syncAccount(ctx context.Context, account entity.Connec
 		syncToken = strings.TrimSpace(*account.CalendarListSyncToken)
 	}
 
-	listed, listErr := s.calendar.ListCalendars(ctx, accessToken, googlecalendar.ListOptions{SyncToken: syncToken})
+	listed, listErr := provider.ListCalendars(ctx, accessToken, calendarprovider.ListCalendarsOptions{SyncToken: syncToken})
 	if listErr != nil {
-		var gone *googlecalendar.GoneError
+		var gone *calendarprovider.SyncCursorInvalidError
 		if errors.As(listErr, &gone) {
 			if s.log != nil {
 				s.log.Warn(ctx, "calendar list sync token invalid; recovering with full sync",
 					constant.LogAttrUserID, account.UserID.String(),
+					"provider", account.Provider,
 				)
 			}
 			clearedAt := s.now().UTC()
@@ -235,32 +351,33 @@ func (s *CalendarService) syncAccount(ctx context.Context, account entity.Connec
 				return CalendarSyncResult{}, err
 			}
 			account.CalendarListSyncToken = nil
-			listed, listErr = s.calendar.ListCalendars(ctx, accessToken, googlecalendar.ListOptions{})
+			listed, listErr = provider.ListCalendars(ctx, accessToken, calendarprovider.ListCalendarsOptions{})
 		}
 	}
 	if listErr != nil {
-		var authErr *googlecalendar.AuthError
+		var authErr *calendarprovider.AuthError
 		if errors.As(listErr, &authErr) {
 			detail := strings.TrimSpace(authErr.Body)
 			if detail == "" {
 				detail = authErr.Error()
 			}
 			if s.log != nil {
-				s.log.Warn(ctx, "google calendar list denied",
+				s.log.Warn(ctx, "calendar provider list denied",
 					constant.LogAttrUserID, account.UserID.String(),
+					"provider", account.Provider,
 					"status", authErr.Status,
-					"google_error", detail,
+					"provider_error", detail,
 				)
 			}
 			err = fmt.Errorf(
-				"%w: google calendar API denied access (%d). Enable the Google Calendar API for this Cloud project, then sign in again. Details: %s",
+				"%w: calendar provider denied access (%d). Check API enablement and reauthorize. Details: %s",
 				apperr.ErrForbidden,
 				authErr.Status,
 				detail,
 			)
 			return CalendarSyncResult{}, err
 		}
-		err = fmt.Errorf("list google calendars: %w", listErr)
+		err = fmt.Errorf("list calendars from provider: %w", listErr)
 		return CalendarSyncResult{}, err
 	}
 
@@ -346,7 +463,7 @@ func (s *CalendarService) syncAccount(ctx context.Context, account entity.Connec
 		}
 	}
 
-	live, listErr := s.sources.ListByUserID(ctx, account.UserID)
+	live, listErr := s.sources.ListByConnectedAccountID(ctx, account.ID)
 	if listErr != nil {
 		// Sync is committed; return counts without failing the request.
 		if s.log != nil {
@@ -359,6 +476,7 @@ func (s *CalendarService) syncAccount(ctx context.Context, account entity.Connec
 	if s.log != nil {
 		s.log.Info(ctx, "calendar sources synced",
 			constant.LogAttrUserID, account.UserID.String(),
+			"provider", account.Provider,
 			"incremental", result.Incremental,
 			"created", result.CreatedCount,
 			"updated", result.UpdatedCount,
@@ -462,7 +580,7 @@ func (s *CalendarService) EnsureBackgroundSyncJobWithPayload(ctx context.Context
 	return s.ensureBackgroundSyncJob(ctx, account, s.now().UTC(), ensureJobOpts{Payload: payload})
 }
 
-// BootstrapCalendarSyncJob enqueues an immediate pending calendar_sync after Google connect.
+// BootstrapCalendarSyncJob enqueues an immediate pending calendar_sync after any calendar provider connect.
 // No-op when the account lacks calendar scope.
 func (s *CalendarService) BootstrapCalendarSyncJob(ctx context.Context, accountID uuid.UUID) error {
 	account, err := s.accounts.GetByID(ctx, accountID)
@@ -472,14 +590,23 @@ func (s *CalendarService) BootstrapCalendarSyncJob(ctx context.Context, accountI
 	if !hasCalendarScope(account.Scopes) {
 		return nil
 	}
-	return s.ensureBackgroundSyncJob(ctx, account, s.now().UTC(), ensureJobOpts{Immediate: true})
+	now := s.now().UTC()
+	opts := ensureJobOpts{Immediate: true}
+	if account.Provider == constant.AuthProviderICS {
+		payload, encErr := repository.EncodeCalendarSyncPayload(constant.ICSDefaultSyncIntervalMin)
+		if encErr != nil {
+			return encErr
+		}
+		opts.Payload = payload
+	}
+	return s.ensureBackgroundSyncJob(ctx, account, now, opts)
 }
 
 func (s *CalendarService) upsertSource(
 	ctx context.Context,
 	repo repository.CalendarSourceRepository,
 	account entity.ConnectedAccount,
-	remote googlecalendar.RemoteCalendar,
+	remote calendarprovider.RemoteCalendar,
 	now time.Time,
 ) (entity.CalendarSource, bool, error) {
 	meta, err := marshalSourceMetadata(remote)
@@ -498,6 +625,7 @@ func (s *CalendarService) upsertSource(
 	if role := strings.TrimSpace(remote.AccessRole); role != "" {
 		accessRole = &role
 	}
+	name := calendarSourceName(account, remote.Name)
 
 	existing, err := repo.GetByAccountAndProviderCalendar(ctx, account.ID, remote.ID)
 	switch {
@@ -512,7 +640,7 @@ func (s *CalendarService) upsertSource(
 			UserID:              account.UserID,
 			ConnectedAccountID:  account.ID,
 			ProviderCalendarID:  remote.ID,
-			Name:                remote.Name,
+			Name:                name,
 			Color:               color,
 			IsPrimaryOnProvider: remote.Primary,
 			IsWritable:          remote.Writable,
@@ -528,7 +656,7 @@ func (s *CalendarService) upsertSource(
 	case err != nil:
 		return entity.CalendarSource{}, false, err
 	default:
-		existing.Name = remote.Name
+		existing.Name = name
 		existing.Color = color
 		existing.IsPrimaryOnProvider = remote.Primary
 		existing.IsWritable = remote.Writable
@@ -539,6 +667,20 @@ func (s *CalendarService) upsertSource(
 		updated, uErr := repo.UpdateFromSync(ctx, existing)
 		return updated, false, uErr
 	}
+}
+
+// calendarSourceName prefers the ICS feed label the user chose over generic
+// X-WR-CALNAME values like "Calendar" from the remote ICS body.
+func calendarSourceName(account entity.ConnectedAccount, remoteName string) string {
+	if account.Provider == constant.AuthProviderICS && account.DisplayName != nil {
+		if name := strings.TrimSpace(*account.DisplayName); name != "" {
+			return name
+		}
+	}
+	if name := strings.TrimSpace(remoteName); name != "" {
+		return name
+	}
+	return "Calendar"
 }
 
 func (s *CalendarService) resolveAccessToken(ctx context.Context, account entity.ConnectedAccount) (string, error) {
@@ -554,8 +696,15 @@ func (s *CalendarService) resolveAccessToken(ctx context.Context, account entity
 	if err := json.Unmarshal(plain, &tokens); err != nil {
 		return "", fmt.Errorf("decode credentials: %w", err)
 	}
-	if tokens.AccessToken == "" || tokens.RefreshToken == "" {
-		return "", fmt.Errorf("%w: google credentials incomplete; sign in again", apperr.ErrForbidden)
+	if tokens.AccessToken == "" {
+		return "", fmt.Errorf("%w: calendar credentials incomplete; sign in again", apperr.ErrForbidden)
+	}
+	// ICS (and similar) stores a non-expiring opaque credential with no refresh token.
+	if tokens.RefreshToken == "" {
+		if _, err := s.tokenRefresherFor(account); err != nil {
+			return tokens.AccessToken, nil
+		}
+		return "", fmt.Errorf("%w: calendar credentials incomplete; sign in again", apperr.ErrForbidden)
 	}
 
 	now := s.now().UTC()
@@ -567,9 +716,13 @@ func (s *CalendarService) resolveAccessToken(ctx context.Context, account entity
 		return tokens.AccessToken, nil
 	}
 
-	refreshed, err := s.oauth.RefreshAccessToken(ctx, tokens.RefreshToken)
+	refresher, err := s.tokenRefresherFor(account)
 	if err != nil {
-		return "", fmt.Errorf("%w: google token refresh failed; sign in again", apperr.ErrForbidden)
+		return "", err
+	}
+	refreshed, err := refresher.RefreshAccessToken(ctx, tokens.RefreshToken)
+	if err != nil {
+		return "", fmt.Errorf("%w: calendar token refresh failed; sign in again", apperr.ErrForbidden)
 	}
 	if refreshed.RefreshToken == "" {
 		refreshed.RefreshToken = tokens.RefreshToken
@@ -578,7 +731,7 @@ func (s *CalendarService) resolveAccessToken(ctx context.Context, account entity
 		refreshed.Scope = tokens.Scope
 	}
 
-	ciphertext, expiresAt, scopes, err := s.sealRefreshedTokens(refreshed, now)
+	ciphertext, expiresAt, scopes, err := s.sealRefreshedTokens(refreshed, account.Provider, now)
 	if err != nil {
 		return "", err
 	}
@@ -591,7 +744,7 @@ func (s *CalendarService) resolveAccessToken(ctx context.Context, account entity
 	return refreshed.AccessToken, nil
 }
 
-func (s *CalendarService) sealRefreshedTokens(tokenSet googleoauth.TokenSet, now time.Time) ([]byte, *time.Time, []string, error) {
+func (s *CalendarService) sealRefreshedTokens(tokenSet calendarprovider.TokenSet, provider string, now time.Time) ([]byte, *time.Time, []string, error) {
 	var expiresAt *time.Time
 	expiryUnix := int64(0)
 	if tokenSet.ExpiresIn > 0 {
@@ -615,25 +768,62 @@ func (s *CalendarService) sealRefreshedTokens(tokenSet googleoauth.TokenSet, now
 	}
 	scopes := splitScopes(tokenSet.Scope)
 	if len(scopes) == 0 {
-		scopes = []string{constant.GoogleScopeCalendar}
+		scopes = defaultCalendarScopes(provider)
 	}
 	return ciphertext, expiresAt, scopes, nil
+}
+
+func defaultCalendarScopes(provider string) []string {
+	switch provider {
+	case constant.AuthProviderMicrosoft:
+		return []string{constant.MicrosoftScopeCalendarsReadWrite, constant.MicrosoftScopeOfflineAccess}
+	case constant.AuthProviderICS:
+		return []string{constant.ICSScopeCalendar}
+	default:
+		return []string{constant.GoogleScopeCalendar}
+	}
 }
 
 func hasCalendarScope(scopes []string) bool {
 	for _, scope := range scopes {
 		scope = strings.TrimSpace(scope)
+		if scope == "" {
+			continue
+		}
+		if scope == constant.ICSScopeCalendar {
+			return true
+		}
 		if scope == constant.GoogleScopeCalendar ||
 			scope == "https://www.googleapis.com/auth/calendar.readonly" ||
 			strings.HasSuffix(scope, "/auth/calendar") ||
 			strings.HasSuffix(scope, "/auth/calendar.readonly") {
 			return true
 		}
+		if scope == constant.MicrosoftScopeCalendarsRead ||
+			scope == constant.MicrosoftScopeCalendarsReadWrite ||
+			strings.EqualFold(scope, "https://graph.microsoft.com/Calendars.Read") ||
+			strings.EqualFold(scope, "https://graph.microsoft.com/Calendars.ReadWrite") ||
+			strings.HasSuffix(scope, "/Calendars.Read") ||
+			strings.HasSuffix(scope, "/Calendars.ReadWrite") {
+			return true
+		}
 	}
 	return false
 }
 
-func marshalSourceMetadata(remote googlecalendar.RemoteCalendar) ([]byte, error) {
+func calendarAccessProven(account entity.ConnectedAccount) bool {
+	if account.LastSyncedAt != nil {
+		return true
+	}
+	switch account.CalendarSyncStatus {
+	case constant.CalendarSyncStatusSucceeded, constant.CalendarSyncStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+func marshalSourceMetadata(remote calendarprovider.RemoteCalendar) ([]byte, error) {
 	payload := map[string]any{
 		"etag":     remote.ETag,
 		"hidden":   remote.Hidden,
@@ -641,6 +831,13 @@ func marshalSourceMetadata(remote googlecalendar.RemoteCalendar) ([]byte, error)
 	}
 	if remote.Description != "" {
 		payload["description"] = remote.Description
+	}
+	if len(remote.Raw) > 0 {
+		for k, v := range remote.Raw {
+			if _, exists := payload[k]; !exists {
+				payload[k] = v
+			}
+		}
 	}
 	return json.Marshal(payload)
 }

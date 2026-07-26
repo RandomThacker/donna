@@ -24,6 +24,12 @@ export const dashboardNavItems: DashboardNavItem[] = [
     href: "/dashboard/memories",
   },
   {
+    id: "integrations",
+    label: "Integrations",
+    icon: "link",
+    href: "/dashboard/integrations",
+  },
+  {
     id: "settings",
     label: "Settings",
     icon: "settings",

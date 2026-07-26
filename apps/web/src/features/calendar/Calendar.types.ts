@@ -77,11 +77,14 @@ export type CalendarConnectedAccount = {
   id: string;
   provider: string;
   display_name?: string;
+  email?: string | null;
+  avatar_url?: string | null;
 };
 
 export type CalendarSourcesResponse = {
   sources: CalendarSource[];
   account?: CalendarConnectedAccount;
+  accounts?: CalendarConnectedAccount[];
   sync?: CalendarAccountSync;
 };
 
@@ -89,6 +92,8 @@ export type CalendarSourcesResponse = {
 export type CalendarAccountGroup = {
   accountId: string;
   label: string;
+  /** Provider account email when known — used to match the Donna login inbox. */
+  email?: string | null;
   color: string;
   sourceIds: string[];
   visibleCount: number;

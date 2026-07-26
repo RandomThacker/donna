@@ -6,6 +6,7 @@ export {
   type ListEventsParams,
 } from "./Calendar.api";
 export { Calendar } from "./Calendar";
+export { calendarQueryKeys } from "./Calendar.utils";
 export type {
   CalendarEvent,
   CalendarSource,
