@@ -2,7 +2,7 @@ package constant
 
 // Config directory and JSON file names.
 const (
-	EnvVarConfigDir = "CONFIG_DIR"
+	EnvVarConfigDir  = "CONFIG_DIR"
 	DefaultConfigDir = "configs"
 
 	ConfigFileApp      = "appconfig.json"

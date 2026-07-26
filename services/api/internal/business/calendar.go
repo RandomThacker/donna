@@ -21,9 +21,10 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// GoogleCalendarClient lists calendars from Google Calendar API.
+// GoogleCalendarClient lists calendars and events from Google Calendar API.
 type GoogleCalendarClient interface {
 	ListCalendars(ctx context.Context, accessToken string, opts googlecalendar.ListOptions) (googlecalendar.ListResult, error)
+	ListEvents(ctx context.Context, accessToken, calendarID string, opts googlecalendar.EventListOptions) (googlecalendar.EventListResult, error)
 }
 
 // CalendarSyncResult summarizes an idempotent source sync.
@@ -39,11 +40,24 @@ type CalendarSyncResult struct {
 	SyncStatus   string
 }
 
-// CalendarService syncs and lists calendar sources (Donna DB is the query source of truth).
+// CalendarEventSyncResult summarizes an events sync across active sources.
+type CalendarEventSyncResult struct {
+	Events       []entity.CalendarEvent
+	CreatedCount int
+	UpdatedCount int
+	RemovedCount int
+	SyncedAt     time.Time
+	DurationMs   int
+	SourceCount  int
+}
+
+// CalendarService syncs and lists calendar sources/events (Donna DB is the query source of truth).
 type CalendarService struct {
 	accounts repository.ConnectedAccountRepository
 	secrets  repository.CredentialSecretRepository
 	sources  repository.CalendarSourceRepository
+	events   repository.CalendarEventRepository
+	syncRuns repository.CalendarSyncRunRepository
 	jobs     repository.SchedulerJobRepository
 	tx       TxRunner
 	oauth    GoogleOAuthClient
@@ -58,6 +72,8 @@ type CalendarServiceDeps struct {
 	Accounts repository.ConnectedAccountRepository
 	Secrets  repository.CredentialSecretRepository
 	Sources  repository.CalendarSourceRepository
+	Events   repository.CalendarEventRepository
+	SyncRuns repository.CalendarSyncRunRepository
 	Jobs     repository.SchedulerJobRepository
 	Tx       TxRunner
 	OAuth    GoogleOAuthClient
@@ -72,6 +88,8 @@ func NewCalendarService(deps CalendarServiceDeps) *CalendarService {
 		accounts: deps.Accounts,
 		secrets:  deps.Secrets,
 		sources:  deps.Sources,
+		events:   deps.Events,
+		syncRuns: deps.SyncRuns,
 		jobs:     deps.Jobs,
 		tx:       deps.Tx,
 		oauth:    deps.OAuth,
@@ -107,49 +125,44 @@ func (s *CalendarService) ListSources(ctx context.Context, userID uuid.UUID) (Ca
 	return view, nil
 }
 
-// SyncSources performs manual / background sync (incremental when syncToken exists).
-func (s *CalendarService) SyncSources(ctx context.Context, userID uuid.UUID) (CalendarSyncResult, error) {
-	account, err := s.requireGoogleAccount(ctx, userID)
-	if err != nil {
-		return CalendarSyncResult{}, err
-	}
-	return s.syncAccount(ctx, account, false)
+// SyncSources is POST /calendar/sync — full orchestration (sources + events).
+func (s *CalendarService) SyncSources(ctx context.Context, userID uuid.UUID) (CalendarPipelineResult, error) {
+	return s.SyncPipeline(ctx, userID, constant.CalendarSyncTriggerManual)
 }
 
-// SyncSourcesForAccount runs sync for a connected account (scheduler worker).
-func (s *CalendarService) SyncSourcesForAccount(ctx context.Context, accountID uuid.UUID) (CalendarSyncResult, error) {
-	account, err := s.accounts.GetByID(ctx, accountID)
-	if err != nil {
-		return CalendarSyncResult{}, err
-	}
-	return s.syncAccount(ctx, account, false)
+// SyncSourcesForAccount runs the full pipeline for a connected account (scheduler).
+func (s *CalendarService) SyncSourcesForAccount(ctx context.Context, accountID uuid.UUID) (CalendarPipelineResult, error) {
+	return s.SyncPipelineForAccount(ctx, accountID, constant.CalendarSyncTriggerScheduler)
 }
 
-// EnsureFresh syncs only when last successful sync is older than maxAge (default 2m).
-// Used for app startup and AI workflows that depend on calendar data — call this before
-// any calendar-dependent tool; always read Donna DB afterward, never Google directly.
-func (s *CalendarService) EnsureFresh(ctx context.Context, userID uuid.UUID, maxAge time.Duration) (CalendarSyncResult, error) {
+// EnsureFresh runs the full pipeline only when last successful sync is older than maxAge.
+// Used for app startup and AI workflows — always read Donna DB afterward.
+func (s *CalendarService) EnsureFresh(ctx context.Context, userID uuid.UUID, maxAge time.Duration) (CalendarPipelineResult, error) {
 	if maxAge <= 0 {
 		maxAge = constant.CalendarSyncStaleAfter
 	}
 	account, err := s.requireGoogleAccount(ctx, userID)
 	if err != nil {
-		return CalendarSyncResult{}, err
+		return CalendarPipelineResult{}, err
 	}
 	now := s.now().UTC()
 	if account.LastSyncedAt != nil && now.Sub(account.LastSyncedAt.UTC()) < maxAge {
 		sources, listErr := s.sources.ListByUserID(ctx, userID)
 		if listErr != nil {
-			return CalendarSyncResult{}, listErr
+			return CalendarPipelineResult{}, listErr
 		}
-		return CalendarSyncResult{
+		return CalendarPipelineResult{
+			Trigger:    constant.CalendarSyncTriggerEnsure,
+			Status:     constant.CalendarSyncRunStatusSkipped,
+			StartedAt:  account.LastSyncedAt.UTC(),
+			FinishedAt: account.LastSyncedAt.UTC(),
 			Sources:    sources,
-			SyncedAt:   account.LastSyncedAt.UTC(),
 			Skipped:    true,
 			SyncStatus: account.CalendarSyncStatus,
+			Failures:   []CalendarSyncFailure{},
 		}, nil
 	}
-	return s.syncAccount(ctx, account, false)
+	return s.runPipeline(ctx, account, constant.CalendarSyncTriggerEnsure)
 }
 
 func (s *CalendarService) requireGoogleAccount(ctx context.Context, userID uuid.UUID) (entity.ConnectedAccount, error) {
@@ -481,15 +494,10 @@ func (s *CalendarService) upsertSource(
 	if t := strings.TrimSpace(remote.TimeZone); t != "" {
 		tz = &t
 	}
-	var syncCursor *string
-	if e := strings.TrimSpace(remote.ETag); e != "" {
-		syncCursor = &e
-	}
 	var accessRole *string
 	if role := strings.TrimSpace(remote.AccessRole); role != "" {
 		accessRole = &role
 	}
-	syncedAt := now
 
 	existing, err := repo.GetByAccountAndProviderCalendar(ctx, account.ID, remote.ID)
 	switch {
@@ -510,12 +518,11 @@ func (s *CalendarService) upsertSource(
 			IsWritable:          remote.Writable,
 			AccessRole:          accessRole,
 			SyncEnabled:         true,
-			SyncCursor:          syncCursor,
-			LastSyncedAt:        &syncedAt,
-			Timezone:            tz,
-			ProviderMetadata:    meta,
-			CreatedAt:           now,
-			UpdatedAt:           now,
+			// sync_cursor / last_synced_at belong to events.list sync, not calendarList.
+			Timezone:         tz,
+			ProviderMetadata: meta,
+			CreatedAt:        now,
+			UpdatedAt:        now,
 		})
 		return created, true, cErr
 	case err != nil:
@@ -526,8 +533,6 @@ func (s *CalendarService) upsertSource(
 		existing.IsPrimaryOnProvider = remote.Primary
 		existing.IsWritable = remote.Writable
 		existing.AccessRole = accessRole
-		existing.SyncCursor = syncCursor
-		existing.LastSyncedAt = &syncedAt
 		existing.Timezone = tz
 		existing.ProviderMetadata = meta
 		existing.UpdatedAt = now

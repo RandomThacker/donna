@@ -78,6 +78,21 @@ UPDATE calendar_sources SET
 WHERE connected_account_id = $1
   AND deleted_at IS NULL
   AND provider_calendar_id = ANY($2::text[])`
+
+	sqlUpdateCalendarSourceEventSyncState = `
+UPDATE calendar_sources SET
+	sync_cursor = $2,
+	last_synced_at = $3,
+	updated_at = $4
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + calendarSourceColumns
+
+	sqlClearCalendarSourceEventSyncCursor = `
+UPDATE calendar_sources SET
+	sync_cursor = NULL,
+	updated_at = $2
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + calendarSourceColumns
 )
 
 // CalendarSourceRepository persists calendar feeds.
@@ -89,6 +104,8 @@ type CalendarSourceRepository interface {
 	UpdateFromSync(ctx context.Context, source entity.CalendarSource) (entity.CalendarSource, error)
 	SoftDeleteMissing(ctx context.Context, accountID uuid.UUID, keepProviderIDs []string, deletedAt time.Time) (int64, error)
 	SoftDeleteByProviderIDs(ctx context.Context, accountID uuid.UUID, providerIDs []string, deletedAt time.Time) (int64, error)
+	UpdateEventSyncState(ctx context.Context, id uuid.UUID, syncCursor *string, lastSyncedAt, updatedAt time.Time) (entity.CalendarSource, error)
+	ClearEventSyncCursor(ctx context.Context, id uuid.UUID, updatedAt time.Time) (entity.CalendarSource, error)
 	WithTx(tx pgx.Tx) CalendarSourceRepository
 }
 
@@ -229,6 +246,33 @@ func (r *calendarSourceRepository) SoftDeleteByProviderIDs(
 		return 0, fmt.Errorf("soft-delete calendar sources by provider ids: %w", err)
 	}
 	return tag.RowsAffected(), nil
+}
+
+func (r *calendarSourceRepository) UpdateEventSyncState(
+	ctx context.Context,
+	id uuid.UUID,
+	syncCursor *string,
+	lastSyncedAt, updatedAt time.Time,
+) (entity.CalendarSource, error) {
+	source, err := scanCalendarSource(r.q.QueryRow(ctx, sqlUpdateCalendarSourceEventSyncState, id, syncCursor, lastSyncedAt, updatedAt))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.CalendarSource{}, apperr.ErrNotFound
+		}
+		return entity.CalendarSource{}, fmt.Errorf("update calendar source event sync state: %w", err)
+	}
+	return source, nil
+}
+
+func (r *calendarSourceRepository) ClearEventSyncCursor(ctx context.Context, id uuid.UUID, updatedAt time.Time) (entity.CalendarSource, error) {
+	source, err := scanCalendarSource(r.q.QueryRow(ctx, sqlClearCalendarSourceEventSyncCursor, id, updatedAt))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.CalendarSource{}, apperr.ErrNotFound
+		}
+		return entity.CalendarSource{}, fmt.Errorf("clear calendar source event sync cursor: %w", err)
+	}
+	return source, nil
 }
 
 func collectCalendarSources(rows pgx.Rows) ([]entity.CalendarSource, error) {

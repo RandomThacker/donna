@@ -14,4 +14,23 @@ const (
 	CalendarSyncStatusRunning   = "running"
 	CalendarSyncStatusSucceeded = "succeeded"
 	CalendarSyncStatusFailed    = "failed"
+
+	// CalendarEventSyncLookback / Lookahead bound the initial full events.list window.
+	CalendarEventSyncLookback  = 365 * 24 * time.Hour
+	CalendarEventSyncLookahead = 730 * 24 * time.Hour
+
+	CalendarEventOriginProviderSync = "provider_sync"
+	CalendarEventStatusConfirmed    = "confirmed"
+	CalendarEventStatusTentative    = "tentative"
+	CalendarEventStatusCancelled    = "cancelled"
+
+	CalendarSyncTriggerManual    = "manual"
+	CalendarSyncTriggerEnsure    = "ensure"
+	CalendarSyncTriggerScheduler = "scheduler"
+
+	CalendarSyncRunStatusRunning   = "running"
+	CalendarSyncRunStatusSucceeded = "succeeded"
+	CalendarSyncRunStatusPartial   = "partial"
+	CalendarSyncRunStatusFailed    = "failed"
+	CalendarSyncRunStatusSkipped   = "skipped"
 )

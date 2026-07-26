@@ -32,7 +32,7 @@ func (j *Job) Type() string {
 	return constant.SchedulerJobTypeCalendarSync
 }
 
-// Run syncs calendar sources for the job's connected account.
+// Run syncs calendar sources and events for the job's connected account.
 func (j *Job) Run(ctx context.Context, job entity.SchedulerJob) error {
 	if j.calendar == nil {
 		return fmt.Errorf("calendar service is not configured")
@@ -40,8 +40,15 @@ func (j *Job) Run(ctx context.Context, job entity.SchedulerJob) error {
 	if job.ConnectedAccountID == nil {
 		return fmt.Errorf("missing connected_account_id")
 	}
-	_, err := j.calendar.SyncSourcesForAccount(ctx, *job.ConnectedAccountID)
-	return err
+	result, err := j.calendar.SyncSourcesForAccount(ctx, *job.ConnectedAccountID)
+	if err != nil {
+		return err
+	}
+	// Partial success (some calendars failed) still completes the job; failures are persisted.
+	if result.Status == constant.CalendarSyncRunStatusFailed {
+		return fmt.Errorf("calendar sync failed")
+	}
+	return nil
 }
 
 // ScheduleNext enqueues the next pending calendar_sync job from payload cadence.

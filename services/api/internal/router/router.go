@@ -67,6 +67,8 @@ func New(opts Options) *gin.Engine {
 			v1.POST(constant.PathCalendarSync, auth, opts.CalendarHandler.SyncSources)
 			v1.POST(constant.PathCalendarSyncEnsure, auth, opts.CalendarHandler.EnsureFreshSources)
 			v1.GET(constant.PathCalendarSources, auth, opts.CalendarHandler.ListSources)
+			v1.POST(constant.PathCalendarEventsSync, auth, opts.CalendarHandler.SyncEvents)
+			v1.GET(constant.PathCalendarEvents, auth, opts.CalendarHandler.ListEvents)
 		}
 	}
 

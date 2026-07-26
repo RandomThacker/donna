@@ -248,6 +248,8 @@ func wireCalendar(
 		Accounts: auth.accounts,
 		Secrets:  auth.secrets,
 		Sources:  repository.NewCalendarSourceRepository(pool),
+		Events:   repository.NewCalendarEventRepository(pool),
+		SyncRuns: repository.NewCalendarSyncRunRepository(pool),
 		Jobs:     repository.NewSchedulerJobRepository(pool),
 		Tx:       auth.tx,
 		OAuth:    auth.googleClient,

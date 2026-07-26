@@ -43,6 +43,10 @@ func (m *mockCalendarAPI) ListCalendars(_ context.Context, _ string, opts google
 	return m.result, nil
 }
 
+func (m *mockCalendarAPI) ListEvents(context.Context, string, string, googlecalendar.EventListOptions) (googlecalendar.EventListResult, error) {
+	return googlecalendar.EventListResult{NextSyncToken: "evt-token"}, nil
+}
+
 type mockCalendarAccountRepo struct {
 	account  entity.ConnectedAccount
 	err      error
@@ -233,6 +237,31 @@ func (m *mockSourceRepo) SoftDeleteByProviderIDs(_ context.Context, accountID uu
 	return n, nil
 }
 
+func (m *mockSourceRepo) UpdateEventSyncState(_ context.Context, id uuid.UUID, syncCursor *string, lastSyncedAt, updatedAt time.Time) (entity.CalendarSource, error) {
+	for key, source := range m.byKey {
+		if source.ID == id {
+			source.SyncCursor = syncCursor
+			source.LastSyncedAt = &lastSyncedAt
+			source.UpdatedAt = updatedAt
+			m.byKey[key] = source
+			return source, nil
+		}
+	}
+	return entity.CalendarSource{}, apperr.ErrNotFound
+}
+
+func (m *mockSourceRepo) ClearEventSyncCursor(_ context.Context, id uuid.UUID, updatedAt time.Time) (entity.CalendarSource, error) {
+	for key, source := range m.byKey {
+		if source.ID == id {
+			source.SyncCursor = nil
+			source.UpdatedAt = updatedAt
+			m.byKey[key] = source
+			return source, nil
+		}
+	}
+	return entity.CalendarSource{}, apperr.ErrNotFound
+}
+
 func (m *mockSourceRepo) WithTx(pgx.Tx) repository.CalendarSourceRepository { return m }
 
 type fakeCalendarTx struct{}
@@ -302,6 +331,7 @@ func newCalendarServiceForTest(
 		Accounts: accounts,
 		Secrets:  secrets,
 		Sources:  sources,
+		Events:   &mockEventRepo{byKey: map[string]entity.CalendarEvent{}},
 		Tx:       fakeCalendarTx{},
 		OAuth:    oauth,
 		Calendar: api,
@@ -320,12 +350,12 @@ func TestSyncSourcesCreatesAndUpdatesIdempotently(t *testing.T) {
 	nowUnix := time.Now().Add(time.Hour).Unix()
 
 	accounts := &mockCalendarAccountRepo{account: entity.ConnectedAccount{
-		ID:             accountID,
-		UserID:         userID,
-		Provider:       constant.AuthProviderGoogle,
-		Status:         constant.ConnectedAccountStatusActive,
-		Scopes:         []string{constant.GoogleScopeCalendar},
-		CredentialsRef: "cred_test",
+		ID:               accountID,
+		UserID:           userID,
+		Provider:         constant.AuthProviderGoogle,
+		Status:           constant.ConnectedAccountStatusActive,
+		Scopes:           []string{constant.GoogleScopeCalendar},
+		CredentialsRef:   "cred_test",
 		ProviderMetadata: []byte(`{}`),
 	}}
 	secrets := &mockCalendarSecretRepo{secret: entity.CredentialSecret{
@@ -347,7 +377,7 @@ func TestSyncSourcesCreatesAndUpdatesIdempotently(t *testing.T) {
 	if err != nil {
 		t.Fatalf("first sync: %v", err)
 	}
-	if first.CreatedCount != 2 || first.UpdatedCount != 0 || first.RemovedCount != 0 {
+	if first.SourcesCreated != 2 || first.SourcesUpdated != 0 || first.SourcesDeleted != 0 {
 		t.Fatalf("first counts = %+v", first)
 	}
 	if accounts.recorded != 1 {
@@ -375,7 +405,7 @@ func TestSyncSourcesCreatesAndUpdatesIdempotently(t *testing.T) {
 	if !second.Incremental {
 		t.Fatal("expected incremental second sync")
 	}
-	if second.CreatedCount != 0 || second.UpdatedCount != 1 || second.RemovedCount != 1 {
+	if second.SourcesCreated != 0 || second.SourcesUpdated != 1 || second.SourcesDeleted != 1 {
 		t.Fatalf("second counts = %+v", second)
 	}
 	if len(api.calls) < 2 || api.calls[len(api.calls)-1].SyncToken != "sync-token-1" {
@@ -433,7 +463,7 @@ func TestSyncSourcesRecoversFromGoneSyncToken(t *testing.T) {
 	if accounts.cleared != 1 {
 		t.Fatalf("cleared = %d", accounts.cleared)
 	}
-	if result.CreatedCount != 1 || result.Incremental {
+	if result.SourcesCreated != 1 || result.Incremental {
 		t.Fatalf("result = %+v", result)
 	}
 	if accounts.account.CalendarListSyncToken == nil || *accounts.account.CalendarListSyncToken != "fresh-token" {

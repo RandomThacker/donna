@@ -8,6 +8,8 @@ const (
 	PublicIDPrefixConnectedAccount = "acct_"
 	PublicIDPrefixCredential       = "cred_"
 	PublicIDPrefixCalendarSource   = "cal_"
+	PublicIDPrefixCalendarEvent    = "evt_"
+	PublicIDPrefixCalendarSyncRun  = "csync_"
 )
 
 // Google OAuth / Calendar scopes.
