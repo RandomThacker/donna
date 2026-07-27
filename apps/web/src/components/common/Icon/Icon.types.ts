@@ -27,6 +27,8 @@ export type IconName =
   | "refresh"
   | "close"
   | "mapPin"
+  | "pin"
+  | "trash"
   | "repeat"
   | "sun";
 

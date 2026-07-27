@@ -35,6 +35,18 @@ const (
 	PathIntegrationsICSByID           = "/integrations/ics/:id"
 	PathIntegrationsICSSync           = "/integrations/ics/:id/sync"
 	PathIntegrationsByID              = "/integrations/:id"
+
+	PathTasks                  = "/tasks"
+	PathTasksDay               = "/tasks/day/:date"
+	PathTasksHistory           = "/tasks/history"
+	PathTasksCarryForward      = "/tasks/carry-forward"
+	PathTaskByID               = "/tasks/:id"
+	PathTaskOccurrences        = "/task-occurrences/:id"
+	PathTaskOccurrencesReorder = "/task-occurrences/reorder"
+	PathDailyNotesDay          = "/daily-notes/:date"
+
+	PathNotes    = "/notes"
+	PathNoteByID = "/notes/:id"
 )
 
 // Full paths (prefix + relative). Useful for docs, clients, and tests.

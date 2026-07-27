@@ -20,6 +20,8 @@ type Options struct {
 	MeHandler          *handler.MeHandler
 	CalendarHandler    *handler.CalendarHandler
 	IntegrationHandler *handler.IntegrationHandler
+	TaskHandler        *handler.TaskHandler
+	NoteHandler        *handler.NoteHandler
 	TokenIssuer        *session.Issuer
 }
 
@@ -90,6 +92,27 @@ func New(opts Options) *gin.Engine {
 			v1.DELETE(constant.PathIntegrationsICSByID, auth, opts.IntegrationHandler.DeleteICS)
 			v1.POST(constant.PathIntegrationsICSSync, auth, opts.IntegrationHandler.SyncICS)
 			v1.DELETE(constant.PathIntegrationsByID, auth, opts.IntegrationHandler.Disconnect)
+		}
+
+		if opts.TaskHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathTasksDay, auth, opts.TaskHandler.GetDay)
+			v1.POST(constant.PathTasks, auth, opts.TaskHandler.CreateTask)
+			v1.PATCH(constant.PathTaskByID, auth, opts.TaskHandler.UpdateTask)
+			v1.DELETE(constant.PathTaskByID, auth, opts.TaskHandler.DeleteTask)
+			v1.PATCH(constant.PathTaskOccurrencesReorder, auth, opts.TaskHandler.ReorderOccurrences)
+			v1.PATCH(constant.PathTaskOccurrences, auth, opts.TaskHandler.UpdateOccurrence)
+			v1.GET(constant.PathTasksHistory, auth, opts.TaskHandler.GetHistory)
+			v1.POST(constant.PathTasksCarryForward, auth, opts.TaskHandler.CarryForward)
+			v1.PUT(constant.PathDailyNotesDay, auth, opts.TaskHandler.UpsertDailyNote)
+		}
+
+		if opts.NoteHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathNotes, auth, opts.NoteHandler.List)
+			v1.POST(constant.PathNotes, auth, opts.NoteHandler.Create)
+			v1.PATCH(constant.PathNoteByID, auth, opts.NoteHandler.Update)
+			v1.DELETE(constant.PathNoteByID, auth, opts.NoteHandler.Delete)
 		}
 	}
 

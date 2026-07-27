@@ -84,6 +84,18 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		authParts.service.SetLoginCalendarLinker(calendarParts.integrations)
 	}
 
+	taskLog := logFactory.Module(constant.ModuleTask)
+	taskRepo := repository.NewTaskRepository(pool)
+	occurrenceRepo := repository.NewTaskOccurrenceRepository(pool)
+	dailyNoteRepo := repository.NewDailyNoteRepository(pool)
+	taskSvc := business.NewTaskJournalService(taskRepo, occurrenceRepo, dailyNoteRepo)
+	taskHandler := handler.NewTaskHandler(taskSvc, taskLog)
+
+	noteLog := logFactory.Module(constant.ModuleNote)
+	noteRepo := repository.NewNoteRepository(pool)
+	noteSvc := business.NewNoteService(noteRepo)
+	noteHandler := handler.NewNoteHandler(noteSvc, noteLog)
+
 	engine := router.New(router.Options{
 		Environment:        cfg.App.Environment,
 		CORSOrigins:        cfg.App.CORSOrigins,
@@ -94,6 +106,8 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		MeHandler:          handler.NewMeHandler(userSvc),
 		CalendarHandler:    calendarParts.handler,
 		IntegrationHandler: calendarParts.integrationHandler,
+		TaskHandler:        taskHandler,
+		NoteHandler:        noteHandler,
 		TokenIssuer:        authParts.issuer,
 	})
 

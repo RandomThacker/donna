@@ -44,6 +44,8 @@ const (
 	ModuleAuth         = "auth"
 	ModuleIdentity     = "identity"
 	ModuleCalendar     = "calendar"
+	ModuleTask         = "task"
+	ModuleNote         = "note"
 	ModuleChat         = "chat"
 	ModuleDashboard    = "dashboard"
 	ModuleScheduler    = "scheduler"
