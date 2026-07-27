@@ -24,9 +24,10 @@ export type DashboardFocus = {
 };
 
 export type DashboardTimelineItem = {
+  id: string;
   time: string;
   title: string;
-  kind: "meeting" | "focus" | "personal";
+  meta?: string;
 };
 
 export type DashboardInsight = {

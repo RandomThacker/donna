@@ -55,7 +55,7 @@ export function Dashboard() {
               />
               <DashboardFocus focus={data.focus} />
               <DashboardInsights insights={data.insights} />
-              <DashboardTimeline items={data.timeline} />
+              <DashboardTimeline />
               <DashboardQuickTasks tasks={data.tasks} />
             </div>
             <div className={styles.phoneMobile}>

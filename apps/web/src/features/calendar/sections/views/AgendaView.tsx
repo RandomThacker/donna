@@ -4,19 +4,11 @@ import { useEffect, useMemo, useRef } from "react";
 
 import { Icon } from "@/components/common";
 
+import { groupAgendaEvents } from "../../Calendar.agenda";
 import { isRecurring } from "../../Calendar.layout";
-import type { AgendaGroup, CalendarEvent } from "../../Calendar.types";
-import {
-  eventAgendaDateKey,
-  isZonedToday,
-  resolveCalendarTimeZone,
-  zonedDateKey,
-} from "../../Calendar.timezone";
-import {
-  format,
-  formatEventTime,
-  parseISO,
-} from "../../Calendar.utils";
+import type { CalendarEvent } from "../../Calendar.types";
+import { resolveCalendarTimeZone } from "../../Calendar.timezone";
+import { formatEventTime } from "../../Calendar.utils";
 import { timelineStyles as styles } from "./view.styles";
 
 type AgendaViewProps = {
@@ -28,39 +20,6 @@ type AgendaViewProps = {
   fromDate: Date;
   timeZone?: string;
 };
-
-function groupEvents(
-  events: CalendarEvent[],
-  fromDate: Date,
-  timeZone: string,
-): AgendaGroup[] {
-  const map = new Map<string, AgendaGroup>();
-  const fromKey = zonedDateKey(fromDate, timeZone);
-  const sorted = [...events].sort(
-    (a, b) =>
-      new Date(a.start_time).getTime() - new Date(b.start_time).getTime(),
-  );
-
-  for (const event of sorted) {
-    const key = eventAgendaDateKey(event, timeZone);
-    if (!key || key < fromKey) {
-      continue;
-    }
-    let group = map.get(key);
-    if (!group) {
-      // Noon UTC on that civil day is a stable anchor for labels.
-      const date = parseISO(`${key}T12:00:00.000Z`);
-      const label = isZonedToday(date, timeZone)
-        ? `Today · ${format(date, "MMMM d")}`
-        : format(date, "EEEE, MMMM d");
-      group = { key, date, label, events: [] };
-      map.set(key, group);
-    }
-    group.events.push(event);
-  }
-
-  return Array.from(map.values());
-}
 
 function AgendaEventRow({
   event,
@@ -115,7 +74,7 @@ export function AgendaView({
   const timeZone = resolveCalendarTimeZone(timeZoneProp);
   const parentRef = useRef<HTMLDivElement>(null);
   const groups = useMemo(
-    () => groupEvents(events, fromDate, timeZone),
+    () => groupAgendaEvents(events, fromDate, timeZone),
     [events, fromDate, timeZone],
   );
 

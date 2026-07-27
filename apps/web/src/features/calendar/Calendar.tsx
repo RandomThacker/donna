@@ -1,14 +1,15 @@
 "use client";
 
 import { addMonths } from "date-fns";
-import { useMemo } from "react";
-import { usePathname } from "next/navigation";
+import { useEffect, useMemo, useRef } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { useAuth } from "@/features/auth";
 import { navItemsForPath } from "@/features/dashboard/dashboardNav";
 import { DashboardSidebar } from "@/features/dashboard/sections/DashboardSidebar";
 
 import { useCalendarController } from "./Calendar.logic";
+import { parseCalendarView } from "./Calendar.routes";
 import { calendarStyles as styles } from "./Calendar.styles";
 import { weekDays } from "./Calendar.utils";
 import { CalendarSidebar } from "./sections/CalendarSidebar";
@@ -37,8 +38,33 @@ function initialsFrom(name: string): string {
 
 export function Calendar() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { user } = useAuth();
   const cal = useCalendarController();
+  const appliedEventRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const view = parseCalendarView(searchParams.get("view"));
+    if (view) {
+      cal.setView(view);
+    }
+  }, [searchParams, cal.setView]);
+
+  useEffect(() => {
+    const eventId = searchParams.get("event");
+    if (!eventId) {
+      appliedEventRef.current = null;
+      return;
+    }
+    if (cal.isLoading || appliedEventRef.current === eventId) {
+      return;
+    }
+    const event = cal.events.find((item) => item.id === eventId);
+    if (event) {
+      appliedEventRef.current = eventId;
+      cal.openEvent(event);
+    }
+  }, [searchParams, cal.events, cal.isLoading, cal.openEvent]);
 
   const profileName =
     user?.display_name?.trim() || user?.email?.split("@")[0] || "You";
