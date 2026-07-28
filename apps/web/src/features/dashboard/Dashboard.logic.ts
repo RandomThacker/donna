@@ -20,8 +20,9 @@ export const dashboardData: DashboardData = {
   greeting: {
     salutation: "Good morning",
     name: "Aryan",
-    summary: "2 meetings · 1 reminder · 5h focus time",
-    nudge: "Great day to finish Calendar Integration.",
+    emoji: "☀️",
+    summary: "0 meetings · 0 tasks",
+    nudge: "",
   },
   focus: {
     goal: "Ship Calendar Integration",

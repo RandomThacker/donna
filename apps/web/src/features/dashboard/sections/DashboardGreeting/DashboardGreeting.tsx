@@ -8,10 +8,10 @@ export function DashboardGreeting({ greeting }: DashboardGreetingProps) {
       <h1 className={styles.title}>
         {greeting.salutation},{" "}
         <span className={styles.name}>{greeting.name}</span>
+        {greeting.emoji ? ` ${greeting.emoji}` : null}
       </h1>
       <div className={styles.row}>
         <p className={styles.summary}>{greeting.summary}</p>
-        <p className={styles.nudge}>{greeting.nudge}</p>
       </div>
     </BentoBox>
   );

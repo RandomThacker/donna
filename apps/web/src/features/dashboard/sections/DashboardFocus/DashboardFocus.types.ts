@@ -1,5 +1,1 @@
-import type { DashboardFocus } from "../../Dashboard.types";
-
-export type DashboardFocusProps = {
-  focus: DashboardFocus;
-};
+export type DashboardFocusProps = Record<string, never>;

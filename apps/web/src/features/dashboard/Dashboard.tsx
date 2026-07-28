@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/features/auth";
 
+import { useDashboardGreeting } from "./Dashboard.greeting";
 import { getDashboardContent } from "./Dashboard.logic";
 import { navItemsForPath } from "./dashboardNav";
 import { dashboardStyles as styles } from "./Dashboard.styles";
@@ -36,6 +37,7 @@ export function Dashboard() {
     user?.display_name?.trim() || user?.email?.split("@")[0] || data.profileName;
   const profileInitials = initialsFrom(profileName);
   const greetingName = profileName.split(/\s+/)[0] || data.greeting.name;
+  const { greeting } = useDashboardGreeting(greetingName);
 
   return (
     <div className={styles.page}>
@@ -50,13 +52,11 @@ export function Dashboard() {
         <main className={styles.workspace}>
           <div className={styles.workspaceInner}>
             <div className={styles.bento}>
-              <DashboardGreeting
-                greeting={{ ...data.greeting, name: greetingName }}
-              />
-              <DashboardFocus focus={data.focus} />
+              <DashboardGreeting greeting={greeting} />
+              <DashboardFocus />
               <DashboardInsights insights={data.insights} />
               <DashboardTimeline />
-              <DashboardQuickTasks tasks={data.tasks} />
+              <DashboardQuickTasks />
             </div>
             <div className={styles.phoneMobile}>
               <DashboardPhone phone={data.phone} />

@@ -11,6 +11,7 @@ export type DashboardNavItem = {
 export type DashboardGreeting = {
   salutation: string;
   name: string;
+  emoji: string;
   summary: string;
   nudge: string;
 };
