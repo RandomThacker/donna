@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -25,7 +26,9 @@ import (
 // GoogleOAuthClient is the outbound Google OAuth port (login or integration).
 type GoogleOAuthClient interface {
 	AuthCodeURL(state string) string
+	AuthCodeURLWithRedirect(state, redirectURI string) string
 	ExchangeCode(ctx context.Context, code string) (googleoauth.TokenSet, error)
+	ExchangeCodeWithRedirect(ctx context.Context, code, redirectURI string) (googleoauth.TokenSet, error)
 	FetchProfile(ctx context.Context, accessToken string) (googleoauth.Profile, error)
 	RefreshAccessToken(ctx context.Context, refreshToken string) (googleoauth.TokenSet, error)
 }
@@ -38,6 +41,8 @@ type AuthSession struct {
 	ExpiresAt   time.Time
 	User        entity.User
 	IsNewUser   bool
+	// FrontendReturnURL overrides the default AUTH_FRONTEND_SUCCESS_URL when set (local FE).
+	FrontendReturnURL string
 }
 
 // TxRunner runs work inside a database transaction.
@@ -112,15 +117,34 @@ func (s *AuthService) SetLoginCalendarLinker(linker loginCalendarLinker) {
 }
 
 // BeginGoogleLogin creates CSRF state and the Google authorization URL.
-func (s *AuthService) BeginGoogleLogin(ctx context.Context) (authURL, state string, err error) {
+// returnTo is an optional allowlisted frontend callback (e.g. http://localhost:3000/auth/callback).
+// When set, Google redirect_uri becomes {origin}/api/v1/auth/google/callback so local FE
+// can proxy OAuth through Next.js and keep donna_session first-party.
+func (s *AuthService) BeginGoogleLogin(ctx context.Context, returnTo string) (authURL, state string, err error) {
 	if s.google == nil {
 		return "", "", fmt.Errorf("%w: google oauth is not configured", apperr.ErrInvalid)
 	}
-	state, err = s.state.Create()
+	returnTo = strings.TrimSpace(returnTo)
+	if returnTo == "" {
+		state, err = s.state.Create()
+		if err != nil {
+			return "", "", fmt.Errorf("oauth state: %w", err)
+		}
+		return s.google.AuthCodeURL(state), state, nil
+	}
+
+	redirectURI, err := oauthCallbackURL(returnTo, constant.EndpointAuthGoogleCallback)
+	if err != nil {
+		return "", "", fmt.Errorf("%w: %v", apperr.ErrValidation, err)
+	}
+	state, err = s.state.CreateLogin(oauthstate.LoginMeta{
+		ReturnTo:    returnTo,
+		RedirectURI: redirectURI,
+	})
 	if err != nil {
 		return "", "", fmt.Errorf("oauth state: %w", err)
 	}
-	return s.google.AuthCodeURL(state), state, nil
+	return s.google.AuthCodeURLWithRedirect(state, redirectURI), state, nil
 }
 
 // CompleteGoogleLogin exchanges the code, links auth_identity, and issues a JWT.
@@ -132,11 +156,17 @@ func (s *AuthService) CompleteGoogleLogin(ctx context.Context, code, state strin
 	if code == "" {
 		return AuthSession{}, fmt.Errorf("%w: code is required", apperr.ErrValidation)
 	}
-	if err := s.state.Verify(state); err != nil {
+	meta, err := s.state.VerifyLogin(state)
+	if err != nil {
 		return AuthSession{}, fmt.Errorf("%w: %v", apperr.ErrInvalid, err)
 	}
 
-	tokenSet, err := s.google.ExchangeCode(ctx, code)
+	var tokenSet googleoauth.TokenSet
+	if meta.RedirectURI != "" {
+		tokenSet, err = s.google.ExchangeCodeWithRedirect(ctx, code, meta.RedirectURI)
+	} else {
+		tokenSet, err = s.google.ExchangeCode(ctx, code)
+	}
 	if err != nil {
 		return AuthSession{}, fmt.Errorf("%w: token exchange failed: %v", apperr.ErrInvalid, err)
 	}
@@ -165,6 +195,7 @@ func (s *AuthService) CompleteGoogleLogin(ctx context.Context, code, state strin
 		return AuthSession{}, err
 	}
 	s.autoLinkGoogleCalendar(ctx, session.User.ID, profile, tokenSet)
+	session.FrontendReturnURL = meta.ReturnTo
 	return session, nil
 }
 
@@ -480,4 +511,20 @@ func unionScopes(parts ...[]string) []string {
 		}
 	}
 	return out
+}
+
+// oauthCallbackURL builds {origin}{callbackPath} from a frontend return URL.
+func oauthCallbackURL(returnTo, callbackPath string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(returnTo))
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", fmt.Errorf("invalid return_to URL")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", fmt.Errorf("return_to must be http(s)")
+	}
+	origin := u.Scheme + "://" + u.Host
+	if !strings.HasPrefix(callbackPath, "/") {
+		callbackPath = "/" + callbackPath
+	}
+	return origin + callbackPath, nil
 }

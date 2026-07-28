@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "env:local": "cp env/local.env .env.local && echo '→ Local FE + local API (http://localhost:8080)'",
+    "env:prod": "cp env/prod.env .env.local && echo '→ Local FE + prod API (Railway via /api proxy)'",
     "dev": "next dev --port 3000",
+    "dev:local": "npm run env:local && next dev --port 3000",
+    "dev:prod": "npm run env:prod && next dev --port 3000",
     "build": "next build",
     "start": "next start --port 3000",
     "lint": "next lint"

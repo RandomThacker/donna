@@ -51,7 +51,10 @@ export function clearClientAuthFlags(): void {
 }
 
 export function startGoogleOAuth(): void {
-  window.location.assign(getGoogleOAuthStartUrl());
+  const returnTo = `${window.location.origin}/auth/callback`;
+  const url = new URL(getGoogleOAuthStartUrl(), window.location.origin);
+  url.searchParams.set("return_to", returnTo);
+  window.location.assign(url.toString());
 }
 
 export function startMicrosoftOAuth(): void {
