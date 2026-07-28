@@ -29,7 +29,9 @@ services:
       - ../../.env
     environment:
       API_ADDR: ":8080"
-      DATABASE_URL: postgres://donna:donna@postgres:5432/donna?sslmode=disable
+      # Local Postgres (default when using the postgres service above):
+      # DATABASE_URL: postgres://donna:donna@postgres:5432/donna?sslmode=disable
+      # Remote DB: set DATABASE_URL in repo-root .env (env_file above)
       MIGRATIONS_PATH: /app/migrations
       CONFIG_DIR: /app/configs
     depends_on:
