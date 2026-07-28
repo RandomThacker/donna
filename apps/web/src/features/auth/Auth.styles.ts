@@ -2,7 +2,7 @@ export const authStyles = {
   page: "relative flex min-h-dvh items-center justify-center overflow-hidden bg-donna-bg px-6 py-16 text-donna-ink",
   glow: "pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,color-mix(in_oklab,var(--donna-accent)_22%,transparent),transparent_55%)]",
   card: "relative w-full max-w-md rounded-[1.75rem] border border-donna-border bg-donna-elevated/80 p-8 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl",
-  eyebrow: "mb-4",
+  brand: "mb-4 flex flex-col items-start gap-3",
   title: "font-[family-name:var(--font-instrument-serif)] text-4xl tracking-tight text-donna-text",
   body: "mt-3 text-sm leading-relaxed text-donna-muted",
   actions: "mt-8 flex flex-col gap-3",

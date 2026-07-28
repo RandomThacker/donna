@@ -47,10 +47,10 @@ export function AuthCallback() {
     <div className={styles.page}>
       <div className={styles.glow} aria-hidden />
       <div className={styles.card}>
-        <Logo size="sm" />
-        <Pill className={styles.eyebrow} withDot>
-          Signing you in
-        </Pill>
+        <div className={styles.brand}>
+          <Logo size="sm" />
+          <Pill withDot>Signing you in</Pill>
+        </div>
         <h1 className={styles.title}>Almost there.</h1>
         {error ? (
           <>
@@ -92,10 +92,10 @@ export function SignInView() {
       <div className={styles.page}>
         <div className={styles.glow} aria-hidden />
         <div className={styles.card}>
-          <Logo size="sm" />
-          <Pill className={styles.eyebrow} withDot>
-            Checking session
-          </Pill>
+          <div className={styles.brand}>
+            <Logo size="sm" />
+            <Pill withDot>Checking session</Pill>
+          </div>
           <h1 className={styles.title}>One moment.</h1>
           <p className={styles.status}>Looking for your Donna session…</p>
         </div>
@@ -107,10 +107,10 @@ export function SignInView() {
     <div className={styles.page}>
       <div className={styles.glow} aria-hidden />
       <div className={styles.card}>
-        <Logo size="sm" />
-        <Pill className={styles.eyebrow} withDot>
-          Welcome back
-        </Pill>
+        <div className={styles.brand}>
+          <Logo size="sm" />
+          <Pill withDot>Welcome back</Pill>
+        </div>
         <h1 className={styles.title}>Sign in to Donna</h1>
         <p className={styles.body}>
           Choose how you&apos;d like to continue. Donna keeps the session
