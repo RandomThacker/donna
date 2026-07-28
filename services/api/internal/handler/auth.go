@@ -12,6 +12,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/business"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
+	"github.com/RandomThacker/donna/services/api/internal/httpx"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/model"
 	"github.com/RandomThacker/donna/services/api/internal/response"
@@ -175,27 +176,21 @@ func (h *AuthHandler) finishLogin(c *gin.Context, session business.AuthSession) 
 }
 
 func (h *AuthHandler) setSessionCookie(c *gin.Context, token string) {
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     constant.CookieSession,
-		Value:    token,
-		Path:     "/",
-		MaxAge:   h.cookieMaxAge,
-		HttpOnly: true,
-		Secure:   h.cookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(c.Writer, httpx.SessionCookie(
+		constant.CookieSession,
+		token,
+		h.cookieMaxAge,
+		h.cookieSecure,
+	))
 }
 
 func (h *AuthHandler) clearSessionCookie(c *gin.Context) {
-	http.SetCookie(c.Writer, &http.Cookie{
-		Name:     constant.CookieSession,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   h.cookieSecure,
-		SameSite: http.SameSiteLaxMode,
-	})
+	http.SetCookie(c.Writer, httpx.SessionCookie(
+		constant.CookieSession,
+		"",
+		-1,
+		h.cookieSecure,
+	))
 }
 
 // hasLiveSession is true only when the cookie JWT is valid AND the user still exists.

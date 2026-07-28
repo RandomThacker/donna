@@ -2,10 +2,17 @@ package middleware
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/gin-gonic/gin"
 )
+
+// normalizeOrigin strips a trailing slash so "https://app.vercel.app/" matches
+// the browser Origin header "https://app.vercel.app".
+func normalizeOrigin(origin string) string {
+	return strings.TrimRight(strings.TrimSpace(origin), "/")
+}
 
 // CORS applies Access-Control headers for configured origins.
 // Empty origins list allows no cross-origin browsers (same-origin only).
@@ -13,15 +20,18 @@ func CORS(origins []string) gin.HandlerFunc {
 	allowed := make(map[string]struct{}, len(origins))
 	allowAll := false
 	for _, o := range origins {
+		o = normalizeOrigin(o)
 		if o == constant.CORSAllowOriginAll {
 			allowAll = true
 			break
 		}
-		allowed[o] = struct{}{}
+		if o != "" {
+			allowed[o] = struct{}{}
+		}
 	}
 
 	return func(c *gin.Context) {
-		origin := c.GetHeader(constant.HeaderOrigin)
+		origin := normalizeOrigin(c.GetHeader(constant.HeaderOrigin))
 		if origin != "" {
 			if allowAll {
 				// Credentials cannot be used with wildcard origins.

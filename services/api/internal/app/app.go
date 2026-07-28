@@ -103,7 +103,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		HealthHandler:      healthHandler,
 		UserHandler:        userHandler,
 		AuthHandler:        authParts.handler,
-		MeHandler:          handler.NewMeHandler(userSvc),
+		MeHandler:          handler.NewMeHandler(userSvc, cfg.App.CookieSecure),
 		CalendarHandler:    calendarParts.handler,
 		IntegrationHandler: calendarParts.integrationHandler,
 		TaskHandler:        taskHandler,
