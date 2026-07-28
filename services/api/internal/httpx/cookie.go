@@ -4,7 +4,8 @@ import "net/http"
 
 // SessionCookie builds the donna_session cookie.
 // Cross-site frontends (e.g. Vercel → Railway) require SameSite=None + Secure.
-// Localhost same-site ports can use Lax without Secure.
+// Prefer same-origin proxying in production so the cookie is first-party on the
+// frontend host (see apps/web next.config.ts API_PROXY_TARGET).
 func SessionCookie(name, value string, maxAge int, secure bool) *http.Cookie {
 	sameSite := http.SameSiteLaxMode
 	if secure {
