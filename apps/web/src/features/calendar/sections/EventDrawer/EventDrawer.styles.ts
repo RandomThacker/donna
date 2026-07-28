@@ -1,0 +1,26 @@
+export const drawerStyles = {
+  root: "fixed inset-0 z-50 flex justify-end overflow-hidden",
+  backdrop: "absolute inset-0 bg-black/45 backdrop-blur-[2px]",
+  panel: [
+    "relative flex h-full w-full max-w-md min-w-0 flex-col overflow-hidden",
+    "border-l border-donna-hairline bg-donna-surface shadow-donna-card",
+    "animate-donna-fade-up",
+  ].join(" "),
+  header: "flex min-w-0 items-start gap-3 border-b border-donna-hairline px-5 py-4",
+  colorBar: "mt-1.5 h-10 w-1.5 shrink-0 rounded-full",
+  headerText: "min-w-0 flex-1 overflow-hidden",
+  title: "break-words font-display text-2xl italic leading-snug text-donna-text",
+  subtitle: "mt-1 break-words text-sm text-donna-muted",
+  close: [
+    "grid h-9 w-9 shrink-0 place-items-center rounded-xl",
+    "text-donna-muted hover:bg-donna-accent-soft hover:text-donna-text",
+  ].join(" "),
+  body: "min-h-0 min-w-0 flex-1 space-y-5 overflow-x-hidden overflow-y-auto px-5 py-5",
+  field: "min-w-0 space-y-1",
+  label: "text-[11px] font-semibold uppercase tracking-[0.12em] text-donna-faint",
+  value: "min-w-0 break-words text-sm text-donna-text whitespace-pre-wrap [overflow-wrap:anywhere]",
+  muted: "text-sm text-donna-muted",
+  chip: "inline-flex rounded-full bg-donna-elevated px-2.5 py-1 text-xs text-donna-muted",
+  list: "min-w-0 space-y-1.5 break-words",
+  footer: "shrink-0 border-t border-donna-hairline px-5 py-3 text-xs text-donna-faint",
+} as const;

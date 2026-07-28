@@ -5,6 +5,7 @@ export type IconName =
   | "check"
   | "arrow"
   | "google"
+  | "microsoft"
   | "clock"
   | "moon"
   | "home"
@@ -12,6 +13,7 @@ export type IconName =
   | "notes"
   | "memory"
   | "settings"
+  | "link"
   | "user"
   | "mic"
   | "send"
@@ -21,7 +23,14 @@ export type IconName =
   | "search"
   | "compose"
   | "plus"
-  | "info";
+  | "info"
+  | "refresh"
+  | "close"
+  | "mapPin"
+  | "pin"
+  | "trash"
+  | "repeat"
+  | "sun";
 
 export type IconProps = {
   name: IconName;

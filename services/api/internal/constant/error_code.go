@@ -8,4 +8,5 @@ const (
 	ErrorCodeNotFound       = "NOT_FOUND"
 	ErrorCodeConflict       = "CONFLICT"
 	ErrorCodeInvalidRequest = "INVALID_REQUEST"
+	ErrorCodeForbidden      = "FORBIDDEN"
 )

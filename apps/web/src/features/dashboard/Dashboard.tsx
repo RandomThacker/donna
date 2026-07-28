@@ -1,10 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 import { useAuth } from "@/features/auth";
 
+import { useDashboardGreeting } from "./Dashboard.greeting";
 import { getDashboardContent } from "./Dashboard.logic";
+import { navItemsForPath } from "./dashboardNav";
 import { dashboardStyles as styles } from "./Dashboard.styles";
 import { DashboardFocus } from "./sections/DashboardFocus";
 import { DashboardGreeting } from "./sections/DashboardGreeting";
@@ -26,40 +28,35 @@ function initialsFrom(name: string): string {
 }
 
 export function Dashboard() {
-  const router = useRouter();
-  const { user, signOut } = useAuth();
+  const pathname = usePathname();
+  const { user } = useAuth();
   const { data } = getDashboardContent();
+  const nav = navItemsForPath(pathname);
 
   const profileName =
     user?.display_name?.trim() || user?.email?.split("@")[0] || data.profileName;
   const profileInitials = initialsFrom(profileName);
   const greetingName = profileName.split(/\s+/)[0] || data.greeting.name;
+  const { greeting } = useDashboardGreeting(greetingName);
 
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
         <DashboardSidebar
-          items={data.nav}
+          items={nav}
           profileName={profileName}
           profileInitials={profileInitials}
+          profileEmail={user?.email}
           profileAvatarUrl={user?.avatar_url}
-          onSignOut={() => {
-            void (async () => {
-              await signOut();
-              router.replace("/");
-            })();
-          }}
         />
         <main className={styles.workspace}>
           <div className={styles.workspaceInner}>
             <div className={styles.bento}>
-              <DashboardGreeting
-                greeting={{ ...data.greeting, name: greetingName }}
-              />
-              <DashboardFocus focus={data.focus} />
+              <DashboardGreeting greeting={greeting} />
+              <DashboardFocus />
               <DashboardInsights insights={data.insights} />
-              <DashboardTimeline items={data.timeline} />
-              <DashboardQuickTasks tasks={data.tasks} />
+              <DashboardTimeline />
+              <DashboardQuickTasks />
             </div>
             <div className={styles.phoneMobile}>
               <DashboardPhone phone={data.phone} />

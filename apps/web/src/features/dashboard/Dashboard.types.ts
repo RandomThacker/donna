@@ -11,6 +11,7 @@ export type DashboardNavItem = {
 export type DashboardGreeting = {
   salutation: string;
   name: string;
+  emoji: string;
   summary: string;
   nudge: string;
 };
@@ -24,9 +25,10 @@ export type DashboardFocus = {
 };
 
 export type DashboardTimelineItem = {
+  id: string;
   time: string;
   title: string;
-  kind: "meeting" | "focus" | "personal";
+  meta?: string;
 };
 
 export type DashboardInsight = {

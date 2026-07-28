@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS scheduler_jobs_pending_calendar_sync_account_uidx;

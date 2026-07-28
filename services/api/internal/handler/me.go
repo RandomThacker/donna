@@ -34,6 +34,15 @@ func (h *MeHandler) Me(c *gin.Context) {
 	user, err := h.users.GetByID(c.Request.Context(), userID)
 	if err != nil {
 		if errors.Is(err, apperr.ErrNotFound) {
+			// Stale JWT after DB wipe / deleted user — drop the cookie so login can proceed.
+			http.SetCookie(c.Writer, &http.Cookie{
+				Name:     constant.CookieSession,
+				Value:    "",
+				Path:     "/",
+				MaxAge:   -1,
+				HttpOnly: true,
+				SameSite: http.SameSiteLaxMode,
+			})
 			response.Error(c, http.StatusUnauthorized, "authentication required", constant.ErrorCodeUnauthorized, "user not found")
 			return
 		}

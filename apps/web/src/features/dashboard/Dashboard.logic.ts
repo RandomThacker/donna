@@ -3,19 +3,26 @@ import type { DashboardData } from "./Dashboard.types";
 export const dashboardData: DashboardData = {
   nav: [
     { id: "home", label: "Home", icon: "home", href: "/dashboard", active: true },
-    { id: "calendar", label: "Calendar", icon: "calendar", href: "/dashboard" },
-    { id: "tasks", label: "Tasks", icon: "tasks", href: "/dashboard" },
-    { id: "notes", label: "Notes", icon: "notes", href: "/dashboard" },
-    { id: "memories", label: "Memories", icon: "memory", href: "/dashboard" },
-    { id: "settings", label: "Settings", icon: "settings", href: "/dashboard" },
+    { id: "calendar", label: "Calendar", icon: "calendar", href: "/dashboard/calendar" },
+    { id: "tasks", label: "Tasks", icon: "tasks", href: "/dashboard/tasks" },
+    { id: "notes", label: "Notes", icon: "notes", href: "/dashboard/notes" },
+    { id: "memories", label: "Memories", icon: "memory", href: "/dashboard/memories" },
+    {
+      id: "integrations",
+      label: "Integrations",
+      icon: "link",
+      href: "/dashboard/integrations",
+    },
+    { id: "settings", label: "Settings", icon: "settings", href: "/dashboard/settings" },
   ],
   profileName: "Aryan Thacker",
   profileInitials: "AT",
   greeting: {
     salutation: "Good morning",
     name: "Aryan",
-    summary: "2 meetings · 1 reminder · 5h focus time",
-    nudge: "Great day to finish Calendar Integration.",
+    emoji: "☀️",
+    summary: "0 meetings · 0 tasks",
+    nudge: "",
   },
   focus: {
     goal: "Ship Calendar Integration",

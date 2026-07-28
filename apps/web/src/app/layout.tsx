@@ -4,6 +4,7 @@ import { Instrument_Serif, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/theme";
 import { AuthProvider } from "@/features/auth";
 import { siteMetadata } from "@/features/landing/Landing.logic";
+import { QueryProvider } from "@/providers/QueryProvider";
 
 import "./globals.css";
 
@@ -54,7 +55,9 @@ export default function RootLayout({
       </head>
       <body>
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <QueryProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </QueryProvider>
         </ThemeProvider>
       </body>
     </html>

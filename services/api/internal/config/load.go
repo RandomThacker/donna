@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -107,6 +108,10 @@ func assemble(appFile appconfigFile, dbFile databaseFile, apisFile apiFile) (*Co
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("google_oauth: %v", err))
 	}
+	microsoft, err := mapMicrosoftOAuth(apisFile.MicrosoftOAuth)
+	if err != nil {
+		errs = append(errs, fmt.Sprintf("microsoft_oauth: %v", err))
+	}
 	aiService, err := mapExternalAPI(apisFile.AIService)
 	if err != nil {
 		errs = append(errs, fmt.Sprintf("ai_service: %v", err))
@@ -127,6 +132,10 @@ func assemble(appFile appconfigFile, dbFile databaseFile, apisFile apiFile) (*Co
 	if frontendURL == "" {
 		frontendURL = "http://localhost:3000/auth/callback"
 	}
+	integrationFrontendURL := strings.TrimSpace(appFile.IntegrationFrontendSuccessURL)
+	if integrationFrontendURL == "" {
+		integrationFrontendURL = "http://localhost:3000/dashboard/settings"
+	}
 
 	cookieSecure := appFile.Environment == constant.EnvProduction || appFile.Environment == constant.EnvStaging
 	if v := strings.TrimSpace(strings.ToLower(appFile.CookieSecure)); v != "" {
@@ -135,16 +144,17 @@ func assemble(appFile appconfigFile, dbFile databaseFile, apisFile apiFile) (*Co
 
 	return &Config{
 		App: AppConfig{
-			Addr:               addr,
-			Environment:        strings.ToLower(strings.TrimSpace(appFile.Environment)),
-			LogLevel:           strings.ToLower(strings.TrimSpace(appFile.LogLevel)),
-			CORSOrigins:        splitCSV(appFile.CORSOrigins),
-			JWTSecret:          jwtSecret,
-			JWTExpiry:          jwtExpiry,
-			CredentialsKey:     credentialsKey,
-			FrontendSuccessURL: frontendURL,
-			CookieSecure:       cookieSecure,
-			ShutdownTimeout:    shutdownTimeout,
+			Addr:                          addr,
+			Environment:                   strings.ToLower(strings.TrimSpace(appFile.Environment)),
+			LogLevel:                      strings.ToLower(strings.TrimSpace(appFile.LogLevel)),
+			CORSOrigins:                   splitCSV(appFile.CORSOrigins),
+			JWTSecret:                     jwtSecret,
+			JWTExpiry:                     jwtExpiry,
+			CredentialsKey:                credentialsKey,
+			FrontendSuccessURL:            frontendURL,
+			IntegrationFrontendSuccessURL: integrationFrontendURL,
+			CookieSecure:                  cookieSecure,
+			ShutdownTimeout:               shutdownTimeout,
 		},
 		Database: DatabaseConfig{
 			URL:                strings.TrimSpace(dbFile.URL),
@@ -156,9 +166,10 @@ func assemble(appFile appconfigFile, dbFile databaseFile, apisFile apiFile) (*Co
 			MigrationsPath:     firstNonEmpty(strings.TrimSpace(dbFile.MigrationsPath), constant.DefaultMigrationsPath),
 		},
 		API: ExternalAPIConfig{
-			OpenAI:      openai,
-			GoogleOAuth: google,
-			AIService:   aiService,
+			OpenAI:         openai,
+			GoogleOAuth:    google,
+			MicrosoftOAuth: microsoft,
+			AIService:      aiService,
 		},
 	}, nil
 }
@@ -202,7 +213,20 @@ func mapGoogleOAuth(in googleOAuthFile) (GoogleOAuthConfig, error) {
 	}
 	scopes := splitCSV(strings.ReplaceAll(in.Scopes, " ", ","))
 	if len(scopes) == 0 {
-		scopes = []string{"openid", "email", "profile"}
+		scopes = []string{
+			"openid",
+			"email",
+			"profile",
+		}
+	}
+	integrationScopes := splitCSV(strings.ReplaceAll(in.IntegrationScopes, " ", ","))
+	if len(integrationScopes) == 0 {
+		integrationScopes = []string{
+			"openid",
+			"email",
+			"profile",
+			"https://www.googleapis.com/auth/calendar",
+		}
 	}
 	authURL := strings.TrimSpace(in.AuthURL)
 	if authURL == "" {
@@ -216,17 +240,99 @@ func mapGoogleOAuth(in googleOAuthFile) (GoogleOAuthConfig, error) {
 	if redirect == "" {
 		redirect = "http://localhost:8080/api/v1/auth/google/callback"
 	}
+	integrationRedirect := strings.TrimSpace(in.IntegrationRedirectURL)
+	if integrationRedirect == "" {
+		integrationRedirect = "http://localhost:8080/api/v1/integrations/google/callback"
+	}
 	return GoogleOAuthConfig{
-		Name:         in.Name,
-		ClientID:     strings.TrimSpace(in.ClientID),
-		ClientSecret: strings.TrimSpace(in.ClientSecret),
-		RedirectURL:  redirect,
-		AuthURL:      authURL,
-		TokenURL:     tokenURL,
-		UserInfoURL:  userInfoURL,
-		Scopes:       scopes,
-		Timeout:      timeout,
-		Headers:      headers,
+		Name:                   in.Name,
+		ClientID:               strings.TrimSpace(in.ClientID),
+		ClientSecret:           strings.TrimSpace(in.ClientSecret),
+		RedirectURL:            redirect,
+		IntegrationRedirectURL: integrationRedirect,
+		AuthURL:                authURL,
+		TokenURL:               tokenURL,
+		UserInfoURL:            userInfoURL,
+		Scopes:                 scopes,
+		IntegrationScopes:      integrationScopes,
+		Timeout:                timeout,
+		Headers:                headers,
+	}, nil
+}
+
+func mapMicrosoftOAuth(in microsoftOAuthFile) (MicrosoftOAuthConfig, error) {
+	timeout, err := parseDuration(in.Timeout, 15*time.Second)
+	if err != nil {
+		return MicrosoftOAuthConfig{}, err
+	}
+	headers := in.Headers
+	if headers == nil {
+		headers = map[string]string{}
+	}
+	tenant := strings.TrimSpace(in.Tenant)
+	// OAuth authority is always multi-tenant "common". Tenant ID is retained for
+	// optional future Graph admin/ops use and must never drive authorize/token URLs.
+	authURL := strings.TrimSpace(in.AuthURL)
+	if authURL == "" || isTenantSpecificMicrosoftAuthority(authURL) {
+		authURL = constant.MicrosoftOAuthAuthorizeURL
+	}
+	tokenURL := strings.TrimSpace(in.TokenURL)
+	if tokenURL == "" {
+		base := strings.TrimSpace(in.BaseURL)
+		path := strings.TrimSpace(in.Path)
+		if base != "" && path != "" {
+			tokenURL = strings.TrimRight(base, "/") + path
+		}
+	}
+	if tokenURL == "" || isTenantSpecificMicrosoftAuthority(tokenURL) {
+		tokenURL = constant.MicrosoftOAuthTokenURL
+	}
+	graphMe := strings.TrimSpace(in.GraphMeURL)
+	if graphMe == "" {
+		graphMe = "https://graph.microsoft.com/v1.0/me"
+	}
+	scopes := splitCSV(strings.ReplaceAll(in.Scopes, " ", ","))
+	if len(scopes) == 0 {
+		scopes = []string{
+			"openid",
+			"email",
+			"profile",
+			"User.Read",
+		}
+	}
+	integrationScopes := splitCSV(strings.ReplaceAll(in.IntegrationScopes, " ", ","))
+	if len(integrationScopes) == 0 {
+		integrationScopes = []string{
+			"openid",
+			"profile",
+			"email",
+			"offline_access",
+			"User.Read",
+			"Calendars.ReadWrite",
+		}
+	}
+	redirect := strings.TrimSpace(in.RedirectURL)
+	if redirect == "" {
+		redirect = "http://localhost:8080/api/v1/auth/microsoft/callback"
+	}
+	integrationRedirect := strings.TrimSpace(in.IntegrationRedirectURL)
+	if integrationRedirect == "" {
+		integrationRedirect = "http://localhost:8080/api/v1/integrations/microsoft/callback"
+	}
+	return MicrosoftOAuthConfig{
+		Name:                   in.Name,
+		ClientID:               strings.TrimSpace(in.ClientID),
+		ClientSecret:           strings.TrimSpace(in.ClientSecret),
+		RedirectURL:            redirect,
+		IntegrationRedirectURL: integrationRedirect,
+		Tenant:                 tenant,
+		AuthURL:                authURL,
+		TokenURL:               tokenURL,
+		GraphMeURL:             graphMe,
+		Scopes:                 scopes,
+		IntegrationScopes:      integrationScopes,
+		Timeout:                timeout,
+		Headers:                headers,
 	}, nil
 }
 
@@ -327,4 +433,27 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+// isTenantSpecificMicrosoftAuthority reports whether url points at a GUID tenant
+// under login.microsoftonline.com (not /common/, /organizations/, or /consumers/).
+func isTenantSpecificMicrosoftAuthority(raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Host == "" {
+		return false
+	}
+	if !strings.EqualFold(u.Host, "login.microsoftonline.com") {
+		return false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) == 0 {
+		return false
+	}
+	segment := strings.ToLower(parts[0])
+	switch segment {
+	case "common", "organizations", "consumers", "oauth2":
+		return false
+	}
+	// Tenant GUID or domain name authority (e.g. contoso.onmicrosoft.com).
+	return segment != ""
 }

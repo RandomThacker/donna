@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 
 import { Icon } from "@/components/common";
-import { ThemeToggle } from "@/components/theme";
 import { cn } from "@/lib/cn";
 
 import { sidebarStyles as styles } from "./DashboardSidebar.styles";
@@ -13,8 +13,8 @@ export function DashboardSidebar({
   items,
   profileName,
   profileInitials,
+  profileEmail,
   profileAvatarUrl,
-  onSignOut,
 }: DashboardSidebarProps) {
   const [avatarFailed, setAvatarFailed] = useState(false);
 
@@ -23,18 +23,19 @@ export function DashboardSidebar({
   }, [profileAvatarUrl]);
 
   const showAvatar = Boolean(profileAvatarUrl) && !avatarFailed;
+  const email = profileEmail?.trim() || null;
 
   return (
     <aside className={styles.aside} aria-label="Primary">
-      <a href="/dashboard" className={styles.brand} aria-label="Donna home">
+      <Link href="/dashboard" className={styles.brand} aria-label="Donna home">
         <span className={styles.brandMark} aria-hidden>
           <span className={styles.brandCore} />
         </span>
         <span className={styles.brandWord}>Donna</span>
-      </a>
+      </Link>
       <nav className={styles.nav}>
         {items.map((item) => (
-          <a
+          <Link
             key={item.id}
             href={item.href}
             aria-current={item.active ? "page" : undefined}
@@ -42,11 +43,10 @@ export function DashboardSidebar({
           >
             <Icon name={item.icon} className={cn("h-4 w-4", styles.itemIcon)} />
             {item.label}
-          </a>
+          </Link>
         ))}
       </nav>
       <div className={styles.footer}>
-        <ThemeToggle className={styles.themeToggle} />
         <div className={styles.profile}>
           <span className={styles.avatar}>
             {showAvatar ? (
@@ -63,14 +63,9 @@ export function DashboardSidebar({
           </span>
           <div className={styles.profileMeta}>
             <p className={styles.profileName}>{profileName}</p>
-            <p className={styles.profileHint}>Personal workspace</p>
+            {email ? <p className={styles.profileHint}>{email}</p> : null}
           </div>
         </div>
-        {onSignOut ? (
-          <button type="button" className={styles.signOut} onClick={onSignOut}>
-            Sign out
-          </button>
-        ) : null}
       </div>
     </aside>
   );

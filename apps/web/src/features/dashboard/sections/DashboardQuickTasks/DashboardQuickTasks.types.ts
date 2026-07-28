@@ -1,5 +1,1 @@
-import type { DashboardTask } from "../../Dashboard.types";
-
-export type DashboardQuickTasksProps = {
-  tasks: DashboardTask[];
-};
+export type DashboardQuickTasksProps = Record<string, never>;

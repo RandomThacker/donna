@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/RandomThacker/donna/services/api/internal/googleoauth"
@@ -73,9 +74,10 @@ func TestExchangeAndProfile(t *testing.T) {
 
 func TestAuthCodeURL(t *testing.T) {
 	client, err := googleoauth.NewClient(googleoauth.Config{
-		ClientID:     "id",
-		ClientSecret: "secret",
-		RedirectURL:  "http://localhost/callback",
+		ClientID:      "id",
+		ClientSecret:  "secret",
+		RedirectURL:   "http://localhost/callback",
+		OfflineAccess: true,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -83,5 +85,14 @@ func TestAuthCodeURL(t *testing.T) {
 	url := client.AuthCodeURL("state123")
 	if url == "" {
 		t.Fatal("empty auth url")
+	}
+	if !strings.Contains(url, "access_type=offline") {
+		t.Fatalf("expected offline access: %s", url)
+	}
+	if !strings.Contains(url, "prompt=consent") {
+		t.Fatalf("expected consent prompt: %s", url)
+	}
+	if strings.Contains(url, "include_granted_scopes") {
+		t.Fatalf("include_granted_scopes omits refresh tokens: %s", url)
 	}
 }

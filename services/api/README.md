@@ -69,7 +69,28 @@ Set `CONFIG_DIR` to override the configs directory (Docker defaults to `/app/con
 | `CORS_ORIGINS` | no | comma-separated |
 | `CONFIG_DIR` | no | defaults to `configs` |
 | `OPENAI_API_KEY` | no | wired in `api.json` for later milestones |
-| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | no | unused until M2 |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | no | Google login + calendar connect |
+| `MICROSOFT_CLIENT_ID` / `MICROSOFT_CLIENT_SECRET` | no | Microsoft login + calendar connect |
+| `MICROSOFT_AUTH_URL` / `MICROSOFT_TOKEN_URL` | no | Must use `/common/` authority (tenant GUIDs are rewritten) |
+| `MICROSOFT_TENANT_ID` | no | Optional metadata only — **not** used for OAuth authorize/token |
+
+### Microsoft multi-tenant OAuth
+
+Azure app registration must be **Accounts in any organizational directory + personal Microsoft accounts**.
+
+Donna always uses the common authority for both login and calendar connect:
+
+- Authorize: `https://login.microsoftonline.com/common/oauth2/v2.0/authorize`
+- Token: `https://login.microsoftonline.com/common/oauth2/v2.0/token`
+
+Redirect URIs:
+
+- Login: `http://localhost:8080/api/v1/auth/microsoft/callback`
+- Integration: `http://localhost:8080/api/v1/integrations/microsoft/callback`
+
+`MICROSOFT_TENANT_ID` is ignored for OAuth URL construction (kept only for possible future Graph admin/ops).
+
+Login requests calendar scopes and automatically upserts a `connected_accounts` row for the signed-in provider identity (plus calendar sync bootstrap). Integrations remain for connecting additional Google/Microsoft accounts.
 
 Copy repo-root `.env.example` to `.env` before `docker compose up`.
 

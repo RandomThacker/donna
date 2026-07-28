@@ -11,14 +11,18 @@ import (
 
 // Options configures the HTTP router.
 type Options struct {
-	Environment   string
-	CORSOrigins   []string
-	HTTPLogger    *logger.Logger
-	HealthHandler *handler.HealthHandler
-	UserHandler   *handler.UserHandler
-	AuthHandler   *handler.AuthHandler
-	MeHandler     *handler.MeHandler
-	TokenIssuer   *session.Issuer
+	Environment        string
+	CORSOrigins        []string
+	HTTPLogger         *logger.Logger
+	HealthHandler      *handler.HealthHandler
+	UserHandler        *handler.UserHandler
+	AuthHandler        *handler.AuthHandler
+	MeHandler          *handler.MeHandler
+	CalendarHandler    *handler.CalendarHandler
+	IntegrationHandler *handler.IntegrationHandler
+	TaskHandler        *handler.TaskHandler
+	NoteHandler        *handler.NoteHandler
+	TokenIssuer        *session.Issuer
 }
 
 // New builds a Gin engine with middleware and /api/v1 routes.
@@ -54,11 +58,61 @@ func New(opts Options) *gin.Engine {
 		if opts.AuthHandler != nil {
 			v1.GET(constant.PathAuthGoogle, opts.AuthHandler.BeginGoogle)
 			v1.GET(constant.PathAuthGoogleCallback, opts.AuthHandler.GoogleCallback)
+			v1.GET(constant.PathAuthMicrosoft, opts.AuthHandler.BeginMicrosoft)
+			v1.GET(constant.PathAuthMicrosoftCallback, opts.AuthHandler.MicrosoftCallback)
 			v1.POST(constant.PathAuthLogout, opts.AuthHandler.Logout)
 		}
 
 		if opts.MeHandler != nil && opts.TokenIssuer != nil {
 			v1.GET(constant.PathMe, middleware.RequireAuth(opts.TokenIssuer), opts.MeHandler.Me)
+		}
+
+		if opts.CalendarHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.POST(constant.PathCalendarSync, auth, opts.CalendarHandler.SyncSources)
+			v1.POST(constant.PathCalendarSyncEnsure, auth, opts.CalendarHandler.EnsureFreshSources)
+			v1.GET(constant.PathCalendarSources, auth, opts.CalendarHandler.ListSources)
+			v1.POST(constant.PathCalendarEventsSync, auth, opts.CalendarHandler.SyncEvents)
+			v1.GET(constant.PathCalendarEvents, auth, opts.CalendarHandler.ListEvents)
+		}
+
+		if opts.IntegrationHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathIntegrations, auth, opts.IntegrationHandler.ListConnectedAccounts)
+			v1.GET(constant.PathIntegrationsGoogle, auth, opts.IntegrationHandler.BeginGoogleConnect)
+			v1.POST(constant.PathIntegrationsGoogle, auth, opts.IntegrationHandler.BeginGoogleConnect)
+			v1.GET(constant.PathIntegrationsGoogleCallback, opts.IntegrationHandler.GoogleCallback)
+			v1.GET(constant.PathIntegrationsMicrosoft, auth, opts.IntegrationHandler.BeginMicrosoftConnect)
+			v1.POST(constant.PathIntegrationsMicrosoft, auth, opts.IntegrationHandler.BeginMicrosoftConnect)
+			// Callback verifies signed state (includes user id); no session cookie required.
+			v1.GET(constant.PathIntegrationsMicrosoftCallback, opts.IntegrationHandler.MicrosoftCallback)
+			v1.GET(constant.PathIntegrationsICS, auth, opts.IntegrationHandler.ListICS)
+			v1.POST(constant.PathIntegrationsICS, auth, opts.IntegrationHandler.ConnectICS)
+			v1.PATCH(constant.PathIntegrationsICSByID, auth, opts.IntegrationHandler.UpdateICS)
+			v1.DELETE(constant.PathIntegrationsICSByID, auth, opts.IntegrationHandler.DeleteICS)
+			v1.POST(constant.PathIntegrationsICSSync, auth, opts.IntegrationHandler.SyncICS)
+			v1.DELETE(constant.PathIntegrationsByID, auth, opts.IntegrationHandler.Disconnect)
+		}
+
+		if opts.TaskHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathTasksDay, auth, opts.TaskHandler.GetDay)
+			v1.POST(constant.PathTasks, auth, opts.TaskHandler.CreateTask)
+			v1.PATCH(constant.PathTaskByID, auth, opts.TaskHandler.UpdateTask)
+			v1.DELETE(constant.PathTaskByID, auth, opts.TaskHandler.DeleteTask)
+			v1.PATCH(constant.PathTaskOccurrencesReorder, auth, opts.TaskHandler.ReorderOccurrences)
+			v1.PATCH(constant.PathTaskOccurrences, auth, opts.TaskHandler.UpdateOccurrence)
+			v1.GET(constant.PathTasksHistory, auth, opts.TaskHandler.GetHistory)
+			v1.POST(constant.PathTasksCarryForward, auth, opts.TaskHandler.CarryForward)
+			v1.PUT(constant.PathDailyNotesDay, auth, opts.TaskHandler.UpsertDailyNote)
+		}
+
+		if opts.NoteHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathNotes, auth, opts.NoteHandler.List)
+			v1.POST(constant.PathNotes, auth, opts.NoteHandler.Create)
+			v1.PATCH(constant.PathNoteByID, auth, opts.NoteHandler.Update)
+			v1.DELETE(constant.PathNoteByID, auth, opts.NoteHandler.Delete)
 		}
 	}
 

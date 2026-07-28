@@ -1,5 +1,8 @@
 import { apiRequest } from "@/lib/api/client";
-import { getGoogleOAuthStartUrl } from "@/lib/api/config";
+import {
+  getGoogleOAuthStartUrl,
+  getMicrosoftOAuthStartUrl,
+} from "@/lib/api/config";
 
 import type { AuthUser } from "./Auth.types";
 
@@ -49,6 +52,10 @@ export function clearClientAuthFlags(): void {
 
 export function startGoogleOAuth(): void {
   window.location.assign(getGoogleOAuthStartUrl());
+}
+
+export function startMicrosoftOAuth(): void {
+  window.location.assign(getMicrosoftOAuthStartUrl());
 }
 
 /** Loads the current user using the HttpOnly session cookie. */

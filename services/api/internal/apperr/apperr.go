@@ -8,4 +8,5 @@ var (
 	ErrConflict   = errors.New("resource conflict")
 	ErrValidation = errors.New("validation failed")
 	ErrInvalid    = errors.New("invalid request")
+	ErrForbidden  = errors.New("forbidden")
 )

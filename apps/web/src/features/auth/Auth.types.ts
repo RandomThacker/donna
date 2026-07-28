@@ -23,6 +23,7 @@ export type AuthContextValue = {
   openSignIn: () => void;
   closeSignIn: () => void;
   signInWithGoogle: () => void;
+  signInWithMicrosoft: () => void;
   signOut: () => Promise<void>;
   completeOAuthCallback: (params: URLSearchParams) => Promise<void>;
   refreshSession: () => Promise<void>;

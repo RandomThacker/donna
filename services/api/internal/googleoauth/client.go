@@ -22,6 +22,8 @@ type Config struct {
 	Scopes       []string
 	Timeout      time.Duration
 	HTTPClient   *http.Client
+	// OfflineAccess requests a refresh token (login + calendar connect both need this).
+	OfflineAccess bool
 }
 
 // TokenSet is the Google token response we care about.
@@ -66,7 +68,11 @@ func NewClient(cfg Config) (*Client, error) {
 		cfg.UserInfoURL = "https://openidconnect.googleapis.com/v1/userinfo"
 	}
 	if len(cfg.Scopes) == 0 {
-		cfg.Scopes = []string{"openid", "email", "profile"}
+		cfg.Scopes = []string{
+			"openid",
+			"email",
+			"profile",
+		}
 	}
 	if cfg.Timeout <= 0 {
 		cfg.Timeout = 15 * time.Second
@@ -85,9 +91,12 @@ func (c *Client) AuthCodeURL(state string) string {
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(c.cfg.Scopes, " "))
 	q.Set("state", state)
-	q.Set("access_type", "offline")
-	q.Set("prompt", "consent")
-	q.Set("include_granted_scopes", "true")
+	if c.cfg.OfflineAccess {
+		q.Set("access_type", "offline")
+		// consent: refresh token; select_account: allow connecting a different Google account.
+		// Do not set include_granted_scopes — incremental grants often omit refresh_token.
+		q.Set("prompt", "consent select_account")
+	}
 	return c.cfg.AuthURL + "?" + q.Encode()
 }
 
@@ -182,6 +191,68 @@ func (c *Client) FetchProfile(ctx context.Context, accessToken string) (Profile,
 		return Profile{}, fmt.Errorf("userinfo missing sub")
 	}
 	return profile, nil
+}
+
+// RefreshAccessToken exchanges a refresh token for a new access token.
+func (c *Client) RefreshAccessToken(ctx context.Context, refreshToken string) (TokenSet, error) {
+	refreshToken = strings.TrimSpace(refreshToken)
+	if refreshToken == "" {
+		return TokenSet{}, fmt.Errorf("refresh token is required")
+	}
+
+	form := url.Values{}
+	form.Set("client_id", c.cfg.ClientID)
+	form.Set("client_secret", c.cfg.ClientSecret)
+	form.Set("refresh_token", refreshToken)
+	form.Set("grant_type", "refresh_token")
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenURL, strings.NewReader(form.Encode()))
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("refresh request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.cfg.HTTPClient.Do(req)
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("refresh token: %w", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return TokenSet{}, fmt.Errorf("read refresh response: %w", err)
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return TokenSet{}, fmt.Errorf("refresh token status %d: %s", resp.StatusCode, truncate(string(body), 200))
+	}
+
+	var raw struct {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+		TokenType    string `json:"token_type"`
+		ExpiresIn    int64  `json:"expires_in"`
+		Scope        string `json:"scope"`
+		Error        string `json:"error"`
+		ErrorDesc    string `json:"error_description"`
+	}
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return TokenSet{}, fmt.Errorf("decode refresh response: %w", err)
+	}
+	if raw.Error != "" {
+		return TokenSet{}, fmt.Errorf("refresh token error: %s (%s)", raw.Error, raw.ErrorDesc)
+	}
+	if raw.AccessToken == "" {
+		return TokenSet{}, fmt.Errorf("refresh token missing access_token")
+	}
+
+	return TokenSet{
+		AccessToken:  raw.AccessToken,
+		RefreshToken: raw.RefreshToken,
+		TokenType:    raw.TokenType,
+		ExpiresIn:    raw.ExpiresIn,
+		Scope:        raw.Scope,
+	}, nil
 }
 
 func truncate(s string, n int) string {

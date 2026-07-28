@@ -380,6 +380,8 @@ Synced calendar feed under a connected account.
 | `name` | `text` | NO | — | Display name |
 | `color` | `text` | YES | `NULL` | UI color |
 | `is_primary_on_provider` | `boolean` | NO | `false` | Provider primary flag |
+| `is_writable` | `boolean` | NO | `false` | Donna can write events (`owner`/`writer`) |
+| `access_role` | `text` | YES | `NULL` | Provider role (`owner`, `writer`, `reader`, …) |
 | `sync_enabled` | `boolean` | NO | `true` | Donna sync toggle |
 | `sync_cursor` | `text` | YES | `NULL` | Incremental sync token |
 | `last_synced_at` | `timestamptz` | YES | `NULL` | |
@@ -423,6 +425,7 @@ App invariant: `user_id` must equal parent account’s `user_id`.
 | --- | --- |
 | `(user_id, sync_enabled) WHERE deleted_at IS NULL` | Sync selection |
 | `(connected_account_id) WHERE deleted_at IS NULL` | List sources |
+| `(user_id, is_writable) WHERE deleted_at IS NULL` | Writable routing |
 | Unique pair live | Sync upsert parent |
 
 ## JSONB Fields

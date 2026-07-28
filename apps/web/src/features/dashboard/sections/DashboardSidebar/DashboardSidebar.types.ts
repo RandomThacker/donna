@@ -4,6 +4,6 @@ export type DashboardSidebarProps = {
   items: DashboardNavItem[];
   profileName: string;
   profileInitials: string;
+  profileEmail?: string | null;
   profileAvatarUrl?: string | null;
-  onSignOut?: () => void;
 };
