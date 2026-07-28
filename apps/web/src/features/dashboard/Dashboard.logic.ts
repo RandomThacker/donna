@@ -32,10 +32,10 @@ export const dashboardData: DashboardData = {
     ctaHref: "#phone",
   },
   timeline: [
-    { time: "09:30", title: "Team Standup", kind: "meeting" },
-    { time: "11:00", title: "Deep Work", kind: "focus" },
-    { time: "14:00", title: "Client Meeting", kind: "meeting" },
-    { time: "17:00", title: "Guitar Class", kind: "personal" },
+    { id: "mock-1", time: "09:30", title: "Team Standup" },
+    { id: "mock-2", time: "11:00", title: "Deep Work" },
+    { id: "mock-3", time: "14:00", title: "Client Meeting" },
+    { id: "mock-4", time: "17:00", title: "Guitar Class" },
   ],
   insights: [
     { id: "1", text: "Two-hour focus window after lunch." },
