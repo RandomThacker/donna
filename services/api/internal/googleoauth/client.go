@@ -85,9 +85,18 @@ func NewClient(cfg Config) (*Client, error) {
 
 // AuthCodeURL builds the Google consent URL.
 func (c *Client) AuthCodeURL(state string) string {
+	return c.AuthCodeURLWithRedirect(state, c.cfg.RedirectURL)
+}
+
+// AuthCodeURLWithRedirect builds the Google consent URL with an explicit redirect_uri.
+func (c *Client) AuthCodeURLWithRedirect(state, redirectURI string) string {
+	redirectURI = strings.TrimSpace(redirectURI)
+	if redirectURI == "" {
+		redirectURI = c.cfg.RedirectURL
+	}
 	q := url.Values{}
 	q.Set("client_id", c.cfg.ClientID)
-	q.Set("redirect_uri", c.cfg.RedirectURL)
+	q.Set("redirect_uri", redirectURI)
 	q.Set("response_type", "code")
 	q.Set("scope", strings.Join(c.cfg.Scopes, " "))
 	q.Set("state", state)
@@ -102,11 +111,20 @@ func (c *Client) AuthCodeURL(state string) string {
 
 // ExchangeCode swaps an authorization code for tokens.
 func (c *Client) ExchangeCode(ctx context.Context, code string) (TokenSet, error) {
+	return c.ExchangeCodeWithRedirect(ctx, code, c.cfg.RedirectURL)
+}
+
+// ExchangeCodeWithRedirect swaps an authorization code using an explicit redirect_uri.
+func (c *Client) ExchangeCodeWithRedirect(ctx context.Context, code, redirectURI string) (TokenSet, error) {
+	redirectURI = strings.TrimSpace(redirectURI)
+	if redirectURI == "" {
+		redirectURI = c.cfg.RedirectURL
+	}
 	form := url.Values{}
 	form.Set("code", code)
 	form.Set("client_id", c.cfg.ClientID)
 	form.Set("client_secret", c.cfg.ClientSecret)
-	form.Set("redirect_uri", c.cfg.RedirectURL)
+	form.Set("redirect_uri", redirectURI)
 	form.Set("grant_type", "authorization_code")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.cfg.TokenURL, strings.NewReader(form.Encode()))

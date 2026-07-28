@@ -33,6 +33,7 @@ type AuthHandler struct {
 	tokens             *session.Issuer
 	log                *logger.Logger
 	frontendSuccessURL string
+	allowedOrigins     map[string]struct{}
 	cookieSecure       bool
 	cookieMaxAge       int
 }
@@ -40,6 +41,7 @@ type AuthHandler struct {
 // AuthHandlerConfig configures AuthHandler cookie/redirect behavior.
 type AuthHandlerConfig struct {
 	FrontendSuccessURL string
+	AllowedOrigins     []string
 	CookieSecure       bool
 	CookieMaxAge       time.Duration
 	Tokens             *session.Issuer
@@ -52,12 +54,23 @@ func NewAuthHandler(svc *business.AuthService, log *logger.Logger, cfg AuthHandl
 	if maxAge <= 0 {
 		maxAge = int((24 * time.Hour).Seconds())
 	}
+	allowed := make(map[string]struct{}, len(cfg.AllowedOrigins)+1)
+	for _, origin := range cfg.AllowedOrigins {
+		origin = strings.TrimRight(strings.TrimSpace(origin), "/")
+		if origin != "" {
+			allowed[origin] = struct{}{}
+		}
+	}
+	if u, err := url.Parse(strings.TrimSpace(cfg.FrontendSuccessURL)); err == nil && u.Scheme != "" && u.Host != "" {
+		allowed[u.Scheme+"://"+u.Host] = struct{}{}
+	}
 	return &AuthHandler{
 		svc:                svc,
 		users:              cfg.Users,
 		tokens:             cfg.Tokens,
 		log:                log,
 		frontendSuccessURL: cfg.FrontendSuccessURL,
+		allowedOrigins:     allowed,
 		cookieSecure:       cfg.CookieSecure,
 		cookieMaxAge:       maxAge,
 	}
@@ -65,13 +78,21 @@ func NewAuthHandler(svc *business.AuthService, log *logger.Logger, cfg AuthHandl
 
 // BeginGoogle redirects the browser to Google's consent screen.
 // If a live Donna session exists, skip Google and send the user back to the app.
+// Optional query return_to (e.g. http://localhost:3000/auth/callback) keeps local FE
+// on localhost after login when API is proxied through Next.js.
 func (h *AuthHandler) BeginGoogle(c *gin.Context) {
 	if h.hasLiveSession(c) {
 		h.redirectAlreadyAuthenticated(c)
 		return
 	}
 
-	authURL, _, err := h.svc.BeginGoogleLogin(c.Request.Context())
+	returnTo, err := h.resolveReturnTo(c.Query("return_to"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid return_to", constant.ErrorCodeValidation, err.Error())
+		return
+	}
+
+	authURL, _, err := h.svc.BeginGoogleLogin(c.Request.Context(), returnTo)
 	if err != nil {
 		h.writeError(c, err)
 		return
@@ -146,7 +167,22 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 }
 
 func (h *AuthHandler) finishLogin(c *gin.Context, session business.AuthSession) {
-	h.setSessionCookie(c, session.AccessToken)
+	successURL := h.frontendSuccessURL
+	if strings.TrimSpace(session.FrontendReturnURL) != "" {
+		successURL = session.FrontendReturnURL
+	}
+
+	secure := h.cookieSecure
+	if u, err := url.Parse(successURL); err == nil && isLocalDevHost(u) {
+		// Local FE proxies API on http://localhost — first-party Lax cookie (no Secure).
+		secure = false
+	}
+	http.SetCookie(c.Writer, httpx.SessionCookie(
+		constant.CookieSession,
+		session.AccessToken,
+		h.cookieMaxAge,
+		secure,
+	))
 
 	// Programmatic clients may request JSON; browsers get a cookie + redirect.
 	if c.GetHeader("Accept") == "application/json" || c.Query("format") == "json" {
@@ -161,7 +197,7 @@ func (h *AuthHandler) finishLogin(c *gin.Context, session business.AuthSession) 
 		return
 	}
 
-	redirectTo, err := url.Parse(h.frontendSuccessURL)
+	redirectTo, err := url.Parse(successURL)
 	if err != nil {
 		response.OK(c, constant.MessageAuthOK, model.UserFromEntity(session.User))
 		return
@@ -185,12 +221,9 @@ func (h *AuthHandler) setSessionCookie(c *gin.Context, token string) {
 }
 
 func (h *AuthHandler) clearSessionCookie(c *gin.Context) {
-	http.SetCookie(c.Writer, httpx.SessionCookie(
-		constant.CookieSession,
-		"",
-		-1,
-		h.cookieSecure,
-	))
+	// Clear both Secure and non-Secure variants (prod HTTPS vs local http://localhost proxy).
+	http.SetCookie(c.Writer, httpx.SessionCookie(constant.CookieSession, "", -1, true))
+	http.SetCookie(c.Writer, httpx.SessionCookie(constant.CookieSession, "", -1, false))
 }
 
 // hasLiveSession is true only when the cookie JWT is valid AND the user still exists.
@@ -224,7 +257,11 @@ func (h *AuthHandler) hasLiveSession(c *gin.Context) bool {
 }
 
 func (h *AuthHandler) redirectAlreadyAuthenticated(c *gin.Context) {
-	redirectTo, err := url.Parse(h.frontendSuccessURL)
+	successURL := h.frontendSuccessURL
+	if returnTo, err := h.resolveReturnTo(c.Query("return_to")); err == nil && returnTo != "" {
+		successURL = returnTo
+	}
+	redirectTo, err := url.Parse(successURL)
 	if err != nil {
 		c.Redirect(http.StatusFound, "/dashboard")
 		return
@@ -233,6 +270,36 @@ func (h *AuthHandler) redirectAlreadyAuthenticated(c *gin.Context) {
 	q.Set("status", "ok")
 	redirectTo.RawQuery = q.Encode()
 	c.Redirect(http.StatusFound, redirectTo.String())
+}
+
+// resolveReturnTo validates an optional frontend callback URL against allowlisted origins.
+// Empty input means "use the default AUTH_FRONTEND_SUCCESS_URL".
+func (h *AuthHandler) resolveReturnTo(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", errors.New("return_to must be an absolute URL")
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", errors.New("return_to must be http(s)")
+	}
+	origin := u.Scheme + "://" + u.Host
+	if _, ok := h.allowedOrigins[origin]; !ok {
+		return "", errors.New("return_to origin is not allowed")
+	}
+	// Normalize to the auth callback path so arbitrary deep-links can't be injected.
+	return origin + "/auth/callback", nil
+}
+
+func isLocalDevHost(u *url.URL) bool {
+	if u == nil || u.Scheme != "http" {
+		return false
+	}
+	host := strings.ToLower(u.Hostname())
+	return host == "localhost" || host == "127.0.0.1" || host == "::1"
 }
 
 func (h *AuthHandler) writeError(c *gin.Context, err error) {

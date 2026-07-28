@@ -259,6 +259,7 @@ func wireAuth(
 	return authWire{
 		handler: handler.NewAuthHandler(authSvc, authLog, handler.AuthHandlerConfig{
 			FrontendSuccessURL: cfg.App.FrontendSuccessURL,
+			AllowedOrigins:     cfg.App.CORSOrigins,
 			CookieSecure:       cfg.App.CookieSecure,
 			CookieMaxAge:       cfg.App.JWTExpiry,
 			Tokens:             tokenIssuer,

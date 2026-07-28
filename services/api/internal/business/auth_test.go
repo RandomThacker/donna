@@ -32,11 +32,19 @@ func (m mockGoogle) AuthCodeURL(state string) string {
 	return "https://accounts.google.com/o/oauth2/v2/auth?state=" + state
 }
 
+func (m mockGoogle) AuthCodeURLWithRedirect(state, redirectURI string) string {
+	return "https://accounts.google.com/o/oauth2/v2/auth?state=" + state + "&redirect_uri=" + redirectURI
+}
+
 func (m mockGoogle) ExchangeCode(context.Context, string) (googleoauth.TokenSet, error) {
 	if m.exchErr != nil {
 		return googleoauth.TokenSet{}, m.exchErr
 	}
 	return m.tokenSet, nil
+}
+
+func (m mockGoogle) ExchangeCodeWithRedirect(ctx context.Context, code, _ string) (googleoauth.TokenSet, error) {
+	return m.ExchangeCode(ctx, code)
 }
 
 func (m mockGoogle) FetchProfile(context.Context, string) (googleoauth.Profile, error) {
@@ -186,7 +194,7 @@ func validState(t *testing.T) string {
 
 func TestBeginGoogleLogin(t *testing.T) {
 	svc := newTestAuth(t, mockGoogle{}, nil, &mockIdentityRepo{}, mockUserRepo{}, fakeTx{})
-	url, state, err := svc.BeginGoogleLogin(context.Background())
+	url, state, err := svc.BeginGoogleLogin(context.Background(), "")
 	if err != nil {
 		t.Fatal(err)
 	}
