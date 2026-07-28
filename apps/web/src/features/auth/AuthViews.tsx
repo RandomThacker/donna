@@ -13,7 +13,7 @@ import {
   startSignInProvider,
   type SignInProviderId,
 } from "./SignInModal";
-import { startGoogleOAuth, startMicrosoftOAuth } from "./Auth.logic";
+import { startGoogleOAuth } from "./Auth.logic";
 
 export function AuthCallback() {
   const router = useRouter();
@@ -83,7 +83,7 @@ export function SignInView() {
   const handleSelectProvider = (id: SignInProviderId) => {
     startSignInProvider(id, {
       google: startGoogleOAuth,
-      microsoft: startMicrosoftOAuth,
+      // microsoft: startMicrosoftOAuth,
     });
   };
 

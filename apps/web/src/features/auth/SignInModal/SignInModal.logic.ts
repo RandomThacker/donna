@@ -4,7 +4,7 @@ import type { IconName } from "@/components/common";
  * Stable provider ids. Add new options here as auth methods ship.
  * Keep this as a string union so UI stays typed without coupling to OAuth URLs.
  */
-export type SignInProviderId = "google" | "microsoft";
+export type SignInProviderId = "google"; // | "microsoft" — disabled for now
 
 export type SignInProviderDefinition = {
   id: SignInProviderId;
@@ -24,12 +24,13 @@ export const SIGN_IN_PROVIDERS: readonly SignInProviderDefinition[] = [
     icon: "google",
     enabled: true,
   },
-  {
-    id: "microsoft",
-    label: "Continue with Microsoft",
-    icon: "microsoft",
-    enabled: true,
-  },
+  // Microsoft login disabled for now.
+  // {
+  //   id: "microsoft",
+  //   label: "Continue with Microsoft",
+  //   icon: "microsoft",
+  //   enabled: true,
+  // },
 ] as const;
 
 export function listEnabledSignInProviders(): SignInProviderDefinition[] {

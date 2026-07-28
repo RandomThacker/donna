@@ -33,8 +33,7 @@ export function CalendarEmptySources() {
     <div className={styles.error}>
       <p className={styles.errorTitle}>No calendars yet</p>
       <p className={styles.errorBody}>
-        Connect a Google or Microsoft calendar from Integrations,
-        then sync.
+        Connect a Google calendar from Integrations, then sync.
       </p>
       <a className={styles.retry} href="/dashboard/integrations">
         Open Integrations

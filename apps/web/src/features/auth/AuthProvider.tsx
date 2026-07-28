@@ -19,7 +19,7 @@ import {
   markNewUser,
   parseOAuthCallback,
   startGoogleOAuth,
-  startMicrosoftOAuth,
+  // startMicrosoftOAuth,
 } from "./Auth.logic";
 import type { AuthContextValue, AuthStatus, AuthUser } from "./Auth.types";
 import {
@@ -102,7 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handleSelectProvider = useCallback((id: SignInProviderId) => {
     startSignInProvider(id, {
       google: startGoogleOAuth,
-      microsoft: startMicrosoftOAuth,
+      // microsoft: startMicrosoftOAuth,
     });
   }, []);
 
@@ -115,7 +115,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       openSignIn,
       closeSignIn,
       signInWithGoogle: startGoogleOAuth,
-      signInWithMicrosoft: startMicrosoftOAuth,
+      // signInWithMicrosoft: startMicrosoftOAuth,
+      signInWithMicrosoft: () => {
+        /* Microsoft login disabled for now */
+      },
       signOut,
       completeOAuthCallback,
       refreshSession,

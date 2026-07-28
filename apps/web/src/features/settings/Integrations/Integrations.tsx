@@ -194,7 +194,7 @@ function ICSSection({
           </div>
           <p className={styles.sectionHint}>
             Paste a public or private calendar feed URL. Donna imports events the
-            same way as Google and Microsoft.
+            same way as Google.
           </p>
         </div>
       </div>
@@ -321,8 +321,8 @@ export function Integrations() {
       <header className={styles.intro}>
         <h1 className={styles.pageTitle}>Integrations</h1>
         <p className={styles.body}>
-          Connect Google, Microsoft, or a Calendar URL (ICS). Signing in never
-          wires these up automatically — you choose what Donna can see.
+          Connect Google or a Calendar URL (ICS). Signing in never wires these
+          up automatically — you choose what Donna can see.
         </p>
       </header>
 
@@ -355,6 +355,7 @@ export function Integrations() {
             }}
             disconnectingId={ctrl.disconnectingId}
           />
+          {/* Microsoft integration disabled for now.
           <ProviderSection
             provider="microsoft"
             accounts={ctrl.microsoftAccounts}
@@ -364,6 +365,7 @@ export function Integrations() {
             }}
             disconnectingId={ctrl.disconnectingId}
           />
+          */}
           <ICSSection
             feeds={ctrl.icsFeeds}
             name={ctrl.icsName}

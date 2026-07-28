@@ -29,14 +29,10 @@ services:
       - ../../.env
     environment:
       API_ADDR: ":8080"
-      # Local Postgres (default when using the postgres service above):
-      # DATABASE_URL: postgres://donna:donna@postgres:5432/donna?sslmode=disable
-      # Remote DB: set DATABASE_URL in repo-root .env (env_file above)
+      # DATABASE_URL comes from repo-root .env (local Docker Postgres or remote Neon).
       MIGRATIONS_PATH: /app/migrations
       CONFIG_DIR: /app/configs
-    depends_on:
-      postgres:
-        condition: service_healthy
+    # No depends_on postgres — API reads only DATABASE_URL from .env.
 
 volumes:
   donna_pg_data:
