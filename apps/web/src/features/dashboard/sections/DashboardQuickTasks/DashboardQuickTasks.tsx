@@ -12,6 +12,7 @@ import {
   updateTaskOccurrence,
 } from "@/features/tasks/Tasks.api";
 import { taskQueryKeys } from "@/features/tasks/Tasks.logic";
+import { TaskTagPill } from "@/features/tasks/sections/TaskTagPill";
 
 import { BentoBox, bentoBoxStyles } from "../BentoBox";
 import { quickTasksStyles as styles } from "./DashboardQuickTasks.styles";
@@ -127,16 +128,21 @@ export function DashboardQuickTasks() {
                   >
                     <Icon name="check" className="h-2.5 w-2.5" />
                   </span>
-                  <span
-                    className={cn(
-                      styles.labelText,
-                      task.completed && styles.labelDone,
-                    )}
-                  >
-                    {task.title}
+                  <span className={styles.labelRow}>
+                    <span
+                      className={cn(
+                        styles.labelText,
+                        task.completed && styles.labelDone,
+                      )}
+                    >
+                      {task.title}
+                    </span>
                     {task.carried_forward || task.source === "carry_forward" ? (
                       <span className={styles.carried}>Carried</span>
                     ) : null}
+                    {(task.tags ?? []).map((tag) => (
+                      <TaskTagPill key={tag.id} tag={tag} />
+                    ))}
                   </span>
                 </button>
               </li>

@@ -23,6 +23,7 @@ export const quickTasksStyles = {
     "border-donna-border bg-donna-surface-2 text-transparent",
   ].join(" "),
   checkDone: "border-donna-accent bg-donna-accent text-donna-on-accent",
+  labelRow: "flex min-w-0 flex-wrap items-center gap-1.5",
   labelText: "text-sm text-donna-text",
   labelDone: "text-donna-faint line-through",
   carried: [
