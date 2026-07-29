@@ -83,11 +83,9 @@ export function DayView({
 
   return (
     <div className={styles.root}>
-      <div className={styles.allDay}>
-        <p className={styles.allDayLabel}>All day</p>
-        {allDay.length === 0 ? (
-          <p className="text-xs text-donna-faint">Nothing all-day</p>
-        ) : (
+      {allDay.length > 0 ? (
+        <div className={styles.allDay}>
+          <p className={styles.allDayLabel}>All day</p>
           <div className={styles.allDayList}>
             {allDay.map((event) => (
               <EventCard
@@ -100,8 +98,8 @@ export function DayView({
               />
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
       <div ref={scrollRef} className={styles.scroll}>
         <div className={styles.grid} style={{ height }}>
           {!hasEvents ? (

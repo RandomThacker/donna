@@ -110,6 +110,37 @@ export function titleForView(view: CalendarView, cursor: Date): string {
   }
 }
 
+/** Compact date header for mobile (Google Calendar–style). */
+export function mobileTitleParts(
+  view: CalendarView,
+  cursor: Date,
+): { primary: string; secondary?: string } {
+  switch (view) {
+    case "day":
+      return {
+        primary: format(cursor, "d"),
+        secondary: format(cursor, "EEE · MMM"),
+      };
+    case "week": {
+      const start = startOfViewWeek(cursor);
+      const end = endOfViewWeek(cursor);
+      if (isSameMonth(start, end)) {
+        return {
+          primary: `${format(start, "MMM d")}–${format(end, "d")}`,
+          secondary: format(start, "yyyy"),
+        };
+      }
+      return {
+        primary: `${format(start, "MMM d")}–${format(end, "MMM d")}`,
+        secondary: format(end, "yyyy"),
+      };
+    }
+    case "month":
+    case "agenda":
+      return { primary: format(cursor, "MMMM yyyy") };
+  }
+}
+
 export function formatEventTime(
   event: CalendarEvent,
   timeZone = resolveCalendarTimeZone(null),

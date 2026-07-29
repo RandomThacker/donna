@@ -97,6 +97,7 @@ export function Calendar() {
         <main className={styles.workspace}>
           <CalendarToolbar
             title={cal.title}
+            cursor={cal.cursor}
             view={cal.view}
             onViewChange={cal.setView}
             onPrev={cal.goPrev}
