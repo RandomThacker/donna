@@ -13,7 +13,7 @@ import {
 } from "@/features/tasks/Tasks.api";
 import { taskQueryKeys } from "@/features/tasks/Tasks.logic";
 
-import { BentoBox } from "../BentoBox";
+import { BentoBox, bentoBoxStyles } from "../BentoBox";
 import { quickTasksStyles as styles } from "./DashboardQuickTasks.styles";
 
 export function DashboardQuickTasks() {
@@ -60,7 +60,10 @@ export function DashboardQuickTasks() {
   };
 
   return (
-    <BentoBox className={styles.box} title="Quick tasks">
+    <BentoBox
+      className={cn(styles.box, bentoBoxStyles.fixedPanel)}
+      title="Quick tasks"
+    >
       <form
         className={styles.addRow}
         onSubmit={(event) => {
@@ -81,52 +84,54 @@ export function DashboardQuickTasks() {
         </button>
       </form>
 
-      {tasksQuery.isLoading ? (
-        <p className={styles.state}>Loading today&apos;s tasks…</p>
-      ) : null}
-      {tasksQuery.isError ? (
-        <p className={styles.state}>Couldn&apos;t load tasks.</p>
-      ) : null}
-      {!tasksQuery.isLoading && !tasksQuery.isError && tasks.length === 0 ? (
-        <p className={styles.empty}>Nothing on today&apos;s list yet.</p>
-      ) : null}
-      {!tasksQuery.isLoading && !tasksQuery.isError && tasks.length > 0 ? (
-        <ul className={styles.list}>
-          {tasks.map((task) => (
-            <li key={task.id}>
-              <button
-                type="button"
-                className={styles.item}
-                aria-pressed={task.completed}
-                disabled={toggleMutation.isPending}
-                onClick={() =>
-                  toggleMutation.mutate({
-                    id: task.id,
-                    completed: !task.completed,
-                  })
-                }
-              >
-                <span
-                  className={cn(styles.check, task.completed && styles.checkDone)}
+      <div className={bentoBoxStyles.scrollBody}>
+        {tasksQuery.isLoading ? (
+          <p className={styles.state}>Loading today&apos;s tasks…</p>
+        ) : null}
+        {tasksQuery.isError ? (
+          <p className={styles.state}>Couldn&apos;t load tasks.</p>
+        ) : null}
+        {!tasksQuery.isLoading && !tasksQuery.isError && tasks.length === 0 ? (
+          <p className={styles.empty}>Nothing on today&apos;s list yet.</p>
+        ) : null}
+        {!tasksQuery.isLoading && !tasksQuery.isError && tasks.length > 0 ? (
+          <ul className={styles.list}>
+            {tasks.map((task) => (
+              <li key={task.id}>
+                <button
+                  type="button"
+                  className={styles.item}
+                  aria-pressed={task.completed}
+                  disabled={toggleMutation.isPending}
+                  onClick={() =>
+                    toggleMutation.mutate({
+                      id: task.id,
+                      completed: !task.completed,
+                    })
+                  }
                 >
-                  <Icon name="check" className="h-2.5 w-2.5" />
-                </span>
-                <span
-                  className={cn(
-                    styles.labelText,
-                    task.completed && styles.labelDone,
-                  )}
-                >
-                  {task.title}
-                  {task.carried_forward || task.source === "carry_forward" ? (
-                    <span className={styles.carried}>Carried</span>
-                  ) : null}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
+                  <span
+                    className={cn(styles.check, task.completed && styles.checkDone)}
+                  >
+                    <Icon name="check" className="h-2.5 w-2.5" />
+                  </span>
+                  <span
+                    className={cn(
+                      styles.labelText,
+                      task.completed && styles.labelDone,
+                    )}
+                  >
+                    {task.title}
+                    {task.carried_forward || task.source === "carry_forward" ? (
+                      <span className={styles.carried}>Carried</span>
+                    ) : null}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
     </BentoBox>
   );
 }

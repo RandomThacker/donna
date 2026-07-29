@@ -1,6 +1,6 @@
 export const quickTasksStyles = {
   box: "order-4 col-span-12 md:order-5 md:col-span-6",
-  addRow: "mb-3 flex gap-2",
+  addRow: "mb-3 flex shrink-0 gap-2",
   addInput: [
     "h-9 min-w-0 flex-1 rounded-lg border border-donna-border bg-transparent",
     "px-3 text-sm text-donna-text placeholder:text-donna-muted/70",
