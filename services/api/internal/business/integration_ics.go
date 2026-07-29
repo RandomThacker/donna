@@ -95,7 +95,23 @@ func (s *IntegrationService) ConnectICS(ctx context.Context, userID uuid.UUID, r
 
 	_ = s.applyICSSourceSyncEnabled(ctx, account.ID, syncEnabled, now)
 	s.notifyAccountReady(ctx, account.ID)
+	// Bootstrap only enqueues a scheduler job; run the pipeline now so sources
+	// and events appear without waiting for Sync now.
+	if syncEnabled {
+		if err := s.runInitialICSSync(ctx, account.ID); err != nil {
+			_ = s.Disconnect(ctx, userID, account.ID)
+			return ICSIntegrationView{}, err
+		}
+	}
 	return s.icsView(ctx, account)
+}
+
+func (s *IntegrationService) runInitialICSSync(ctx context.Context, accountID uuid.UUID) error {
+	if s.syncAccount == nil {
+		return fmt.Errorf("%w: calendar sync is not configured", apperr.ErrInvalid)
+	}
+	_, err := s.syncAccount(ctx, accountID)
+	return err
 }
 
 // ListICS returns ICS feed integrations for the user (URL never exposed).
@@ -197,10 +213,7 @@ func (s *IntegrationService) SyncICS(ctx context.Context, userID, accountID uuid
 	if account.Provider != constant.AuthProviderICS {
 		return ICSIntegrationView{}, fmt.Errorf("%w: not an ics integration", apperr.ErrInvalid)
 	}
-	if s.syncAccount == nil {
-		return ICSIntegrationView{}, fmt.Errorf("%w: calendar sync is not configured", apperr.ErrInvalid)
-	}
-	if _, err := s.syncAccount(ctx, accountID); err != nil {
+	if err := s.runInitialICSSync(ctx, account.ID); err != nil {
 		return ICSIntegrationView{}, err
 	}
 	fresh, err := s.accounts.GetByID(ctx, accountID)
