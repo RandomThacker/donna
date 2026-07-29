@@ -1,11 +1,13 @@
 export const phoneStyles = {
-  wrap: "flex h-full w-full items-center justify-center p-5",
+  wrap: "flex h-full w-full items-center justify-center px-0 py-4 xl:p-5",
   frame: [
-    "relative mx-auto h-[42rem] w-[20.25rem]",
+    "relative mx-auto w-full max-w-[26.5rem]",
+    "h-[min(52rem,78dvh)]",
     "rounded-[2.85rem] p-[0.58rem]",
     "bg-[var(--phone-frame)]",
     "shadow-[0_28px_70px_-24px_rgb(0_0_0_/_0.65),inset_0_1px_0_var(--phone-frame-shine)]",
     "ring-1 ring-[var(--phone-frame-edge)]",
+    "xl:h-[42rem] xl:w-[20.25rem] xl:max-w-none",
   ].join(" "),
   sideBtnLeft: [
     "pointer-events-none absolute -left-[0.15rem] top-[7.2rem] h-7 w-[0.15rem]",
@@ -36,6 +38,38 @@ export const phoneStyles = {
     "rounded-full bg-[var(--phone-home)]",
   ].join(" "),
   content: "relative z-10 flex min-h-0 flex-1 flex-col pt-12",
+} as const;
+
+export const phoneFullscreenStyles = {
+  root: [
+    "fixed inset-0 z-[60] flex flex-col overflow-hidden md:hidden",
+    "origin-bottom-right bg-[var(--im-bg)]",
+    "pt-[env(safe-area-inset-top)]",
+  ].join(" "),
+  rootEnter: "animate-donna-phone-in",
+  rootExit: "animate-donna-phone-out",
+  body: "flex min-h-0 flex-1 flex-col",
+} as const;
+
+export const phoneFabStyles = {
+  button: [
+    "fixed z-[55] grid h-12 w-12 touch-none place-items-center rounded-full md:hidden",
+    "bg-transparent animate-donna-fab-glow",
+    "cursor-grab active:cursor-grabbing",
+    "select-none",
+  ].join(" "),
+  buttonDragging: "scale-105",
+  mark: [
+    "h-full w-full rounded-full",
+    "bg-gradient-to-br from-donna-accent-bright to-donna-accent-deep",
+    "[mask-image:radial-gradient(farthest-side,transparent_34%,#000_35%)]",
+    "[-webkit-mask-image:radial-gradient(farthest-side,transparent_34%,#000_35%)]",
+  ].join(" "),
+  badge: [
+    "pointer-events-none absolute right-0.5 top-0.5 z-10",
+    "h-2.5 w-2.5 rounded-full bg-[#ff3b30]",
+    "ring-2 ring-donna-bg",
+  ].join(" "),
 } as const;
 
 export const iMessageStyles = {
@@ -126,7 +160,8 @@ export const iMessageStyles = {
   composer: [
     "relative z-20 flex shrink-0 items-end gap-2",
     "border-t border-[var(--im-separator)]/40 bg-[var(--im-nav)]",
-    "px-2.5 pb-6 pt-2.5 backdrop-blur-xl",
+    "px-2.5 pt-2.5 backdrop-blur-xl",
+    "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
   ].join(" "),
   plus: [
     "mb-0.5 grid h-[28px] w-[28px] shrink-0 place-items-center rounded-full",

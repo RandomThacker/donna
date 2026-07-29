@@ -1,5 +1,5 @@
 export const quickTasksStyles = {
-  box: "col-span-12 md:col-span-6",
+  box: "order-4 col-span-12 md:order-5 md:col-span-6",
   addRow: "mb-3 flex gap-2",
   addInput: [
     "h-9 min-w-0 flex-1 rounded-lg border border-donna-border bg-transparent",
@@ -19,10 +19,10 @@ export const quickTasksStyles = {
     "disabled:opacity-60",
   ].join(" "),
   check: [
-    "grid h-5 w-5 shrink-0 place-items-center rounded-full border",
-    "border-donna-accent/40 text-transparent",
+    "grid h-5 w-5 shrink-0 place-items-center rounded border",
+    "border-donna-border bg-donna-surface-2 text-transparent",
   ].join(" "),
-  checkDone: "border-donna-accent bg-donna-accent-soft text-donna-accent",
+  checkDone: "border-donna-accent bg-donna-accent text-donna-on-accent",
   labelText: "text-sm text-donna-text",
   labelDone: "text-donna-faint line-through",
   carried: [

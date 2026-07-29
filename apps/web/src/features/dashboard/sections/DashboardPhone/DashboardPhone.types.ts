@@ -7,9 +7,18 @@ export type DashboardPhoneProps = {
 export type IMessageListProps = {
   conversations: IMessageConversation[];
   onOpen: (id: string) => void;
+  onClose?: () => void;
 };
 
 export type IMessageChatProps = {
   conversation: IMessageConversation;
   onBack: () => void;
+  onClose?: () => void;
+};
+
+export type DashboardPhoneFullscreenProps = {
+  phone: DashboardPhone;
+  onClose: () => void;
+  exiting?: boolean;
+  onCloseComplete?: () => void;
 };

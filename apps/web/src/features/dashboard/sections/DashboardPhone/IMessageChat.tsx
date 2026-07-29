@@ -20,7 +20,7 @@ function isFirstInGroup(messages: IMessageBubble[], index: number) {
   return !prev || prev.role !== current.role;
 }
 
-export function IMessageChat({ conversation, onBack }: IMessageChatProps) {
+export function IMessageChat({ conversation, onBack, onClose }: IMessageChatProps) {
   return (
     <div className={styles.chatRoot}>
       <header className={styles.chatNav}>
@@ -32,9 +32,20 @@ export function IMessageChat({ conversation, onBack }: IMessageChatProps) {
           <span className={styles.chatAvatar}>{conversation.name.slice(0, 1)}</span>
           <span className={styles.chatName}>{conversation.name}</span>
         </div>
-        <button type="button" className={styles.chatInfo} aria-label="Info">
-          <Icon name="info" className="h-4 w-4" />
-        </button>
+        {onClose ? (
+          <button
+            type="button"
+            className={styles.chatInfo}
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <Icon name="close" className="h-4 w-4" />
+          </button>
+        ) : (
+          <button type="button" className={styles.chatInfo} aria-label="Info">
+            <Icon name="info" className="h-4 w-4" />
+          </button>
+        )}
       </header>
 
       <div className={styles.chatBody}>

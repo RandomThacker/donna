@@ -58,9 +58,6 @@ export function Dashboard() {
               <DashboardTimeline />
               <DashboardQuickTasks />
             </div>
-            <div className={styles.phoneMobile}>
-              <DashboardPhone phone={data.phone} />
-            </div>
           </div>
         </main>
         <aside className={styles.phoneColumn} aria-label="Donna phone">

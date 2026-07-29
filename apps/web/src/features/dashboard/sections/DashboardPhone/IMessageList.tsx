@@ -3,7 +3,7 @@ import { Icon } from "@/components/common";
 import { iMessageStyles as styles } from "./DashboardPhone.styles";
 import type { IMessageListProps } from "./DashboardPhone.types";
 
-export function IMessageList({ conversations, onOpen }: IMessageListProps) {
+export function IMessageList({ conversations, onOpen, onClose }: IMessageListProps) {
   return (
     <div className={styles.listRoot}>
       <div className={styles.listHeader}>
@@ -11,9 +11,20 @@ export function IMessageList({ conversations, onOpen }: IMessageListProps) {
           <button type="button" className={styles.edit}>
             Edit
           </button>
-          <button type="button" className={styles.compose} aria-label="Compose">
-            <Icon name="compose" className="h-5 w-5" />
-          </button>
+          {onClose ? (
+            <button
+              type="button"
+              className={styles.compose}
+              aria-label="Close"
+              onClick={onClose}
+            >
+              <Icon name="close" className="h-5 w-5" />
+            </button>
+          ) : (
+            <button type="button" className={styles.compose} aria-label="Compose">
+              <Icon name="compose" className="h-5 w-5" />
+            </button>
+          )}
         </div>
         <h2 className={styles.listTitle}>Messages</h2>
         <div className={styles.search}>

@@ -1,5 +1,5 @@
 export const timelineStyles = {
-  box: "col-span-12 md:col-span-6",
+  box: "order-3 col-span-12 md:order-4 md:col-span-6",
   list: "space-y-0",
   item: [
     "grid w-full grid-cols-[3.5rem_1fr] gap-3 border-b border-donna-hairline py-2.5",

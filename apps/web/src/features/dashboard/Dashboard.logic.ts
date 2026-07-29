@@ -4,7 +4,7 @@ export const dashboardData: DashboardData = {
   nav: [
     { id: "home", label: "Home", icon: "home", href: "/dashboard", active: true },
     { id: "calendar", label: "Calendar", icon: "calendar", href: "/dashboard/calendar" },
-    { id: "tasks", label: "Tasks", icon: "tasks", href: "/dashboard/tasks" },
+    { id: "tasks", label: "Todo", icon: "tasks", href: "/dashboard/tasks" },
     { id: "notes", label: "Notes", icon: "notes", href: "/dashboard/notes" },
     { id: "memories", label: "Memories", icon: "memory", href: "/dashboard/memories" },
     {

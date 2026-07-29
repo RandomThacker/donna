@@ -164,6 +164,17 @@
   border-color: var(--donna-hairline);
 }
 
+@utility scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+}
+
 @keyframes donna-fade-up {
   from {
     opacity: 0;
@@ -271,6 +282,56 @@
 
 @utility animate-donna-typing {
   animation: donna-typing 1.2s ease-in-out infinite;
+}
+
+@keyframes donna-fab-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 10px rgb(201 168 124 / 0.28),
+      0 0 22px rgb(201 168 124 / 0.14);
+  }
+  50% {
+    box-shadow:
+      0 0 14px rgb(226 199 154 / 0.4),
+      0 0 28px rgb(201 168 124 / 0.22);
+  }
+}
+
+@keyframes donna-phone-in {
+  from {
+    opacity: 0.55;
+    transform: scale(0.06);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes donna-phone-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.06);
+  }
+}
+
+@utility animate-donna-fab-glow {
+  animation: donna-fab-glow 3.6s ease-in-out infinite;
+}
+
+@utility animate-donna-phone-in {
+  transform-origin: bottom right;
+  animation: donna-phone-in 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@utility animate-donna-phone-out {
+  transform-origin: bottom right;
+  animation: donna-phone-out 0.3s cubic-bezier(0.4, 0, 1, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

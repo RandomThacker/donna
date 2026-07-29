@@ -1,10 +1,9 @@
-import { BentoBox } from "../BentoBox";
 import { greetingStyles as styles } from "./DashboardGreeting.styles";
 import type { DashboardGreetingProps } from "./DashboardGreeting.types";
 
 export function DashboardGreeting({ greeting }: DashboardGreetingProps) {
   return (
-    <BentoBox className={styles.box}>
+    <section className={styles.box}>
       <h1 className={styles.title}>
         {greeting.salutation},{" "}
         <span className={styles.name}>{greeting.name}</span>
@@ -13,6 +12,6 @@ export function DashboardGreeting({ greeting }: DashboardGreetingProps) {
       <div className={styles.row}>
         <p className={styles.summary}>{greeting.summary}</p>
       </div>
-    </BentoBox>
+    </section>
   );
 }

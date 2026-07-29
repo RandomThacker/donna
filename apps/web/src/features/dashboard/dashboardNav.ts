@@ -15,7 +15,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
     icon: "calendar",
     href: "/dashboard/calendar",
   },
-  { id: "tasks", label: "Tasks", icon: "tasks", href: "/dashboard/tasks" },
+  { id: "tasks", label: "Todo", icon: "tasks", href: "/dashboard/tasks" },
   { id: "notes", label: "Notes", icon: "notes", href: "/dashboard/notes" },
   {
     id: "memories",
@@ -36,6 +36,15 @@ export const dashboardNavItems: DashboardNavItem[] = [
     href: "/dashboard/settings",
   },
 ];
+
+/** Mobile bottom bar — subset of primary nav. */
+export const dashboardBottomNavIds = [
+  "home",
+  "calendar",
+  "tasks",
+  "notes",
+  "settings",
+] as const;
 
 /** Active nav item for the current path — only one selection at a time. */
 export function navItemsForPath(
@@ -60,4 +69,11 @@ export function navItemsForPath(
     ...item,
     active: item.id === activeId,
   }));
+}
+
+export function bottomNavItemsForPath(
+  pathname: string,
+): Array<DashboardNavItem & { active: boolean }> {
+  const ids: ReadonlySet<string> = new Set(dashboardBottomNavIds);
+  return navItemsForPath(pathname).filter((item) => ids.has(item.id));
 }

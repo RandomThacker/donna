@@ -1,11 +1,17 @@
 export const calendarStyles = {
-  page: "relative flex h-dvh overflow-hidden bg-donna-bg text-donna-text",
+  page: [
+    "relative flex h-dvh overflow-x-hidden overflow-hidden bg-donna-bg text-donna-text",
+    "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+  ].join(" "),
   shell: [
-    "relative z-10 grid h-full w-full",
+    "relative z-10 grid h-full w-full min-w-0",
     "grid-cols-1",
     "md:grid-cols-[15rem_minmax(0,1fr)]",
   ].join(" "),
-  workspace: "flex min-h-0 min-w-0 flex-col overflow-hidden bg-donna-bg",
+  workspace: [
+    "flex min-h-0 min-w-0 flex-col overflow-x-hidden overflow-hidden",
+    "bg-donna-bg",
+  ].join(" "),
   body: "relative flex min-h-0 flex-1 overflow-hidden",
   main: "flex min-h-0 min-w-0 flex-1 flex-col",
   calSidebar: [
@@ -19,7 +25,9 @@ export const calendarStyles = {
     "animate-donna-fade-up lg:hidden",
   ].join(" "),
   mobileBackdrop: "absolute inset-0 z-20 bg-black/40 lg:hidden",
-  viewPane: "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto",
+  viewPane: [
+    "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scrollbar-hidden",
+  ].join(" "),
   syncBar: "h-0.5 w-full overflow-hidden bg-donna-hairline",
   syncBarFill: "h-full w-1/3 animate-pulse bg-donna-accent",
 } as const;

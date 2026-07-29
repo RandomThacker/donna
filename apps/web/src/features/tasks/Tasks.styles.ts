@@ -1,13 +1,19 @@
 export const journalStyles = {
-  page: "relative flex h-dvh overflow-hidden bg-donna-bg text-donna-text",
+  page: [
+    "relative flex h-dvh overflow-x-hidden overflow-hidden bg-donna-bg text-donna-text",
+    "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+  ].join(" "),
   shell: [
-    "relative z-10 grid h-full w-full",
+    "relative z-10 grid h-full w-full min-w-0",
     "grid-cols-1",
     "md:grid-cols-[15rem_minmax(0,1fr)]",
   ].join(" "),
-  workspace: "min-h-0 overflow-y-auto bg-donna-bg",
+  workspace: [
+    "min-h-0 min-w-0 overflow-x-hidden overflow-y-auto scrollbar-hidden",
+    "bg-donna-bg",
+  ].join(" "),
   workspaceInner: [
-    "mx-auto grid w-full max-w-6xl gap-6 p-5 sm:p-6 lg:p-8",
+    "mx-auto grid w-full max-w-6xl gap-6 overflow-x-hidden p-5 sm:p-6 lg:p-8",
     "lg:grid-cols-[minmax(0,1fr)_16rem]",
   ].join(" "),
   main: "flex min-w-0 flex-col gap-6",

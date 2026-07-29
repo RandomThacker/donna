@@ -3,7 +3,9 @@ export const timelineStyles = {
   allDay: "border-b border-donna-hairline bg-donna-surface/60 px-3 py-2",
   allDayLabel: "mb-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-donna-faint",
   allDayList: "flex flex-wrap gap-1.5",
-  scroll: "relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto",
+  scroll: [
+    "relative min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scrollbar-hidden",
+  ].join(" "),
   grid: "relative min-w-0",
   hourRow: "relative flex border-b border-donna-hairline/70",
   gutter: [
