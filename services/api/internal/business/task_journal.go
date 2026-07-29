@@ -17,10 +17,11 @@ import (
 
 // TaskJournalService orchestrates the daily task notebook.
 type TaskJournalService struct {
-	tasks        repository.TaskRepository
-	occurrences  repository.TaskOccurrenceRepository
-	notes        repository.DailyNoteRepository
-	now          func() time.Time
+	tasks       repository.TaskRepository
+	occurrences repository.TaskOccurrenceRepository
+	notes       repository.DailyNoteRepository
+	tags        repository.TaskTagRepository
+	now         func() time.Time
 }
 
 // NewTaskJournalService constructs a TaskJournalService.
@@ -28,11 +29,13 @@ func NewTaskJournalService(
 	tasks repository.TaskRepository,
 	occurrences repository.TaskOccurrenceRepository,
 	notes repository.DailyNoteRepository,
+	tags repository.TaskTagRepository,
 ) *TaskJournalService {
 	return &TaskJournalService{
 		tasks:       tasks,
 		occurrences: occurrences,
 		notes:       notes,
+		tags:        tags,
 		now:         time.Now,
 	}
 }
@@ -50,6 +53,7 @@ type CreateTaskInput struct {
 	Priority       *string
 	Project        *string
 	Labels         []string
+	TagIDs         []uuid.UUID
 	RecurrenceRule *string
 	Date           time.Time
 	Source         string
@@ -62,6 +66,7 @@ type UpdateTaskInput struct {
 	Priority       *string
 	Project        *string
 	Labels         []string
+	TagIDs         *[]uuid.UUID
 	RecurrenceRule *string
 }
 
@@ -84,6 +89,10 @@ func (s *TaskJournalService) GetDay(ctx context.Context, userID uuid.UUID, date 
 		return DayView{}, err
 	}
 	occurrences, err := s.occurrences.ListByUserDate(ctx, userID, date)
+	if err != nil {
+		return DayView{}, err
+	}
+	occurrences, err = s.attachTagsToOccurrences(ctx, userID, occurrences)
 	if err != nil {
 		return DayView{}, err
 	}
@@ -241,7 +250,16 @@ func (s *TaskJournalService) CreateTask(ctx context.Context, userID uuid.UUID, i
 	if err != nil {
 		return entity.TaskOccurrenceWithTask{}, err
 	}
-	return s.occurrences.GetByID(ctx, occID)
+	if len(in.TagIDs) > 0 {
+		if err := s.validateAndAssignTags(ctx, userID, task.ID, in.TagIDs); err != nil {
+			return entity.TaskOccurrenceWithTask{}, err
+		}
+	}
+	occ, err := s.occurrences.GetByID(ctx, occID)
+	if err != nil {
+		return entity.TaskOccurrenceWithTask{}, err
+	}
+	return s.occurrenceWithTags(ctx, userID, occ)
 }
 
 // UpdateTask patches the permanent task (does not rewrite history).
@@ -256,7 +274,7 @@ func (s *TaskJournalService) UpdateTask(ctx context.Context, userID, taskID uuid
 	if task.UserID != userID {
 		return entity.Task{}, apperr.ErrForbidden
 	}
-	return s.tasks.Update(ctx, taskID, userID, repository.TaskUpdateFields{
+	task, err = s.tasks.Update(ctx, taskID, userID, repository.TaskUpdateFields{
 		Title:          in.Title,
 		Description:    in.Description,
 		Priority:       in.Priority,
@@ -264,6 +282,15 @@ func (s *TaskJournalService) UpdateTask(ctx context.Context, userID, taskID uuid
 		Labels:         in.Labels,
 		RecurrenceRule: in.RecurrenceRule,
 	}, s.now().UTC())
+	if err != nil {
+		return entity.Task{}, err
+	}
+	if in.TagIDs != nil {
+		if err := s.validateAndAssignTags(ctx, userID, taskID, *in.TagIDs); err != nil {
+			return entity.Task{}, err
+		}
+	}
+	return task, nil
 }
 
 // UpdateOccurrence toggles completion for a journal row.
@@ -288,7 +315,11 @@ func (s *TaskJournalService) UpdateOccurrence(ctx context.Context, userID, occur
 	if err != nil {
 		return entity.TaskOccurrenceWithTask{}, err
 	}
-	return s.occurrences.GetByID(ctx, occurrenceID)
+	occ, err := s.occurrences.GetByID(ctx, occurrenceID)
+	if err != nil {
+		return entity.TaskOccurrenceWithTask{}, err
+	}
+	return s.occurrenceWithTags(ctx, userID, occ)
 }
 
 // DeleteTask soft-deletes the permanent task and removes all journal rows.

@@ -54,6 +54,7 @@ type TaskOccurrenceWithTask struct {
 	Project        *string
 	Labels         []string
 	RecurrenceRule *string
+	Tags           []TaskTag
 }
 
 // DailyNote is markdown content for one journal day.

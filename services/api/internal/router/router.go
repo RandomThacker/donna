@@ -105,6 +105,10 @@ func New(opts Options) *gin.Engine {
 			v1.GET(constant.PathTasksHistory, auth, opts.TaskHandler.GetHistory)
 			v1.POST(constant.PathTasksCarryForward, auth, opts.TaskHandler.CarryForward)
 			v1.PUT(constant.PathDailyNotesDay, auth, opts.TaskHandler.UpsertDailyNote)
+			v1.GET(constant.PathTaskTags, auth, opts.TaskHandler.ListTaskTags)
+			v1.POST(constant.PathTaskTags, auth, opts.TaskHandler.CreateTaskTag)
+			v1.PATCH(constant.PathTaskTagByID, auth, opts.TaskHandler.UpdateTaskTag)
+			v1.DELETE(constant.PathTaskTagByID, auth, opts.TaskHandler.DeleteTaskTag)
 		}
 
 		if opts.NoteHandler != nil && opts.TokenIssuer != nil {

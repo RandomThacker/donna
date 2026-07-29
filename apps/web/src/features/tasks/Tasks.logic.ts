@@ -1,20 +1,36 @@
-import { addDays, format, isToday } from "date-fns";
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  format,
+  isToday,
+  startOfMonth,
+  subMonths,
+} from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   createTask,
   deleteTask,
   fetchTaskDay,
+  fetchTaskHistory,
   reorderTaskOccurrences,
   updateTaskOccurrence,
 } from "./Tasks.api";
+import {
+  createTaskTag,
+  deleteTaskTag,
+  fetchTaskTags,
+  updateTaskTagAssignments,
+} from "./Tasks.tags.api";
 import type { TaskDayResponse, TaskOccurrence } from "./Tasks.types";
 
 export const taskQueryKeys = {
   all: ["tasks"] as const,
   day: (date: string) => ["tasks", "day", date] as const,
   history: (from: string, to: string) => ["tasks", "history", from, to] as const,
+  tags: ["tasks", "tags"] as const,
 };
 
 export function formatJournalDate(date: Date): string {
@@ -24,7 +40,9 @@ export function formatJournalDate(date: Date): string {
 export function useTaskJournal() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [miniMonth, setMiniMonth] = useState(() => startOfMonth(new Date()));
   const [draftTitle, setDraftTitle] = useState("");
+  const [filterTagIds, setFilterTagIds] = useState<string[]>([]);
 
   const dateKey = formatJournalDate(selectedDate);
 
@@ -33,18 +51,64 @@ export function useTaskJournal() {
     queryFn: ({ signal }) => fetchTaskDay(dateKey, signal),
   });
 
+  const tagsQuery = useQuery({
+    queryKey: taskQueryKeys.tags,
+    queryFn: ({ signal }) => fetchTaskTags(signal),
+  });
+
+  const historyFrom = formatJournalDate(startOfMonth(miniMonth));
+  const historyTo = formatJournalDate(endOfMonth(miniMonth));
+
+  const historyQuery = useQuery({
+    queryKey: taskQueryKeys.history(historyFrom, historyTo),
+    queryFn: ({ signal }) => fetchTaskHistory(historyFrom, historyTo, signal),
+  });
+
+  useEffect(() => {
+    setMiniMonth(startOfMonth(selectedDate));
+  }, [selectedDate]);
+
+  const historyByDate = useMemo(() => {
+    const map = new Map<
+      string,
+      { total: number; completed: number; pending: number; carried: number }
+    >();
+    for (const day of historyQuery.data?.days ?? []) {
+      map.set(day.date, day);
+    }
+    return map;
+  }, [historyQuery.data?.days]);
+
   const occurrences = dayQuery.data?.occurrences ?? [];
   const statistics = dayQuery.data?.statistics;
+  const tags = tagsQuery.data ?? [];
+
+  const filteredOccurrences = useMemo(() => {
+    if (filterTagIds.length === 0) {
+      return occurrences;
+    }
+    return occurrences.filter((occurrence) => {
+      const taskTagIds = (occurrence.tags ?? []).map((tag) => tag.id);
+      return filterTagIds.some((id) => taskTagIds.includes(id));
+    });
+  }, [filterTagIds, occurrences]);
 
   const invalidateDay = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: taskQueryKeys.day(dateKey) });
   }, [queryClient, dateKey]);
+
+  const invalidateTags = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: taskQueryKeys.tags });
+  }, [queryClient]);
 
   const createMutation = useMutation({
     mutationFn: (title: string) => createTask({ title, date: dateKey }),
     onSuccess: async () => {
       setDraftTitle("");
       await invalidateDay();
+      await queryClient.invalidateQueries({
+        queryKey: taskQueryKeys.history(historyFrom, historyTo),
+      });
     },
   });
 
@@ -53,6 +117,9 @@ export function useTaskJournal() {
       updateTaskOccurrence(id, completed),
     onSuccess: async () => {
       await invalidateDay();
+      await queryClient.invalidateQueries({
+        queryKey: taskQueryKeys.history(historyFrom, historyTo),
+      });
     },
   });
 
@@ -93,6 +160,38 @@ export function useTaskJournal() {
     mutationFn: (taskId: string) => deleteTask(taskId),
     onSuccess: async () => {
       await invalidateDay();
+      await queryClient.invalidateQueries({
+        queryKey: taskQueryKeys.history(historyFrom, historyTo),
+      });
+    },
+  });
+
+  const createTagMutation = useMutation({
+    mutationFn: createTaskTag,
+    onSuccess: async () => {
+      await invalidateTags();
+    },
+  });
+
+  const deleteTagMutation = useMutation({
+    mutationFn: deleteTaskTag,
+    onSuccess: async (_data, tagId) => {
+      await invalidateTags();
+      await invalidateDay();
+      setFilterTagIds((current) => current.filter((id) => id !== tagId));
+    },
+  });
+
+  const assignTagsMutation = useMutation({
+    mutationFn: ({
+      taskId,
+      tagIds,
+    }: {
+      taskId: string;
+      tagIds: string[];
+    }) => updateTaskTagAssignments(taskId, tagIds),
+    onSuccess: async () => {
+      await invalidateDay();
     },
   });
 
@@ -110,6 +209,12 @@ export function useTaskJournal() {
 
   const selectDay = useCallback((day: Date) => {
     setSelectedDate(day);
+  }, []);
+
+  const shiftMiniMonth = useCallback((direction: -1 | 1) => {
+    setMiniMonth((month) =>
+      direction === 1 ? addMonths(month, 1) : subMonths(month, 1),
+    );
   }, []);
 
   const addTask = useCallback(
@@ -159,6 +264,39 @@ export function useTaskJournal() {
     [deleteMutation],
   );
 
+  const toggleFilterTag = useCallback((tagId: string) => {
+    setFilterTagIds((current) =>
+      current.includes(tagId)
+        ? current.filter((id) => id !== tagId)
+        : [...current, tagId],
+    );
+  }, []);
+
+  const clearFilterTags = useCallback(() => {
+    setFilterTagIds([]);
+  }, []);
+
+  const createTag = useCallback(
+    (input: { name: string; color: string }) => {
+      createTagMutation.mutate(input);
+    },
+    [createTagMutation],
+  );
+
+  const removeTag = useCallback(
+    (tagId: string) => {
+      deleteTagMutation.mutate(tagId);
+    },
+    [deleteTagMutation],
+  );
+
+  const setTaskTags = useCallback(
+    (taskId: string, tagIds: string[]) => {
+      assignTagsMutation.mutate({ taskId, tagIds });
+    },
+    [assignTagsMutation],
+  );
+
   const titleLabel = isToday(selectedDate)
     ? `Today · ${format(selectedDate, "MMMM d, yyyy")}`
     : format(selectedDate, "EEEE, MMMM d, yyyy");
@@ -167,8 +305,13 @@ export function useTaskJournal() {
     selectedDate,
     dateKey,
     titleLabel,
-    occurrences,
+    miniMonth,
+    historyByDate,
+    occurrences: filteredOccurrences,
+    allOccurrences: occurrences,
     statistics,
+    tags,
+    filterTagIds,
     draftTitle,
     setDraftTitle,
     isLoading: dayQuery.isLoading,
@@ -177,15 +320,24 @@ export function useTaskJournal() {
       createMutation.isPending ||
       completeMutation.isPending ||
       reorderMutation.isPending ||
-      deleteMutation.isPending,
+      deleteMutation.isPending ||
+      createTagMutation.isPending ||
+      deleteTagMutation.isPending ||
+      assignTagsMutation.isPending,
     goToday,
     goPrevDay,
     goNextDay,
     selectDay,
+    shiftMiniMonth,
     addTask,
     toggleComplete,
     reorder,
     removeTask,
+    toggleFilterTag,
+    clearFilterTags,
+    createTag,
+    removeTag,
+    setTaskTags,
   };
 }
 

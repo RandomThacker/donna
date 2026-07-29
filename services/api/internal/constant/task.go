@@ -5,6 +5,7 @@ const (
 	PublicIDPrefixTask           = "tsk_"
 	PublicIDPrefixTaskOccurrence = "toc_"
 	PublicIDPrefixDailyNote      = "dnt_"
+	PublicIDPrefixTaskTag        = "tag_"
 )
 
 // Task occurrence sources.

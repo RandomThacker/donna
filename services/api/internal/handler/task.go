@@ -69,6 +69,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		Priority:       req.Priority,
 		Project:        req.Project,
 		Labels:         req.Labels,
+		TagIDs:         parseUUIDList(req.TagIDs),
 		RecurrenceRule: req.RecurrenceRule,
 		Date:           date,
 		Source:         req.Source,
@@ -97,19 +98,29 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "invalid request body", constant.ErrorCodeInvalidRequest, err.Error())
 		return
 	}
-	task, err := h.svc.UpdateTask(c.Request.Context(), userID, taskID, business.UpdateTaskInput{
+	update := business.UpdateTaskInput{
 		Title:          req.Title,
 		Description:    req.Description,
 		Priority:       req.Priority,
 		Project:        req.Project,
 		Labels:         req.Labels,
 		RecurrenceRule: req.RecurrenceRule,
-	})
+	}
+	if req.TagIDs != nil {
+		ids := parseUUIDList(*req.TagIDs)
+		update.TagIDs = &ids
+	}
+	task, err := h.svc.UpdateTask(c.Request.Context(), userID, taskID, update)
 	if err != nil {
 		h.writeTaskError(c, err)
 		return
 	}
-	response.OK(c, constant.MessageOK, model.TaskFromEntity(task))
+	tags, err := h.svc.ListTaskTagsForTask(c.Request.Context(), userID, taskID)
+	if err != nil {
+		h.writeTaskError(c, err)
+		return
+	}
+	response.OK(c, constant.MessageOK, model.TaskFromEntityWithTags(task, tags))
 }
 
 // DeleteTask handles DELETE /tasks/:id.
@@ -273,6 +284,106 @@ func (h *TaskHandler) UpsertDailyNote(c *gin.Context) {
 		return
 	}
 	response.OK(c, constant.MessageOK, model.DailyNoteFromEntity(note))
+}
+
+// ListTaskTags handles GET /task-tags.
+func (h *TaskHandler) ListTaskTags(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "authentication required", constant.ErrorCodeUnauthorized, "missing user")
+		return
+	}
+	tags, err := h.svc.ListTaskTags(c.Request.Context(), userID)
+	if err != nil {
+		h.writeTaskError(c, err)
+		return
+	}
+	response.OK(c, constant.MessageOK, gin.H{"tags": model.TaskTagsFromEntities(tags)})
+}
+
+// CreateTaskTag handles POST /task-tags.
+func (h *TaskHandler) CreateTaskTag(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "authentication required", constant.ErrorCodeUnauthorized, "missing user")
+		return
+	}
+	var req model.CreateTaskTagRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid request body", constant.ErrorCodeInvalidRequest, err.Error())
+		return
+	}
+	tag, err := h.svc.CreateTaskTag(c.Request.Context(), userID, business.CreateTaskTagInput{
+		Name:  req.Name,
+		Color: req.Color,
+	})
+	if err != nil {
+		h.writeTaskError(c, err)
+		return
+	}
+	response.JSON(c, http.StatusCreated, constant.MessageOK, model.TaskTagFromEntity(tag))
+}
+
+// UpdateTaskTag handles PATCH /task-tags/:id.
+func (h *TaskHandler) UpdateTaskTag(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "authentication required", constant.ErrorCodeUnauthorized, "missing user")
+		return
+	}
+	tagID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid tag id", constant.ErrorCodeInvalidRequest, err.Error())
+		return
+	}
+	var req model.UpdateTaskTagRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid request body", constant.ErrorCodeInvalidRequest, err.Error())
+		return
+	}
+	tag, err := h.svc.UpdateTaskTag(c.Request.Context(), userID, tagID, business.UpdateTaskTagInput{
+		Name:  req.Name,
+		Color: req.Color,
+	})
+	if err != nil {
+		h.writeTaskError(c, err)
+		return
+	}
+	response.OK(c, constant.MessageOK, model.TaskTagFromEntity(tag))
+}
+
+// DeleteTaskTag handles DELETE /task-tags/:id.
+func (h *TaskHandler) DeleteTaskTag(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "authentication required", constant.ErrorCodeUnauthorized, "missing user")
+		return
+	}
+	tagID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid tag id", constant.ErrorCodeInvalidRequest, err.Error())
+		return
+	}
+	if err := h.svc.DeleteTaskTag(c.Request.Context(), userID, tagID); err != nil {
+		h.writeTaskError(c, err)
+		return
+	}
+	response.OK(c, constant.MessageOK, gin.H{"deleted": true})
+}
+
+func parseUUIDList(raw []string) []uuid.UUID {
+	if len(raw) == 0 {
+		return nil
+	}
+	out := make([]uuid.UUID, 0, len(raw))
+	for _, s := range raw {
+		id, err := uuid.Parse(s)
+		if err != nil {
+			continue
+		}
+		out = append(out, id)
+	}
+	return out
 }
 
 func (h *TaskHandler) writeTaskError(c *gin.Context, err error) {

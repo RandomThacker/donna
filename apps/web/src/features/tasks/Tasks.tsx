@@ -1,5 +1,6 @@
 "use client";
 
+import { format } from "date-fns";
 import { useMemo, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
 import { usePathname } from "next/navigation";
 
@@ -7,6 +8,7 @@ import { Icon } from "@/components/common";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/features/auth";
 import { DateMark } from "@/features/calendar/sections/DateMark";
+import { MiniCalendar } from "@/features/calendar/sections/MiniCalendar";
 import { navItemsForPath } from "@/features/dashboard/dashboardNav";
 import { DashboardSidebar } from "@/features/dashboard/sections/DashboardSidebar";
 
@@ -14,6 +16,9 @@ import { useFlipList } from "./Tasks.flip";
 import { useTaskJournal } from "./Tasks.logic";
 import { journalStyles as styles } from "./Tasks.styles";
 import type { TaskOccurrence } from "./Tasks.types";
+import { TaskTagPicker } from "./sections/TaskTagPicker";
+import { TaskTagPill } from "./sections/TaskTagPill";
+import { TaskTagsPanel } from "./sections/TaskTagsPanel";
 
 const DRAG_TYPE = "text/task-occurrence-id";
 
@@ -30,8 +35,10 @@ function initialsFrom(name: string): string {
 
 function JournalTaskRow({
   occurrence,
+  tags,
   onToggle,
   onDelete,
+  onTagsChange,
   deleting,
   draggingId,
   overId,
@@ -42,8 +49,10 @@ function JournalTaskRow({
   setNodeRef,
 }: {
   occurrence: TaskOccurrence;
+  tags: TaskOccurrence["tags"];
   onToggle: (occurrence: TaskOccurrence) => void;
   onDelete: (occurrence: TaskOccurrence) => void;
+  onTagsChange: (taskId: string, tagIds: string[]) => void;
   deleting: boolean;
   draggingId: string | null;
   overId: string | null;
@@ -55,6 +64,7 @@ function JournalTaskRow({
 }) {
   const isDragging = draggingId === occurrence.id;
   const isOver = overId === occurrence.id && draggingId !== occurrence.id;
+  const selectedTagIds = (occurrence.tags ?? []).map((tag) => tag.id);
 
   return (
     <li
@@ -94,12 +104,19 @@ function JournalTaskRow({
             </span>
           ) : null}
         </p>
-        {occurrence.project ? (
-          <div className={styles.itemMeta}>
-            <span>{occurrence.project}</span>
-          </div>
-        ) : null}
+        <div className={styles.itemMeta}>
+          {(occurrence.tags ?? []).map((tag) => (
+            <TaskTagPill key={tag.id} tag={tag} />
+          ))}
+          {occurrence.project ? <span>{occurrence.project}</span> : null}
+        </div>
       </div>
+      <TaskTagPicker
+        tags={tags ?? []}
+        selectedIds={selectedTagIds}
+        disabled={deleting}
+        onChange={(tagIds) => onTagsChange(occurrence.task_id, tagIds)}
+      />
       <button
         type="button"
         className={styles.deleteBtn}
@@ -146,6 +163,12 @@ export function Tasks() {
   const profileInitials = initialsFrom(profileName);
 
   const stats = journal.statistics;
+  const isFiltered = journal.filterTagIds.length > 0;
+  const showEmptyFiltered =
+    !journal.isLoading &&
+    !journal.isError &&
+    journal.allOccurrences.length > 0 &&
+    journal.occurrences.length === 0;
 
   const onDragStartRow = (id: string, event: DragEvent) => {
     event.dataTransfer.setData(DRAG_TYPE, id);
@@ -198,6 +221,18 @@ export function Tasks() {
     submitNewTask(event.currentTarget.value);
   };
 
+  const tagsPanel = (
+    <TaskTagsPanel
+      tags={journal.tags}
+      filterTagIds={journal.filterTagIds}
+      isSaving={journal.isSaving}
+      onToggleFilter={journal.toggleFilterTag}
+      onClearFilters={journal.clearFilterTags}
+      onCreateTag={journal.createTag}
+      onDeleteTag={journal.removeTag}
+    />
+  );
+
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
@@ -210,13 +245,15 @@ export function Tasks() {
         />
         <main className={styles.workspace}>
           <div className={styles.workspaceInner}>
-            <div className={styles.main}>
-              <header className={styles.header}>
+            <header className={styles.header}>
                 <DateMark
                   date={journal.selectedDate}
                   onClick={journal.goToday}
-                  className="min-w-0 flex-1"
+                  className="min-w-0 flex-1 lg:hidden"
                 />
+                <p className="hidden min-w-0 flex-1 truncate text-sm font-medium text-donna-text lg:block">
+                  {journal.titleLabel}
+                </p>
                 <div className={styles.nav}>
                   <button
                     type="button"
@@ -242,111 +279,163 @@ export function Tasks() {
                     <Icon name="chevronRight" className="h-4 w-4" />
                   </button>
                 </div>
-              </header>
+            </header>
 
-              <section className={styles.tasksCard} aria-label="Tasks">
-                <form className={styles.addRow} onSubmit={onAddTaskSubmit}>
-                  <input
-                    className={styles.addInput}
-                    name="title"
-                    placeholder="Add a task for this day…"
-                    value={journal.draftTitle}
-                    autoComplete="off"
-                    enterKeyHint="done"
-                    onKeyDown={onAddTaskKeyDown}
-                    onChange={(event) =>
-                      journal.setDraftTitle(event.target.value)
-                    }
+            <div className={styles.contentRow}>
+                <aside className={styles.sidebar}>
+                  <MiniCalendar
+                    month={journal.miniMonth}
+                    selected={journal.selectedDate}
+                    onSelectDay={journal.selectDay}
+                    onMonthShift={journal.shiftMiniMonth}
+                    aria-label="Journal calendar"
+                    dayExtra={(day) => {
+                      const summary = journal.historyByDate.get(
+                        format(day, "yyyy-MM-dd"),
+                      );
+                      if (!summary || summary.total <= 0) {
+                        return null;
+                      }
+                      return `${summary.completed}/${summary.total}`;
+                    }}
                   />
-                  <button
-                    type="submit"
-                    className={styles.addBtn}
-                    disabled={journal.isSaving}
-                  >
-                    Add
-                  </button>
-                </form>
+                  {tagsPanel}
+                </aside>
 
-                <div className={styles.tasksBody}>
-                  {journal.isLoading ? (
-                    <p className={styles.state}>Loading notebook…</p>
-                  ) : null}
-                  {!journal.isLoading && journal.isError ? (
-                    <p className={styles.state}>Couldn&apos;t load this day.</p>
-                  ) : null}
-                  {!journal.isLoading &&
-                  !journal.isError &&
-                  journal.occurrences.length === 0 ? (
-                    <p className={styles.empty}>
-                      Nothing here yet. Add a task — it stays on this day&apos;s
-                      page.
-                    </p>
-                  ) : null}
-                  {!journal.isLoading && journal.occurrences.length > 0 ? (
-                    <ul className={styles.list}>
-                      {journal.occurrences.map((occurrence) => (
-                        <JournalTaskRow
-                          key={occurrence.id}
-                          occurrence={occurrence}
-                          onToggle={journal.toggleComplete}
-                          onDelete={journal.removeTask}
-                          deleting={journal.isSaving}
-                          draggingId={draggingId}
-                          overId={overId}
-                          onDragStartRow={onDragStartRow}
-                          onDragOverRow={onDragOverRow}
-                          onDropRow={onDropRow}
-                          onDragEndRow={onDragEndRow}
-                          setNodeRef={setFlipRef(occurrence.id)}
-                        />
-                      ))}
-                    </ul>
-                  ) : null}
-                </div>
-              </section>
-            </div>
+                <div className={styles.tasksCol}>
+                  <div className={styles.mobileTags}>{tagsPanel}</div>
 
-            <aside className={styles.statsCard} aria-label="Statistics">
-              <h2 className={styles.statsTitle}>Statistics</h2>
-              {stats ? (
-                <div className={styles.statsGrid}>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Completion</span>
-                    <span className={styles.statValue}>
-                      {Math.round(stats.completion_pct)}%
-                    </span>
-                  </div>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Completed</span>
-                    <span className={styles.statValue}>{stats.completed}</span>
-                  </div>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Pending</span>
-                    <span className={styles.statValue}>{stats.pending}</span>
-                  </div>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Carried forward</span>
-                    <span className={styles.statValue}>
-                      {stats.carried_forward}
-                    </span>
-                  </div>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Streak</span>
-                    <span className={styles.statValue}>{stats.streak}</span>
-                  </div>
-                  {stats.average_completion_min != null ? (
-                    <div className={styles.statRow}>
-                      <span className={styles.statLabel}>Avg completion</span>
-                      <span className={styles.statValue}>
-                        {Math.round(stats.average_completion_min)}m
-                      </span>
+                  <section className={styles.tasksCard} aria-label="Tasks">
+                    {isFiltered ? (
+                      <div className={styles.filterRow}>
+                        {journal.tags
+                          .filter((tag) => journal.filterTagIds.includes(tag.id))
+                          .map((tag) => (
+                            <TaskTagPill
+                              key={tag.id}
+                              tag={tag}
+                              selected
+                              onClick={() => journal.toggleFilterTag(tag.id)}
+                            />
+                          ))}
+                        <span className={styles.filterHint}>
+                          Showing tasks with selected tags
+                        </span>
+                      </div>
+                    ) : null}
+
+                    <form className={styles.addRow} onSubmit={onAddTaskSubmit}>
+                      <input
+                        className={styles.addInput}
+                        name="title"
+                        placeholder="Add a task for this day…"
+                        value={journal.draftTitle}
+                        autoComplete="off"
+                        enterKeyHint="done"
+                        onKeyDown={onAddTaskKeyDown}
+                        onChange={(event) =>
+                          journal.setDraftTitle(event.target.value)
+                        }
+                      />
+                      <button
+                        type="submit"
+                        className={styles.addBtn}
+                        disabled={journal.isSaving}
+                      >
+                        Add
+                      </button>
+                    </form>
+
+                    <div className={styles.tasksBody}>
+                      {journal.isLoading ? (
+                        <p className={styles.state}>Loading notebook…</p>
+                      ) : null}
+                      {!journal.isLoading && journal.isError ? (
+                        <p className={styles.state}>
+                          Couldn&apos;t load this day.
+                        </p>
+                      ) : null}
+                      {!journal.isLoading &&
+                      !journal.isError &&
+                      journal.allOccurrences.length === 0 ? (
+                        <p className={styles.empty}>
+                          Nothing here yet. Add a task — it stays on this
+                          day&apos;s page.
+                        </p>
+                      ) : null}
+                      {showEmptyFiltered ? (
+                        <p className={styles.empty}>
+                          No tasks match the selected tags.
+                        </p>
+                      ) : null}
+                      {!journal.isLoading && journal.occurrences.length > 0 ? (
+                        <ul className={styles.list}>
+                          {journal.occurrences.map((occurrence) => (
+                            <JournalTaskRow
+                              key={occurrence.id}
+                              occurrence={occurrence}
+                              tags={journal.tags}
+                              onToggle={journal.toggleComplete}
+                              onDelete={journal.removeTask}
+                              onTagsChange={journal.setTaskTags}
+                              deleting={journal.isSaving}
+                              draggingId={draggingId}
+                              overId={overId}
+                              onDragStartRow={onDragStartRow}
+                              onDragOverRow={onDragOverRow}
+                              onDropRow={onDropRow}
+                              onDragEndRow={onDragEndRow}
+                              setNodeRef={setFlipRef(occurrence.id)}
+                            />
+                          ))}
+                        </ul>
+                      ) : null}
                     </div>
-                  ) : null}
+                  </section>
+
+                  <aside className={styles.statsCard} aria-label="Statistics">
+                    <h2 className={styles.statsTitle}>Statistics</h2>
+                    {stats ? (
+                      <div className={styles.statsGrid}>
+                        <div className={styles.statRow}>
+                          <span className={styles.statLabel}>Completion</span>
+                          <span className={styles.statValue}>
+                            {Math.round(stats.completion_pct)}%
+                          </span>
+                        </div>
+                        <div className={styles.statRow}>
+                          <span className={styles.statLabel}>Completed</span>
+                          <span className={styles.statValue}>{stats.completed}</span>
+                        </div>
+                        <div className={styles.statRow}>
+                          <span className={styles.statLabel}>Pending</span>
+                          <span className={styles.statValue}>{stats.pending}</span>
+                        </div>
+                        <div className={styles.statRow}>
+                          <span className={styles.statLabel}>Carried forward</span>
+                          <span className={styles.statValue}>
+                            {stats.carried_forward}
+                          </span>
+                        </div>
+                        <div className={styles.statRow}>
+                          <span className={styles.statLabel}>Streak</span>
+                          <span className={styles.statValue}>{stats.streak}</span>
+                        </div>
+                        {stats.average_completion_min != null ? (
+                          <div className={styles.statRow}>
+                            <span className={styles.statLabel}>Avg completion</span>
+                            <span className={styles.statValue}>
+                              {Math.round(stats.average_completion_min)}m
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <p className={styles.state}>—</p>
+                    )}
+                  </aside>
                 </div>
-              ) : (
-                <p className={styles.state}>—</p>
-              )}
-            </aside>
+            </div>
           </div>
         </main>
       </div>

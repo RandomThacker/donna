@@ -13,10 +13,17 @@ export const journalStyles = {
     "bg-donna-bg lg:overflow-y-hidden",
   ].join(" "),
   workspaceInner: [
-    "mx-auto grid w-full max-w-6xl gap-6 overflow-x-hidden p-5 sm:p-6 lg:p-8",
-    "lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-start",
+    "mx-auto flex w-full max-w-6xl flex-col gap-4 overflow-x-hidden p-5 sm:p-6 lg:p-8",
+    "lg:h-full lg:min-h-0",
   ].join(" "),
-  main: "flex min-h-0 min-w-0 flex-col gap-4 lg:h-full lg:flex-1 lg:overflow-hidden",
+  main: "flex min-h-0 min-w-0 flex-col gap-4 lg:h-full lg:overflow-hidden",
+  contentRow: [
+    "flex min-h-0 flex-1 flex-col gap-4",
+    "lg:flex-row lg:items-start lg:overflow-hidden",
+  ].join(" "),
+  sidebar: "hidden shrink-0 flex-col gap-4 overflow-y-auto scrollbar-hidden lg:flex lg:w-52",
+  tasksCol: "flex min-h-0 flex-1 flex-col gap-4 lg:h-full lg:overflow-hidden",
+  mobileTags: "block lg:hidden",
   header: "flex shrink-0 min-w-0 flex-nowrap items-center justify-between gap-2",
   nav: "flex shrink-0 items-center gap-1.5 sm:gap-2",
   navBtn: [
@@ -34,6 +41,8 @@ export const journalStyles = {
     "flex min-h-0 flex-1 flex-col rounded-2xl border border-donna-hairline",
     "bg-donna-surface p-4 sm:p-5",
   ].join(" "),
+  filterRow: "mb-3 flex flex-wrap items-center gap-1.5",
+  filterHint: "text-xs text-donna-muted",
   addRow: "mb-4 flex shrink-0 gap-2",
   addInput: [
     "h-10 min-w-0 flex-1 rounded-xl border border-donna-border bg-donna-elevated/40",
@@ -72,7 +81,7 @@ export const journalStyles = {
     "align-middle text-[10px] font-medium tracking-wide text-donna-muted",
     "no-underline",
   ].join(" "),
-  itemMeta: "mt-0.5 flex items-center gap-2 text-xs text-donna-faint",
+  itemMeta: "mt-1 flex flex-wrap items-center gap-1.5 text-xs text-donna-faint",
   deleteBtn: [
     "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg",
     "text-donna-faint transition-colors",
@@ -85,7 +94,7 @@ export const journalStyles = {
     "hover:bg-donna-accent-soft hover:text-donna-text",
   ].join(" "),
   empty: "py-8 text-center text-sm text-donna-muted",
-  statsCard: "shrink-0 self-start rounded-2xl border border-donna-hairline bg-donna-surface p-4",
+  statsCard: "mt-2 shrink-0 rounded-2xl border border-donna-hairline bg-donna-surface p-4",
   statsTitle: "mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-donna-faint",
   statsGrid: "space-y-3",
   statRow: "flex items-center justify-between gap-3 text-sm",

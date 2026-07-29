@@ -15,7 +15,6 @@ type MiniCalendarProps = {
   selected: Date;
   onSelectDay: (day: Date) => void;
   onMonthShift: (direction: -1 | 1) => void;
-  /** Optional per-day annotation (e.g. task counts). */
   dayExtra?: (day: Date) => ReactNode;
   className?: string;
   "aria-label"?: string;

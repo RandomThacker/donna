@@ -45,6 +45,9 @@ const (
 	PathTaskOccurrencesReorder = "/task-occurrences/reorder"
 	PathDailyNotesDay          = "/daily-notes/:date"
 
+	PathTaskTags    = "/task-tags"
+	PathTaskTagByID = "/task-tags/:id"
+
 	PathNotes    = "/notes"
 	PathNoteByID = "/notes/:id"
 )

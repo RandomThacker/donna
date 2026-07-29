@@ -13,6 +13,7 @@ type CreateTaskRequest struct {
 	Priority       *string  `json:"priority,omitempty"`
 	Project        *string  `json:"project,omitempty"`
 	Labels         []string `json:"labels,omitempty"`
+	TagIDs         []string `json:"tag_ids,omitempty"`
 	RecurrenceRule *string  `json:"recurrence_rule,omitempty"`
 	Date           string   `json:"date"`
 	Source         string   `json:"source,omitempty"`
@@ -20,12 +21,13 @@ type CreateTaskRequest struct {
 
 // UpdateTaskRequest is PATCH /tasks/:id.
 type UpdateTaskRequest struct {
-	Title          *string  `json:"title,omitempty"`
-	Description    *string  `json:"description,omitempty"`
-	Priority       *string  `json:"priority,omitempty"`
-	Project        *string  `json:"project,omitempty"`
-	Labels         []string `json:"labels,omitempty"`
-	RecurrenceRule *string  `json:"recurrence_rule,omitempty"`
+	Title          *string   `json:"title,omitempty"`
+	Description    *string   `json:"description,omitempty"`
+	Priority       *string   `json:"priority,omitempty"`
+	Project        *string   `json:"project,omitempty"`
+	Labels         []string  `json:"labels,omitempty"`
+	TagIDs         *[]string `json:"tag_ids"`
+	RecurrenceRule *string   `json:"recurrence_rule,omitempty"`
 }
 
 // UpdateTaskOccurrenceRequest is PATCH /task-occurrences/:id.
@@ -89,8 +91,9 @@ type TaskOccurrenceResponse struct {
 	Description    *string  `json:"description,omitempty"`
 	Priority       *string  `json:"priority,omitempty"`
 	Project        *string  `json:"project,omitempty"`
-	Labels         []string `json:"labels,omitempty"`
-	RecurrenceRule *string  `json:"recurrence_rule,omitempty"`
+	Labels         []string          `json:"labels,omitempty"`
+	Tags           []TaskTagResponse `json:"tags,omitempty"`
+	RecurrenceRule *string           `json:"recurrence_rule,omitempty"`
 }
 
 type TaskHistoryDayResponse struct {
@@ -102,15 +105,16 @@ type TaskHistoryDayResponse struct {
 }
 
 type TaskResponse struct {
-	ID             string   `json:"id"`
-	PublicID       string   `json:"public_id"`
-	Title          string   `json:"title"`
-	Description    *string  `json:"description,omitempty"`
-	Priority       *string  `json:"priority,omitempty"`
-	Project        *string  `json:"project,omitempty"`
-	Labels         []string `json:"labels,omitempty"`
-	RecurrenceRule *string  `json:"recurrence_rule,omitempty"`
-	UpdatedAt      string   `json:"updated_at"`
+	ID             string            `json:"id"`
+	PublicID       string            `json:"public_id"`
+	Title          string            `json:"title"`
+	Description    *string           `json:"description,omitempty"`
+	Priority       *string           `json:"priority,omitempty"`
+	Project        *string           `json:"project,omitempty"`
+	Labels         []string          `json:"labels,omitempty"`
+	Tags           []TaskTagResponse `json:"tags,omitempty"`
+	RecurrenceRule *string           `json:"recurrence_rule,omitempty"`
+	UpdatedAt      string            `json:"updated_at"`
 }
 
 func TaskDayFromEntity(view entity.TaskJournalDay) TaskDayResponse {
@@ -141,6 +145,7 @@ func TaskOccurrenceFromEntity(o entity.TaskOccurrenceWithTask) TaskOccurrenceRes
 		Priority:       o.Priority,
 		Project:        o.Project,
 		Labels:         o.Labels,
+		Tags:           TaskTagsFromEntities(o.Tags),
 		RecurrenceRule: o.RecurrenceRule,
 	}
 	if o.CompletedAt != nil {
@@ -159,9 +164,16 @@ func TaskFromEntity(t entity.Task) TaskResponse {
 		Priority:       t.Priority,
 		Project:        t.Project,
 		Labels:         t.Labels,
+		Tags:           TaskTagsFromEntities(nil),
 		RecurrenceRule: t.RecurrenceRule,
 		UpdatedAt:      t.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+}
+
+func TaskFromEntityWithTags(t entity.Task, tags []entity.TaskTag) TaskResponse {
+	resp := TaskFromEntity(t)
+	resp.Tags = TaskTagsFromEntities(tags)
+	return resp
 }
 
 func DailyNoteFromEntity(n entity.DailyNote) DailyNoteResponse {

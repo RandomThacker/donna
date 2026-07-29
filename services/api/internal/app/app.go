@@ -88,7 +88,8 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	taskRepo := repository.NewTaskRepository(pool)
 	occurrenceRepo := repository.NewTaskOccurrenceRepository(pool)
 	dailyNoteRepo := repository.NewDailyNoteRepository(pool)
-	taskSvc := business.NewTaskJournalService(taskRepo, occurrenceRepo, dailyNoteRepo)
+	taskTagRepo := repository.NewTaskTagRepository(pool)
+	taskSvc := business.NewTaskJournalService(taskRepo, occurrenceRepo, dailyNoteRepo, taskTagRepo)
 	taskHandler := handler.NewTaskHandler(taskSvc, taskLog)
 
 	noteLog := logFactory.Module(constant.ModuleNote)

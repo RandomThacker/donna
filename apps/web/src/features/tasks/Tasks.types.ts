@@ -5,6 +5,14 @@ export type TaskOccurrenceSource =
   | "ai"
   | "carry_forward";
 
+export type TaskTag = {
+  id: string;
+  public_id: string;
+  name: string;
+  color: string;
+  updated_at?: string;
+};
+
 export type TaskOccurrence = {
   id: string;
   public_id: string;
@@ -20,6 +28,7 @@ export type TaskOccurrence = {
   priority?: string | null;
   project?: string | null;
   labels?: string[];
+  tags?: TaskTag[];
   recurrence_rule?: string | null;
 };
 
