@@ -88,13 +88,15 @@ function JournalTaskRow({
         ) : null}
       </button>
       <div className={styles.itemBody}>
-        <p
-          className={cn(
-            styles.itemTitle,
-            occurrence.completed && styles.itemTitleDone,
-          )}
-        >
-          <span>{occurrence.title}</span>
+        <div className={styles.itemRow}>
+          <p
+            className={cn(
+              styles.itemTitle,
+              occurrence.completed && styles.itemTitleDone,
+            )}
+          >
+            {occurrence.title}
+          </p>
           {occurrence.source === "carry_forward" ? (
             <span
               className={styles.carriedPill}
@@ -103,13 +105,15 @@ function JournalTaskRow({
               Carried
             </span>
           ) : null}
-        </p>
-        <div className={styles.itemMeta}>
           {(occurrence.tags ?? []).map((tag) => (
             <TaskTagPill key={tag.id} tag={tag} />
           ))}
-          {occurrence.project ? <span>{occurrence.project}</span> : null}
         </div>
+        {occurrence.project ? (
+          <div className={styles.itemMeta}>
+            <span>{occurrence.project}</span>
+          </div>
+        ) : null}
       </div>
       <TaskTagPicker
         tags={tags ?? []}
@@ -245,44 +249,46 @@ export function Tasks() {
         />
         <main className={styles.workspace}>
           <div className={styles.workspaceInner}>
+            {/* Header: date + nav — full width */}
             <header className={styles.header}>
-                <DateMark
-                  date={journal.selectedDate}
+              <DateMark
+                date={journal.selectedDate}
+                onClick={journal.goToday}
+                className="min-w-0 flex-1 lg:hidden"
+              />
+              <p className="hidden min-w-0 flex-1 truncate text-sm font-medium text-donna-text lg:block">
+                {journal.titleLabel}
+              </p>
+              <div className={styles.nav}>
+                <button
+                  type="button"
+                  className={styles.navBtn}
+                  onClick={journal.goPrevDay}
+                  aria-label="Previous day"
+                >
+                  <Icon name="chevronLeft" className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  className={styles.todayBtn}
                   onClick={journal.goToday}
-                  className="min-w-0 flex-1 lg:hidden"
-                />
-                <p className="hidden min-w-0 flex-1 truncate text-sm font-medium text-donna-text lg:block">
-                  {journal.titleLabel}
-                </p>
-                <div className={styles.nav}>
-                  <button
-                    type="button"
-                    className={styles.navBtn}
-                    onClick={journal.goPrevDay}
-                    aria-label="Previous day"
-                  >
-                    <Icon name="chevronLeft" className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.todayBtn}
-                    onClick={journal.goToday}
-                  >
-                    Today
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.navBtn}
-                    onClick={journal.goNextDay}
-                    aria-label="Next day"
-                  >
-                    <Icon name="chevronRight" className="h-4 w-4" />
-                  </button>
-                </div>
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  className={styles.navBtn}
+                  onClick={journal.goNextDay}
+                  aria-label="Next day"
+                >
+                  <Icon name="chevronRight" className="h-4 w-4" />
+                </button>
+              </div>
             </header>
 
-            <div className={styles.contentRow}>
-                <aside className={styles.sidebar}>
+            {/* Three-column body: [calendar+tags] | [tasks] | [stats] */}
+            <div className={styles.main}>
+              <aside className={styles.sidebar}>
                   <MiniCalendar
                     month={journal.miniMonth}
                     selected={journal.selectedDate}
@@ -302,8 +308,9 @@ export function Tasks() {
                   {tagsPanel}
                 </aside>
 
-                <div className={styles.tasksCol}>
-                  <div className={styles.mobileTags}>{tagsPanel}</div>
+              {/* Center: tasks */}
+              <div className={styles.tasksCol}>
+                <div className={styles.mobileTags}>{tagsPanel}</div>
 
                   <section className={styles.tasksCard} aria-label="Tasks">
                     {isFiltered ? (
@@ -393,48 +400,73 @@ export function Tasks() {
                     </div>
                   </section>
 
-                  <aside className={styles.statsCard} aria-label="Statistics">
-                    <h2 className={styles.statsTitle}>Statistics</h2>
-                    {stats ? (
-                      <div className={styles.statsGrid}>
-                        <div className={styles.statRow}>
-                          <span className={styles.statLabel}>Completion</span>
-                          <span className={styles.statValue}>
-                            {Math.round(stats.completion_pct)}%
-                          </span>
-                        </div>
-                        <div className={styles.statRow}>
-                          <span className={styles.statLabel}>Completed</span>
-                          <span className={styles.statValue}>{stats.completed}</span>
-                        </div>
-                        <div className={styles.statRow}>
-                          <span className={styles.statLabel}>Pending</span>
-                          <span className={styles.statValue}>{stats.pending}</span>
-                        </div>
-                        <div className={styles.statRow}>
-                          <span className={styles.statLabel}>Carried forward</span>
-                          <span className={styles.statValue}>
-                            {stats.carried_forward}
-                          </span>
-                        </div>
-                        <div className={styles.statRow}>
-                          <span className={styles.statLabel}>Streak</span>
-                          <span className={styles.statValue}>{stats.streak}</span>
-                        </div>
-                        {stats.average_completion_min != null ? (
-                          <div className={styles.statRow}>
-                            <span className={styles.statLabel}>Avg completion</span>
-                            <span className={styles.statValue}>
-                              {Math.round(stats.average_completion_min)}m
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <p className={styles.state}>—</p>
-                    )}
-                  </aside>
+              </div>
+
+              {/* Right: statistics */}
+              <aside className={styles.statsCol}>
+              <div className={styles.statsCard}>
+              <h2 className={styles.statsTitle}>Statistics</h2>
+              {stats ? (
+                <div className={styles.statsGrid}>
+                  <div className={styles.statRow}>
+                    <span className={styles.statLabel}>Completion</span>
+                    <span className={styles.statValue}>
+                      {Math.round(stats.completion_pct)}%
+                    </span>
+                  </div>
+                  <div className={styles.statRow}>
+                    <span className={styles.statLabel}>Completed</span>
+                    <span className={styles.statValue}>{stats.completed}</span>
+                  </div>
+                  <div className={styles.statRow}>
+                    <span className={styles.statLabel}>Pending</span>
+                    <span className={styles.statValue}>{stats.pending}</span>
+                  </div>
+                  <div className={styles.statRow}>
+                    <span className={styles.statLabel}>Carried forward</span>
+                    <span className={styles.statValue}>
+                      {stats.carried_forward}
+                    </span>
+                  </div>
+                  <div className={styles.statRow}>
+                    <span className={styles.statLabel}>Streak</span>
+                    <span className={styles.statValue}>{stats.streak}</span>
+                  </div>
+                  {stats.average_completion_min != null ? (
+                    <div className={styles.statRow}>
+                      <span className={styles.statLabel}>Avg completion</span>
+                      <span className={styles.statValue}>
+                        {Math.round(stats.average_completion_min)}m
+                      </span>
+                    </div>
+                  ) : null}
                 </div>
+              ) : (
+                <p className={styles.state}>—</p>
+              )}
+
+              {journal.tags.length > 0 ? (
+                <>
+                  <h2 className={cn(styles.statsTitle, "mt-4")}>By Tag</h2>
+                  <div className={styles.statsGrid}>
+                    {journal.tags.map((tag) => {
+                      const count = journal.allOccurrences.filter((o) =>
+                        (o.tags ?? []).some((t) => t.id === tag.id),
+                      ).length;
+                      return (
+                        <div key={tag.id} className={styles.statRow}>
+                          <span className={styles.statLabel} style={{ color: tag.color }}>
+                            {tag.name}
+                          </span>
+                          <span className={styles.statValue}>{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </>
+              ) : null}
+              </div>
+              </aside>
             </div>
           </div>
         </main>

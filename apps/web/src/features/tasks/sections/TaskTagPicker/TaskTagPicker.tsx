@@ -6,7 +6,6 @@ import { Icon } from "@/components/common";
 import { cn } from "@/lib/cn";
 
 import type { TaskTag } from "../../Tasks.types";
-import { TaskTagPill } from "../TaskTagPill";
 import { tagPickerStyles as styles } from "./TaskTagPicker.styles";
 
 type TaskTagPickerProps = {
@@ -45,15 +44,8 @@ export function TaskTagPicker({
     onChange(next);
   };
 
-  const selectedTags = tags.filter((tag) => selectedIds.includes(tag.id));
-
   return (
     <div ref={rootRef} className={styles.root}>
-      <div className={styles.pills}>
-        {selectedTags.map((tag) => (
-          <TaskTagPill key={tag.id} tag={tag} />
-        ))}
-      </div>
       <button
         type="button"
         className={styles.trigger}

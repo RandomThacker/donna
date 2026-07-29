@@ -1,6 +1,5 @@
 export const tagPickerStyles = {
-  root: "relative flex items-start gap-1",
-  pills: "flex min-w-0 flex-wrap gap-1",
+  root: "relative",
   trigger: [
     "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg",
     "text-donna-faint transition-colors",

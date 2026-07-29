@@ -142,10 +142,21 @@ func (s *TaskJournalService) purgeFutureCarryForwards(ctx context.Context, userI
 }
 
 func (s *TaskJournalService) carryForwardTo(ctx context.Context, userID uuid.UUID, date time.Time) error {
-	yesterday := date.AddDate(0, 0, -1)
-	incomplete, err := s.occurrences.ListIncompleteByUserDate(ctx, userID, yesterday)
-	if err != nil {
-		return err
+	// Walk backwards up to 30 days to find the most recent day with incomplete
+	// tasks. This handles gaps where the user didn't open the app for one or
+	// more days.
+	const maxLookback = 30
+	var incomplete []entity.TaskOccurrence
+	for offset := 1; offset <= maxLookback; offset++ {
+		lookback := date.AddDate(0, 0, -offset)
+		tasks, err := s.occurrences.ListIncompleteByUserDate(ctx, userID, lookback)
+		if err != nil {
+			return err
+		}
+		if len(tasks) > 0 {
+			incomplete = tasks
+			break
+		}
 	}
 	if len(incomplete) == 0 {
 		return nil

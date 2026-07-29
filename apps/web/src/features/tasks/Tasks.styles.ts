@@ -13,16 +13,21 @@ export const journalStyles = {
     "bg-donna-bg lg:overflow-y-hidden",
   ].join(" "),
   workspaceInner: [
-    "mx-auto flex w-full max-w-6xl flex-col gap-4 overflow-x-hidden p-5 sm:p-6 lg:p-8",
-    "lg:h-full lg:min-h-0",
+    "mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-hidden p-5 sm:p-6 lg:p-8",
   ].join(" "),
-  main: "flex min-h-0 min-w-0 flex-col gap-4 lg:h-full lg:overflow-hidden",
-  contentRow: [
+  main: [
     "flex min-h-0 flex-1 flex-col gap-4",
     "lg:flex-row lg:items-start lg:overflow-hidden",
   ].join(" "),
-  sidebar: "hidden shrink-0 flex-col gap-4 overflow-y-auto scrollbar-hidden lg:flex lg:w-52",
-  tasksCol: "flex min-h-0 flex-1 flex-col gap-4 lg:h-full lg:overflow-hidden",
+  // left col: mini calendar + tags (desktop only)
+  sidebar: "hidden w-52 shrink-0 flex-col gap-4 overflow-y-auto scrollbar-hidden lg:flex",
+  // center col: tasks
+  tasksCol: [
+    "flex min-h-0 flex-1 flex-col gap-4",
+    "lg:h-full lg:overflow-hidden",
+  ].join(" "),
+  // right col: statistics
+  statsCol: "shrink-0 lg:w-52",
   mobileTags: "block lg:hidden",
   header: "flex shrink-0 min-w-0 flex-nowrap items-center justify-between gap-2",
   nav: "flex shrink-0 items-center gap-1.5 sm:gap-2",
@@ -73,7 +78,8 @@ export const journalStyles = {
   ].join(" "),
   checkboxOn: "border-donna-accent bg-donna-accent text-donna-on-accent",
   itemBody: "min-w-0 flex-1",
-  itemTitle: "inline text-sm text-donna-text",
+  itemRow: "flex min-w-0 flex-wrap items-center gap-1.5",
+  itemTitle: "text-sm text-donna-text",
   itemTitleDone: "text-donna-muted line-through",
   carriedPill: [
     "ml-2 inline-flex translate-y-[-1px] items-center rounded-full",
@@ -94,7 +100,7 @@ export const journalStyles = {
     "hover:bg-donna-accent-soft hover:text-donna-text",
   ].join(" "),
   empty: "py-8 text-center text-sm text-donna-muted",
-  statsCard: "mt-2 shrink-0 rounded-2xl border border-donna-hairline bg-donna-surface p-4",
+  statsCard: "shrink-0 self-start rounded-2xl border border-donna-hairline bg-donna-surface p-4",
   statsTitle: "mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-donna-faint",
   statsGrid: "space-y-3",
   statRow: "flex items-center justify-between gap-3 text-sm",
