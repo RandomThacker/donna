@@ -1,21 +1,11 @@
-import {
-  addDays,
-  addMonths,
-  endOfMonth,
-  format,
-  isSameMonth,
-  isToday,
-  startOfMonth,
-  subMonths,
-} from "date-fns";
+import { addDays, format, isToday } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 
 import {
   createTask,
   deleteTask,
   fetchTaskDay,
-  fetchTaskHistory,
   reorderTaskOccurrences,
   updateTaskOccurrence,
 } from "./Tasks.api";
@@ -31,59 +21,24 @@ export function formatJournalDate(date: Date): string {
   return format(date, "yyyy-MM-dd");
 }
 
-export function buildMonthGrid(cursor: Date): Date[] {
-  const start = startOfMonth(cursor);
-  const end = endOfMonth(cursor);
-  const gridStart = new Date(start);
-  gridStart.setDate(gridStart.getDate() - gridStart.getDay());
-  const gridEnd = new Date(end);
-  gridEnd.setDate(gridEnd.getDate() + (6 - gridEnd.getDay()));
-  const days: Date[] = [];
-  let current = gridStart;
-  while (current <= gridEnd) {
-    days.push(new Date(current));
-    current = addDays(current, 1);
-  }
-  return days;
-}
-
 export function useTaskJournal() {
   const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(() => new Date());
-  const [miniMonth, setMiniMonth] = useState(() => new Date());
   const [draftTitle, setDraftTitle] = useState("");
 
   const dateKey = formatJournalDate(selectedDate);
-  const historyFrom = formatJournalDate(startOfMonth(miniMonth));
-  const historyTo = formatJournalDate(endOfMonth(miniMonth));
 
   const dayQuery = useQuery({
     queryKey: taskQueryKeys.day(dateKey),
     queryFn: ({ signal }) => fetchTaskDay(dateKey, signal),
   });
 
-  const historyQuery = useQuery({
-    queryKey: taskQueryKeys.history(historyFrom, historyTo),
-    queryFn: ({ signal }) => fetchTaskHistory(historyFrom, historyTo, signal),
-  });
-
-  const historyByDate = useMemo(() => {
-    const map = new Map<string, { total: number; completed: number; pending: number }>();
-    for (const day of historyQuery.data?.days ?? []) {
-      map.set(day.date, day);
-    }
-    return map;
-  }, [historyQuery.data?.days]);
-
   const occurrences = dayQuery.data?.occurrences ?? [];
   const statistics = dayQuery.data?.statistics;
 
   const invalidateDay = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: taskQueryKeys.day(dateKey) });
-    await queryClient.invalidateQueries({
-      queryKey: taskQueryKeys.history(historyFrom, historyTo),
-    });
-  }, [queryClient, dateKey, historyFrom, historyTo]);
+  }, [queryClient, dateKey]);
 
   const createMutation = useMutation({
     mutationFn: (title: string) => createTask({ title, date: dateKey }),
@@ -142,9 +97,7 @@ export function useTaskJournal() {
   });
 
   const goToday = useCallback(() => {
-    const today = new Date();
-    setSelectedDate(today);
-    setMiniMonth(today);
+    setSelectedDate(new Date());
   }, []);
 
   const goPrevDay = useCallback(() => {
@@ -157,13 +110,6 @@ export function useTaskJournal() {
 
   const selectDay = useCallback((day: Date) => {
     setSelectedDate(day);
-    if (!isSameMonth(day, miniMonth)) {
-      setMiniMonth(day);
-    }
-  }, [miniMonth]);
-
-  const shiftMiniMonth = useCallback((dir: -1 | 1) => {
-    setMiniMonth((m) => (dir === 1 ? addMonths(m, 1) : subMonths(m, 1)));
   }, []);
 
   const addTask = useCallback(() => {
@@ -216,15 +162,12 @@ export function useTaskJournal() {
 
   return {
     selectedDate,
-    miniMonth,
     dateKey,
     titleLabel,
     occurrences,
     statistics,
     draftTitle,
     setDraftTitle,
-    historyByDate,
-    miniDays: buildMonthGrid(miniMonth),
     isLoading: dayQuery.isLoading,
     isError: dayQuery.isError,
     isSaving:
@@ -236,7 +179,6 @@ export function useTaskJournal() {
     goPrevDay,
     goNextDay,
     selectDay,
-    shiftMiniMonth,
     addTask,
     toggleComplete,
     reorder,

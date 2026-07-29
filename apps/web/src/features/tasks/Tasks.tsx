@@ -1,12 +1,12 @@
 "use client";
 
-import { format, isToday } from "date-fns";
 import { useMemo, useState, type DragEvent } from "react";
 import { usePathname } from "next/navigation";
 
 import { Icon } from "@/components/common";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/features/auth";
+import { DateMark } from "@/features/calendar/sections/DateMark";
 import { navItemsForPath } from "@/features/dashboard/dashboardNav";
 import { DashboardSidebar } from "@/features/dashboard/sections/DashboardSidebar";
 
@@ -194,7 +194,11 @@ export function Tasks() {
           <div className={styles.workspaceInner}>
             <div className={styles.main}>
               <header className={styles.header}>
-                <h1 className={styles.title}>{journal.titleLabel}</h1>
+                <DateMark
+                  date={journal.selectedDate}
+                  onClick={journal.goToday}
+                  className="min-w-0 flex-1"
+                />
                 <div className={styles.nav}>
                   <button
                     type="button"
@@ -222,69 +226,7 @@ export function Tasks() {
                 </div>
               </header>
 
-              <div className={styles.layout}>
-                <aside className={styles.miniRoot} aria-label="Journal calendar">
-                  <div className={styles.miniHeader}>
-                    <p className={styles.miniMonth}>
-                      {format(journal.miniMonth, "MMMM yyyy")}
-                    </p>
-                    <div className={styles.miniNav}>
-                      <button
-                        type="button"
-                        className={styles.miniNavBtn}
-                        onClick={() => journal.shiftMiniMonth(-1)}
-                        aria-label="Previous month"
-                      >
-                        <Icon name="chevronLeft" className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.miniNavBtn}
-                        onClick={() => journal.shiftMiniMonth(1)}
-                        aria-label="Next month"
-                      >
-                        <Icon name="chevronRight" className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                  <div className={styles.miniWeekdays}>
-                    {["S", "M", "T", "W", "T", "F", "S"].map((d, i) => (
-                      <span key={`${d}-${i}`}>{d}</span>
-                    ))}
-                  </div>
-                  <div className={styles.miniGrid}>
-                    {journal.miniDays.map((day) => {
-                      const key = format(day, "yyyy-MM-dd");
-                      const inMonth =
-                        day.getMonth() === journal.miniMonth.getMonth();
-                      const selected =
-                        format(day, "yyyy-MM-dd") === journal.dateKey;
-                      const summary = journal.historyByDate.get(key);
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          className={cn(
-                            styles.miniDay,
-                            !inMonth && styles.miniDayMuted,
-                            isToday(day) && !selected && styles.miniDayToday,
-                            selected && styles.miniDaySelected,
-                          )}
-                          onClick={() => journal.selectDay(day)}
-                        >
-                          <span>{day.getDate()}</span>
-                          {summary && summary.total > 0 ? (
-                            <span className={styles.miniCounts}>
-                              {summary.completed}/{summary.total}
-                            </span>
-                          ) : null}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </aside>
-
-                <div className="flex min-w-0 flex-col gap-6">
+              <div className="flex min-w-0 flex-col gap-6">
                   <section className={styles.tasksCard} aria-label="Tasks">
                     <form
                       className={styles.addRow}
@@ -345,7 +287,6 @@ export function Tasks() {
                       </ul>
                     ) : null}
                   </section>
-                </div>
               </div>
             </div>
 

@@ -4,7 +4,7 @@ import { Icon } from "@/components/common";
 import { cn } from "@/lib/cn";
 
 import type { CalendarAccountGroup } from "../../Calendar.types";
-import { buildMonthGrid, format, isToday } from "../../Calendar.utils";
+import { MiniCalendar } from "../MiniCalendar";
 import { sidebarPanelStyles as styles } from "./CalendarSidebar.styles";
 
 type CalendarSidebarProps = {
@@ -22,65 +22,16 @@ export function CalendarSidebar({
   accounts,
   onToggleAccount,
 }: CalendarSidebarProps) {
-  const days = buildMonthGrid(cursor);
-  const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
-
   return (
     <>
       <section className={styles.section} aria-label="Mini calendar">
         <h2 className={styles.sectionTitle}>Calendar</h2>
-        <div className={styles.miniRoot}>
-          <div className={styles.miniHeader}>
-            <p className={styles.miniMonth}>{format(cursor, "MMMM yyyy")}</p>
-            <div className={styles.miniNav}>
-              <button
-                type="button"
-                className={styles.miniNavBtn}
-                aria-label="Previous month"
-                onClick={() => onMonthShift(-1)}
-              >
-                <Icon name="chevronLeft" className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                className={styles.miniNavBtn}
-                aria-label="Next month"
-                onClick={() => onMonthShift(1)}
-              >
-                <Icon name="chevronRight" className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          </div>
-          <div className={styles.miniWeekdays}>
-            {weekdays.map((d, i) => (
-              <span key={`${d}-${i}`}>{d}</span>
-            ))}
-          </div>
-          <div className={styles.miniGrid}>
-            {days.map((day) => {
-              const inMonth = day.getMonth() === cursor.getMonth();
-              const selected =
-                day.getDate() === cursor.getDate() &&
-                day.getMonth() === cursor.getMonth() &&
-                day.getFullYear() === cursor.getFullYear();
-              return (
-                <button
-                  key={day.toISOString()}
-                  type="button"
-                  className={cn(
-                    styles.miniDay,
-                    !inMonth && styles.miniDayMuted,
-                    isToday(day) && !selected && styles.miniDayToday,
-                    selected && styles.miniDaySelected,
-                  )}
-                  onClick={() => onSelectDay(day)}
-                >
-                  {day.getDate()}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <MiniCalendar
+          month={cursor}
+          selected={cursor}
+          onSelectDay={onSelectDay}
+          onMonthShift={onMonthShift}
+        />
       </section>
 
       <section className={styles.section} aria-label="Connected calendars">

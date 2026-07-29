@@ -1,23 +1,6 @@
 export const sidebarPanelStyles = {
   section: "space-y-3",
   sectionTitle: "text-[11px] font-semibold uppercase tracking-[0.14em] text-donna-faint",
-  miniRoot: "rounded-2xl border border-donna-border bg-donna-surface-2 p-3",
-  miniHeader: "mb-2 flex items-center justify-between",
-  miniMonth: "text-sm font-medium text-donna-text",
-  miniNav: "flex gap-1",
-  miniNavBtn: [
-    "grid h-7 w-7 place-items-center rounded-lg text-donna-muted",
-    "hover:bg-donna-accent-soft hover:text-donna-text",
-  ].join(" "),
-  miniWeekdays: "mb-1 grid grid-cols-7 gap-0.5 text-center text-[10px] text-donna-faint",
-  miniGrid: "grid grid-cols-7 gap-0.5",
-  miniDay: [
-    "grid aspect-square place-items-center rounded-lg text-xs",
-    "text-donna-muted transition-colors hover:bg-donna-accent-soft hover:text-donna-text",
-  ].join(" "),
-  miniDayMuted: "text-donna-faint/70",
-  miniDayToday: "font-semibold text-donna-accent",
-  miniDaySelected: "bg-donna-accent text-donna-on-accent hover:bg-donna-accent-bright hover:text-donna-on-accent",
   sourceList: "space-y-1.5",
   sourceRow: [
     "flex w-full items-center gap-2.5 rounded-xl px-2 py-2 text-left",
