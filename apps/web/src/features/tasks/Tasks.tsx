@@ -226,68 +226,68 @@ export function Tasks() {
                 </div>
               </header>
 
-              <div className="flex min-w-0 flex-col gap-6">
-                  <section className={styles.tasksCard} aria-label="Tasks">
-                    <form
-                      className={styles.addRow}
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        journal.addTask();
-                      }}
-                    >
-                      <input
-                        className={styles.addInput}
-                        placeholder="Add a task for this day…"
-                        value={journal.draftTitle}
-                        onChange={(event) =>
-                          journal.setDraftTitle(event.target.value)
-                        }
-                      />
-                      <button
-                        type="submit"
-                        className={styles.addBtn}
-                        disabled={journal.isSaving}
-                      >
-                        Add
-                      </button>
-                    </form>
+              <section className={styles.tasksCard} aria-label="Tasks">
+                <form
+                  className={styles.addRow}
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    journal.addTask();
+                  }}
+                >
+                  <input
+                    className={styles.addInput}
+                    placeholder="Add a task for this day…"
+                    value={journal.draftTitle}
+                    onChange={(event) =>
+                      journal.setDraftTitle(event.target.value)
+                    }
+                  />
+                  <button
+                    type="submit"
+                    className={styles.addBtn}
+                    disabled={journal.isSaving}
+                  >
+                    Add
+                  </button>
+                </form>
 
-                    {journal.isLoading ? (
-                      <p className={styles.state}>Loading notebook…</p>
-                    ) : null}
-                    {!journal.isLoading && journal.isError ? (
-                      <p className={styles.state}>Couldn&apos;t load this day.</p>
-                    ) : null}
-                    {!journal.isLoading &&
-                    !journal.isError &&
-                    journal.occurrences.length === 0 ? (
-                      <p className={styles.empty}>
-                        Nothing here yet. Add a task — it stays on this day&apos;s
-                        page.
-                      </p>
-                    ) : null}
-                    {!journal.isLoading && journal.occurrences.length > 0 ? (
-                      <ul className={styles.list}>
-                        {journal.occurrences.map((occurrence) => (
-                          <JournalTaskRow
-                            key={occurrence.id}
-                            occurrence={occurrence}
-                            onToggle={journal.toggleComplete}
-                            onDelete={journal.removeTask}
-                            deleting={journal.isSaving}
-                            draggingId={draggingId}
-                            overId={overId}
-                            onDragStartRow={onDragStartRow}
-                            onDragOverRow={onDragOverRow}
-                            onDropRow={onDropRow}
-                            onDragEndRow={onDragEndRow}
-                            setNodeRef={setFlipRef(occurrence.id)}
-                          />
-                        ))}
-                      </ul>
-                    ) : null}
-                  </section>
-              </div>
+                <div className={styles.tasksBody}>
+                  {journal.isLoading ? (
+                    <p className={styles.state}>Loading notebook…</p>
+                  ) : null}
+                  {!journal.isLoading && journal.isError ? (
+                    <p className={styles.state}>Couldn&apos;t load this day.</p>
+                  ) : null}
+                  {!journal.isLoading &&
+                  !journal.isError &&
+                  journal.occurrences.length === 0 ? (
+                    <p className={styles.empty}>
+                      Nothing here yet. Add a task — it stays on this day&apos;s
+                      page.
+                    </p>
+                  ) : null}
+                  {!journal.isLoading && journal.occurrences.length > 0 ? (
+                    <ul className={styles.list}>
+                      {journal.occurrences.map((occurrence) => (
+                        <JournalTaskRow
+                          key={occurrence.id}
+                          occurrence={occurrence}
+                          onToggle={journal.toggleComplete}
+                          onDelete={journal.removeTask}
+                          deleting={journal.isSaving}
+                          draggingId={draggingId}
+                          overId={overId}
+                          onDragStartRow={onDragStartRow}
+                          onDragOverRow={onDragOverRow}
+                          onDropRow={onDropRow}
+                          onDragEndRow={onDragEndRow}
+                          setNodeRef={setFlipRef(occurrence.id)}
+                        />
+                      ))}
+                    </ul>
+                  ) : null}
+                </div>
+              </section>
             </div>
 
             <aside className={styles.statsCard} aria-label="Statistics">

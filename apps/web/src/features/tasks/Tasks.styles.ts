@@ -9,15 +9,15 @@ export const journalStyles = {
     "md:grid-cols-[15rem_minmax(0,1fr)]",
   ].join(" "),
   workspace: [
-    "min-h-0 min-w-0 overflow-x-hidden overflow-y-auto scrollbar-hidden",
-    "bg-donna-bg",
+    "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto scrollbar-hidden",
+    "bg-donna-bg lg:overflow-y-hidden",
   ].join(" "),
   workspaceInner: [
     "mx-auto grid w-full max-w-6xl gap-6 overflow-x-hidden p-5 sm:p-6 lg:p-8",
-    "lg:grid-cols-[minmax(0,1fr)_16rem]",
+    "lg:h-full lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-start",
   ].join(" "),
-  main: "flex min-w-0 flex-col gap-6",
-  header: "flex min-w-0 flex-nowrap items-center justify-between gap-2",
+  main: "flex min-h-0 min-w-0 flex-col gap-4 lg:h-full lg:flex-1 lg:overflow-hidden",
+  header: "flex shrink-0 min-w-0 flex-nowrap items-center justify-between gap-2",
   nav: "flex shrink-0 items-center gap-1.5 sm:gap-2",
   navBtn: [
     "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full",
@@ -30,8 +30,11 @@ export const journalStyles = {
     "border border-donna-accent/40 bg-donna-accent-soft px-2.5",
     "text-xs font-medium text-donna-accent sm:h-9 sm:px-3.5 sm:text-sm",
   ].join(" "),
-  tasksCard: "rounded-2xl border border-donna-hairline bg-donna-surface p-4 sm:p-5",
-  addRow: "mb-4 flex gap-2",
+  tasksCard: [
+    "flex min-h-0 flex-1 flex-col rounded-2xl border border-donna-hairline",
+    "bg-donna-surface p-4 sm:p-5",
+  ].join(" "),
+  addRow: "mb-4 flex shrink-0 gap-2",
   addInput: [
     "h-10 min-w-0 flex-1 rounded-xl border border-donna-border bg-donna-elevated/40",
     "px-3 text-sm text-donna-text placeholder:text-donna-muted/70",
@@ -43,6 +46,7 @@ export const journalStyles = {
     "bg-donna-accent px-4 text-sm font-medium text-donna-on-accent",
     "hover:bg-donna-accent-bright disabled:opacity-60",
   ].join(" "),
+  tasksBody: "min-h-0 flex-1 overflow-y-auto scrollbar-hidden",
   list: "space-y-1",
   item: [
     "flex items-start gap-3 rounded-xl border border-transparent px-2 py-2.5",
@@ -81,7 +85,7 @@ export const journalStyles = {
     "hover:bg-donna-accent-soft hover:text-donna-text",
   ].join(" "),
   empty: "py-8 text-center text-sm text-donna-muted",
-  statsCard: "rounded-2xl border border-donna-hairline bg-donna-surface p-4",
+  statsCard: "shrink-0 self-start rounded-2xl border border-donna-hairline bg-donna-surface p-4",
   statsTitle: "mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-donna-faint",
   statsGrid: "space-y-3",
   statRow: "flex items-center justify-between gap-3 text-sm",
