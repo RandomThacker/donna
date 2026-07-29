@@ -1,9 +1,10 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Instrument_Serif, Manrope } from "next/font/google";
 
 import { ThemeProvider } from "@/components/theme";
 import { AuthProvider } from "@/features/auth";
 import { siteMetadata } from "@/features/landing/Landing.logic";
+import { PwaInstallPrompt } from "@/features/pwa";
 import { QueryProvider } from "@/providers/QueryProvider";
 
 import "./globals.css";
@@ -22,7 +23,31 @@ const manrope = Manrope({
   display: "swap",
 });
 
-export const metadata: Metadata = siteMetadata;
+export const metadata: Metadata = {
+  ...siteMetadata,
+  applicationName: "Donna",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Donna",
+  },
+  icons: {
+    icon: [
+      { url: "/icons/donna-icon.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  formatDetection: {
+    telephone: false,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#0b0b0c",
+  colorScheme: "dark",
+};
 
 const themeInitScript = `
 (() => {
@@ -56,7 +81,10 @@ export default function RootLayout({
       <body>
         <ThemeProvider>
           <QueryProvider>
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              {children}
+              <PwaInstallPrompt />
+            </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
       </body>

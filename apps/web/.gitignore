@@ -13,6 +13,8 @@ node_modules
 out
 build
 dist
+public/sw.js
+public/sw.js.map
 
 # Env
 .env

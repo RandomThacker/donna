@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Donna">
+  <defs>
+    <linearGradient id="donna-gold" x1="18%" y1="12%" x2="88%" y2="92%">
+      <stop offset="0%" stop-color="#e2c79a" />
+      <stop offset="100%" stop-color="#9a7a4f" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#0b0b0c" />
+  <circle cx="256" cy="256" r="196" fill="url(#donna-gold)" />
+  <circle cx="256" cy="256" r="128" fill="#0b0b0c" />
+</svg>
