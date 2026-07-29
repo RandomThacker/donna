@@ -112,13 +112,16 @@ export function useTaskJournal() {
     setSelectedDate(day);
   }, []);
 
-  const addTask = useCallback(() => {
-    const title = draftTitle.trim();
-    if (!title) {
-      return;
-    }
-    createMutation.mutate(title);
-  }, [createMutation, draftTitle]);
+  const addTask = useCallback(
+    (titleOverride?: string) => {
+      const title = (titleOverride ?? draftTitle).trim();
+      if (!title || createMutation.isPending) {
+        return;
+      }
+      createMutation.mutate(title);
+    },
+    [createMutation, draftTitle],
+  );
 
   const toggleComplete = useCallback(
     (occurrence: TaskOccurrence) => {

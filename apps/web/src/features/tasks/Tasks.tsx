@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type DragEvent } from "react";
+import { useMemo, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
 import { usePathname } from "next/navigation";
 
 import { Icon } from "@/components/common";
@@ -180,6 +180,24 @@ export function Tasks() {
     setOverId(null);
   };
 
+  const submitNewTask = (title: string) => {
+    journal.addTask(title);
+  };
+
+  const onAddTaskSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const raw = new FormData(event.currentTarget).get("title");
+    submitNewTask(typeof raw === "string" ? raw : "");
+  };
+
+  const onAddTaskKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+      return;
+    }
+    event.preventDefault();
+    submitNewTask(event.currentTarget.value);
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.shell}>
@@ -227,17 +245,15 @@ export function Tasks() {
               </header>
 
               <section className={styles.tasksCard} aria-label="Tasks">
-                <form
-                  className={styles.addRow}
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    journal.addTask();
-                  }}
-                >
+                <form className={styles.addRow} onSubmit={onAddTaskSubmit}>
                   <input
                     className={styles.addInput}
+                    name="title"
                     placeholder="Add a task for this day…"
                     value={journal.draftTitle}
+                    autoComplete="off"
+                    enterKeyHint="done"
+                    onKeyDown={onAddTaskKeyDown}
                     onChange={(event) =>
                       journal.setDraftTitle(event.target.value)
                     }

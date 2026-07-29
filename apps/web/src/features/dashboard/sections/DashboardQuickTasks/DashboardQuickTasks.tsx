@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 
 import { Icon } from "@/components/common";
 import { cn } from "@/lib/cn";
@@ -51,12 +51,26 @@ export function DashboardQuickTasks() {
   const isSaving = createMutation.isPending;
   const canAdd = draftTitle.trim().length > 0 && !isSaving;
 
-  const handleAdd = () => {
-    const title = draftTitle.trim();
+  const handleAdd = (titleOverride?: string) => {
+    const title = (titleOverride ?? draftTitle).trim();
     if (!title || isSaving) {
       return;
     }
     createMutation.mutate(title);
+  };
+
+  const onAddSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const raw = new FormData(event.currentTarget).get("title");
+    handleAdd(typeof raw === "string" ? raw : "");
+  };
+
+  const onAddKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) {
+      return;
+    }
+    event.preventDefault();
+    handleAdd(event.currentTarget.value);
   };
 
   return (
@@ -64,18 +78,16 @@ export function DashboardQuickTasks() {
       className={cn(styles.box, bentoBoxStyles.fixedPanel)}
       title="Quick tasks"
     >
-      <form
-        className={styles.addRow}
-        onSubmit={(event) => {
-          event.preventDefault();
-          handleAdd();
-        }}
-      >
+      <form className={styles.addRow} onSubmit={onAddSubmit}>
         <input
           className={styles.addInput}
+          name="title"
           placeholder="Add a task…"
           value={draftTitle}
           disabled={isSaving}
+          autoComplete="off"
+          enterKeyHint="done"
+          onKeyDown={onAddKeyDown}
           onChange={(event) => setDraftTitle(event.target.value)}
           aria-label="New task"
         />
