@@ -7,6 +7,8 @@ export {
 } from "./Calendar.api";
 export { Calendar } from "./Calendar";
 export { calendarQueryKeys } from "./Calendar.utils";
+export { useCalendarDayEvents } from "./useCalendarDayEvents";
+export { useCalendarFreshness } from "./useCalendarFreshness";
 export type {
   CalendarEvent,
   CalendarSource,

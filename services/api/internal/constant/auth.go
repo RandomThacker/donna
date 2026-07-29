@@ -42,7 +42,7 @@ const (
 // ICS calendar scopes / defaults.
 const (
 	ICSScopeCalendar          = "ics.calendar"
-	ICSDefaultSyncIntervalMin = 30
+	ICSDefaultSyncIntervalMin = 15
 	ICSHTTPUserAgent          = "DonnaCalendar/1.0"
 )
 

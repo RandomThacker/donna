@@ -19,6 +19,11 @@ const (
 	is_primary_on_provider, is_writable, access_role, sync_enabled, sync_cursor, last_synced_at, timezone,
 	provider_metadata, created_at, updated_at, deleted_at`
 
+	calendarSourceColumnsAliased = `
+	s.id, s.public_id, s.user_id, s.connected_account_id, s.provider_calendar_id, s.name, s.color,
+	s.is_primary_on_provider, s.is_writable, s.access_role, s.sync_enabled, s.sync_cursor, s.last_synced_at, s.timezone,
+	s.provider_metadata, s.created_at, s.updated_at, s.deleted_at`
+
 	sqlInsertCalendarSource = `
 INSERT INTO calendar_sources (
 	id, public_id, user_id, connected_account_id, provider_calendar_id, name, color,
@@ -37,10 +42,13 @@ ORDER BY deleted_at NULLS FIRST
 LIMIT 1`
 
 	sqlSelectCalendarSourcesByUser = `
-SELECT` + calendarSourceColumns + `
-FROM calendar_sources
-WHERE user_id = $1 AND deleted_at IS NULL
-ORDER BY is_primary_on_provider DESC, name ASC`
+SELECT` + calendarSourceColumnsAliased + `
+FROM calendar_sources s
+JOIN connected_accounts ca ON ca.id = s.connected_account_id
+WHERE s.user_id = $1
+  AND s.deleted_at IS NULL
+  AND ca.deleted_at IS NULL
+ORDER BY s.is_primary_on_provider DESC, s.name ASC`
 
 	sqlSelectCalendarSourcesByAccount = `
 SELECT` + calendarSourceColumns + `
@@ -79,6 +87,17 @@ WHERE connected_account_id = $1
   AND deleted_at IS NULL
   AND provider_calendar_id = ANY($2::text[])`
 
+	sqlDeleteCalendarSourcesByAccount = `
+DELETE FROM calendar_sources
+WHERE connected_account_id = $1`
+
+	sqlDeleteOrphanCalendarSourcesForUser = `
+DELETE FROM calendar_sources s
+USING connected_accounts ca
+WHERE s.connected_account_id = ca.id
+  AND s.user_id = $1
+  AND ca.deleted_at IS NOT NULL`
+
 	sqlUpdateCalendarSourceEventSyncState = `
 UPDATE calendar_sources SET
 	sync_cursor = $2,
@@ -110,6 +129,8 @@ type CalendarSourceRepository interface {
 	UpdateFromSync(ctx context.Context, source entity.CalendarSource) (entity.CalendarSource, error)
 	SoftDeleteMissing(ctx context.Context, accountID uuid.UUID, keepProviderIDs []string, deletedAt time.Time) (int64, error)
 	SoftDeleteByProviderIDs(ctx context.Context, accountID uuid.UUID, providerIDs []string, deletedAt time.Time) (int64, error)
+	DeleteByConnectedAccountID(ctx context.Context, accountID uuid.UUID) (int64, error)
+	DeleteOrphansForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	UpdateEventSyncState(ctx context.Context, id uuid.UUID, syncCursor *string, lastSyncedAt, updatedAt time.Time) (entity.CalendarSource, error)
 	ClearEventSyncCursor(ctx context.Context, id uuid.UUID, updatedAt time.Time) (entity.CalendarSource, error)
 	UpdateSyncEnabledByAccount(ctx context.Context, accountID uuid.UUID, syncEnabled bool, updatedAt time.Time) (int64, error)
@@ -251,6 +272,28 @@ func (r *calendarSourceRepository) SoftDeleteByProviderIDs(
 	tag, err := r.q.Exec(ctx, sqlSoftDeleteCalendarSourcesByProviderIDs, accountID, providerIDs, deletedAt)
 	if err != nil {
 		return 0, fmt.Errorf("soft-delete calendar sources by provider ids: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *calendarSourceRepository) DeleteByConnectedAccountID(
+	ctx context.Context,
+	accountID uuid.UUID,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlDeleteCalendarSourcesByAccount, accountID)
+	if err != nil {
+		return 0, fmt.Errorf("delete calendar sources by account: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *calendarSourceRepository) DeleteOrphansForUser(
+	ctx context.Context,
+	userID uuid.UUID,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlDeleteOrphanCalendarSourcesForUser, userID)
+	if err != nil {
+		return 0, fmt.Errorf("delete orphan calendar sources: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }

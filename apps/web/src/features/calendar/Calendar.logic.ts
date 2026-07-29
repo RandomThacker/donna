@@ -84,13 +84,16 @@ function buildAccountGroups(
   for (const account of accounts) {
     orderedIds.push(account.id);
   }
+  // Never surface sources whose connected account is gone (disconnected ICS/OAuth).
   for (const accountId of byAccount.keys()) {
     if (!accountById.has(accountId)) {
-      orderedIds.push(accountId);
+      byAccount.delete(accountId);
     }
   }
 
-  return orderedIds.map((accountId) => {
+  return orderedIds
+    .filter((accountId) => byAccount.has(accountId))
+    .map((accountId) => {
     const matchedAccount = accountById.get(accountId);
     const groupSources = byAccount.get(accountId) ?? [];
     const primary =
@@ -158,8 +161,24 @@ export function useCalendarController() {
 
   const enabledSources = useMemo(() => {
     const sources = sourcesQuery.data?.sources ?? [];
-    return sources.filter((s) => s.sync_enabled);
-  }, [sourcesQuery.data?.sources]);
+    const liveAccountIds = new Set<string>();
+    for (const account of sourcesQuery.data?.accounts ?? []) {
+      liveAccountIds.add(account.id);
+    }
+    if (sourcesQuery.data?.account?.id) {
+      liveAccountIds.add(sourcesQuery.data.account.id);
+    }
+    return sources.filter((source) => {
+      if (!source.sync_enabled) {
+        return false;
+      }
+      // Drop leftovers from disconnected integrations.
+      if (liveAccountIds.size === 0) {
+        return true;
+      }
+      return liveAccountIds.has(source.connected_account_id);
+    });
+  }, [sourcesQuery.data?.sources, sourcesQuery.data?.accounts, sourcesQuery.data?.account]);
 
   const sourceColorMap = useMemo(() => {
     const map = new Map<string, string>();

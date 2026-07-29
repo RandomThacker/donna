@@ -28,6 +28,7 @@ import {
 
 export const calendarQueryKeys = {
   all: ["calendar"] as const,
+  freshness: ["calendar", "freshness"] as const,
   // v2: bust stale caches after multi-account calendar connect fixes
   sources: ["calendar", "sources", "v2"] as const,
   events: (from: string, to: string) =>

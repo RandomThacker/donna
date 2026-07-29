@@ -177,7 +177,7 @@ func (s *IntegrationService) UpdateICS(ctx context.Context, userID, accountID uu
 	return s.icsView(ctx, updated)
 }
 
-// DeleteICS soft-deletes an ICS feed integration.
+// DeleteICS disconnects an ICS feed and permanently removes its calendar rows.
 func (s *IntegrationService) DeleteICS(ctx context.Context, userID, accountID uuid.UUID) error {
 	return s.Disconnect(ctx, userID, accountID)
 }

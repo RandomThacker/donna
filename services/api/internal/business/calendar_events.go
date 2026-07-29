@@ -160,6 +160,11 @@ func (s *CalendarService) syncSourceEvents(
 	if source.SyncCursor != nil {
 		syncToken = strings.TrimSpace(*source.SyncCursor)
 	}
+	// Outlook/Office 365 published ICS often returns 304 with a stale ETag after
+	// meetings move. Always re-download the feed so ReplaceAll picks up changes.
+	if account.Provider == constant.AuthProviderICS {
+		syncToken = ""
+	}
 
 	listed, listErr := provider.ListEvents(ctx, accessToken, source.ProviderCalendarID, calendarprovider.ListEventsOptions{
 		SyncToken: syncToken,

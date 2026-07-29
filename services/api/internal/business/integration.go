@@ -119,7 +119,8 @@ func (s *IntegrationService) ListConnectedAccounts(ctx context.Context, userID u
 	return accounts, nil
 }
 
-// Disconnect soft-deletes a connected account owned by the user.
+// Disconnect soft-deletes the connected account and permanently removes its
+// calendar sources + events from Donna.
 func (s *IntegrationService) Disconnect(ctx context.Context, userID, accountID uuid.UUID) error {
 	if userID == uuid.Nil || accountID == uuid.Nil {
 		return fmt.Errorf("%w: user id and account id are required", apperr.ErrValidation)
@@ -132,8 +133,44 @@ func (s *IntegrationService) Disconnect(ctx context.Context, userID, accountID u
 		return apperr.ErrForbidden
 	}
 	now := s.now().UTC()
-	_, err = s.accounts.SoftDelete(ctx, accountID, now)
-	return err
+
+	cleanup := func(
+		ctx context.Context,
+		accounts repository.ConnectedAccountRepository,
+		sources repository.CalendarSourceRepository,
+		events repository.CalendarEventRepository,
+	) error {
+		// Events first (FK RESTRICT on calendar_source_id), then sources, then account.
+		if events != nil {
+			if _, err := events.DeleteByConnectedAccountID(ctx, accountID); err != nil {
+				return err
+			}
+		}
+		if sources != nil {
+			if _, err := sources.DeleteByConnectedAccountID(ctx, accountID); err != nil {
+				return err
+			}
+		}
+		if _, err := accounts.SoftDelete(ctx, accountID, now); err != nil {
+			return err
+		}
+		return nil
+	}
+
+	if s.tx != nil && (s.sources != nil || s.events != nil) {
+		return s.tx.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+			var sourcesRepo repository.CalendarSourceRepository
+			var eventsRepo repository.CalendarEventRepository
+			if s.sources != nil {
+				sourcesRepo = s.sources.WithTx(tx)
+			}
+			if s.events != nil {
+				eventsRepo = s.events.WithTx(tx)
+			}
+			return cleanup(ctx, s.accounts.WithTx(tx), sourcesRepo, eventsRepo)
+		})
+	}
+	return cleanup(ctx, s.accounts, s.sources, s.events)
 }
 
 // BeginGoogleConnect starts Google calendar OAuth for an authenticated Donna user.

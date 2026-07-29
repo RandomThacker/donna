@@ -11,6 +11,7 @@ import { dedupeHolidayEvents } from "./Calendar.layout";
 import type { CalendarEvent } from "./Calendar.types";
 import { endOfZonedDay, resolveCalendarTimeZone, startOfZonedDay } from "./Calendar.timezone";
 import { calendarQueryKeys } from "./Calendar.utils";
+import { useCalendarFreshness } from "./useCalendarFreshness";
 
 function normalizeEvents(raw: CalendarEvent[]): CalendarEvent[] {
   return raw.filter((event) => event.status !== "cancelled");
@@ -20,6 +21,9 @@ function normalizeEvents(raw: CalendarEvent[]): CalendarEvent[] {
 export function useCalendarDayEvents(day = new Date()) {
   const { user } = useAuth();
   const timeZone = resolveCalendarTimeZone(user?.timezone);
+
+  // Sync from Microsoft/Google into Donna before trusting local reads.
+  const freshnessQuery = useCalendarFreshness();
 
   const range = useMemo(() => {
     const from = startOfZonedDay(day, timeZone);
@@ -33,20 +37,41 @@ export function useCalendarDayEvents(day = new Date()) {
   const sourcesQuery = useQuery({
     queryKey: calendarQueryKeys.sources,
     queryFn: ({ signal }) => listCalendarSources(signal),
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const eventsQuery = useQuery({
     queryKey: calendarQueryKeys.events(fromIso, toIso),
     queryFn: ({ signal }) =>
       listCalendarEvents({ from: fromIso, to: toIso, signal }),
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
 
   const enabledSources = useMemo(() => {
     const sources = sourcesQuery.data?.sources ?? [];
-    return sources.filter((source) => source.sync_enabled);
-  }, [sourcesQuery.data?.sources]);
+    const liveAccountIds = new Set<string>();
+    for (const account of sourcesQuery.data?.accounts ?? []) {
+      liveAccountIds.add(account.id);
+    }
+    if (sourcesQuery.data?.account?.id) {
+      liveAccountIds.add(sourcesQuery.data.account.id);
+    }
+    return sources.filter((source) => {
+      if (!source.sync_enabled) {
+        return false;
+      }
+      if (liveAccountIds.size === 0) {
+        return true;
+      }
+      return liveAccountIds.has(source.connected_account_id);
+    });
+  }, [
+    sourcesQuery.data?.sources,
+    sourcesQuery.data?.accounts,
+    sourcesQuery.data?.account,
+  ]);
 
   const events = useMemo(() => {
     const all = normalizeEvents(eventsQuery.data?.events ?? []);
@@ -66,5 +91,6 @@ export function useCalendarDayEvents(day = new Date()) {
     timeZone,
     isLoading: sourcesQuery.isLoading || eventsQuery.isLoading,
     isError: sourcesQuery.isError || eventsQuery.isError,
+    isSyncing: freshnessQuery.isFetching,
   };
 }

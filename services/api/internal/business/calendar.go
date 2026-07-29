@@ -161,6 +161,17 @@ func (s *CalendarService) ListSources(ctx context.Context, userID uuid.UUID) (Ca
 	if userID == uuid.Nil {
 		return CalendarSourcesView{}, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
 	}
+	// Heal leftovers from older disconnects that left orphaned calendar rows.
+	if s.events != nil {
+		if _, err := s.events.DeleteOrphansForUser(ctx, userID); err != nil && s.log != nil {
+			s.log.Warn(ctx, "failed to delete orphan calendar events", constant.LogAttrError, err)
+		}
+	}
+	if s.sources != nil {
+		if _, err := s.sources.DeleteOrphansForUser(ctx, userID); err != nil && s.log != nil {
+			s.log.Warn(ctx, "failed to delete orphan calendar sources", constant.LogAttrError, err)
+		}
+	}
 	sources, err := s.sources.ListByUserID(ctx, userID)
 	if err != nil {
 		return CalendarSourcesView{}, err

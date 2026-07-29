@@ -20,6 +20,13 @@ const calendarEventColumns = `
 	provider_event_id, provider_etag, provider_updated_at, provider_payload, origin,
 	created_at, updated_at, deleted_at`
 
+const calendarEventColumnsAliased = `
+	e.id, e.public_id, e.user_id, e.calendar_source_id, e.title, e.description, e.location,
+	e.starts_at, e.ends_at, e.is_all_day, e.status, e.visibility, e.timezone, e.organizer_summary,
+	e.attendees_summary, e.recurrence_rule, e.recurring_event_id, e.provider_recurring_event_id,
+	e.provider_event_id, e.provider_etag, e.provider_updated_at, e.provider_payload, e.origin,
+	e.created_at, e.updated_at, e.deleted_at`
+
 const (
 	sqlInsertCalendarEvent = `
 INSERT INTO calendar_events (
@@ -42,13 +49,17 @@ ORDER BY deleted_at NULLS FIRST
 LIMIT 1`
 
 	sqlSelectCalendarEventsByUserRange = `
-SELECT` + calendarEventColumns + `
-FROM calendar_events
-WHERE user_id = $1
-  AND deleted_at IS NULL
-  AND starts_at < $3
-  AND ends_at > $2
-ORDER BY starts_at ASC`
+SELECT` + calendarEventColumnsAliased + `
+FROM calendar_events e
+JOIN calendar_sources s ON s.id = e.calendar_source_id
+JOIN connected_accounts ca ON ca.id = s.connected_account_id
+WHERE e.user_id = $1
+  AND e.deleted_at IS NULL
+  AND s.deleted_at IS NULL
+  AND ca.deleted_at IS NULL
+  AND e.starts_at < $3
+  AND e.ends_at > $2
+ORDER BY e.starts_at ASC`
 
 	sqlUpdateCalendarEventFromSync = `
 UPDATE calendar_events SET
@@ -95,6 +106,20 @@ WHERE calendar_source_id = $1
   AND provider_event_id IS NOT NULL
   AND NOT (provider_event_id = ANY($2::text[]))`
 
+	sqlDeleteCalendarEventsByAccount = `
+DELETE FROM calendar_events e
+USING calendar_sources s
+WHERE e.calendar_source_id = s.id
+  AND s.connected_account_id = $1`
+
+	sqlDeleteOrphanCalendarEventsForUser = `
+DELETE FROM calendar_events e
+USING calendar_sources s
+JOIN connected_accounts ca ON ca.id = s.connected_account_id
+WHERE e.calendar_source_id = s.id
+  AND e.user_id = $1
+  AND (s.deleted_at IS NOT NULL OR ca.deleted_at IS NOT NULL)`
+
 	sqlCountLiveCalendarEventsByAccount = `
 SELECT COUNT(*)
 FROM calendar_events e
@@ -112,6 +137,8 @@ type CalendarEventRepository interface {
 	UpdateFromSync(ctx context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error)
 	SoftDeleteByProviderEventID(ctx context.Context, sourceID uuid.UUID, providerEventID string, deletedAt time.Time) (entity.CalendarEvent, error)
 	SoftDeleteMissing(ctx context.Context, sourceID uuid.UUID, keepProviderIDs []string, deletedAt time.Time) (int64, error)
+	DeleteByConnectedAccountID(ctx context.Context, accountID uuid.UUID) (int64, error)
+	DeleteOrphansForUser(ctx context.Context, userID uuid.UUID) (int64, error)
 	CountLiveByConnectedAccountID(ctx context.Context, accountID uuid.UUID) (int64, error)
 	WithTx(tx pgx.Tx) CalendarEventRepository
 }
@@ -278,6 +305,28 @@ func (r *calendarEventRepository) SoftDeleteMissing(
 	tag, err := r.q.Exec(ctx, sqlSoftDeleteCalendarEventsMissing, sourceID, keepProviderIDs, deletedAt)
 	if err != nil {
 		return 0, fmt.Errorf("soft-delete missing calendar events: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *calendarEventRepository) DeleteByConnectedAccountID(
+	ctx context.Context,
+	accountID uuid.UUID,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlDeleteCalendarEventsByAccount, accountID)
+	if err != nil {
+		return 0, fmt.Errorf("delete calendar events by account: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *calendarEventRepository) DeleteOrphansForUser(
+	ctx context.Context,
+	userID uuid.UUID,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlDeleteOrphanCalendarEventsForUser, userID)
+	if err != nil {
+		return 0, fmt.Errorf("delete orphan calendar events: %w", err)
 	}
 	return tag.RowsAffected(), nil
 }

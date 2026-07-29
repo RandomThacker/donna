@@ -337,6 +337,23 @@ func (m *mockSourceRepo) SoftDeleteByProviderIDs(_ context.Context, accountID uu
 	return n, nil
 }
 
+func (m *mockSourceRepo) DeleteByConnectedAccountID(_ context.Context, accountID uuid.UUID) (int64, error) {
+	var n int64
+	for key, source := range m.byKey {
+		if source.ConnectedAccountID != accountID {
+			continue
+		}
+		delete(m.byKey, key)
+		n++
+	}
+	m.removed = n
+	return n, nil
+}
+
+func (m *mockSourceRepo) DeleteOrphansForUser(_ context.Context, _ uuid.UUID) (int64, error) {
+	return 0, nil
+}
+
 func (m *mockSourceRepo) UpdateEventSyncState(_ context.Context, id uuid.UUID, syncCursor *string, lastSyncedAt, updatedAt time.Time) (entity.CalendarSource, error) {
 	for key, source := range m.byKey {
 		if source.ID == id {

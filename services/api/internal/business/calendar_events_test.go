@@ -104,6 +104,16 @@ func (m *mockEventRepo) SoftDeleteMissing(_ context.Context, sourceID uuid.UUID,
 	return n, nil
 }
 
+func (m *mockEventRepo) DeleteByConnectedAccountID(_ context.Context, _ uuid.UUID) (int64, error) {
+	n := int64(len(m.byKey))
+	m.byKey = map[string]entity.CalendarEvent{}
+	return n, nil
+}
+
+func (m *mockEventRepo) DeleteOrphansForUser(_ context.Context, _ uuid.UUID) (int64, error) {
+	return 0, nil
+}
+
 func (m *mockEventRepo) CountLiveByConnectedAccountID(context.Context, uuid.UUID) (int64, error) {
 	var n int64
 	for _, event := range m.byKey {
@@ -145,6 +155,12 @@ func (m *mockEventSourceRepo) SoftDeleteMissing(context.Context, uuid.UUID, []st
 	return 0, nil
 }
 func (m *mockEventSourceRepo) SoftDeleteByProviderIDs(context.Context, uuid.UUID, []string, time.Time) (int64, error) {
+	return 0, nil
+}
+func (m *mockEventSourceRepo) DeleteByConnectedAccountID(context.Context, uuid.UUID) (int64, error) {
+	return 0, nil
+}
+func (m *mockEventSourceRepo) DeleteOrphansForUser(context.Context, uuid.UUID) (int64, error) {
 	return 0, nil
 }
 func (m *mockEventSourceRepo) UpdateEventSyncState(_ context.Context, id uuid.UUID, syncCursor *string, lastSyncedAt, updatedAt time.Time) (entity.CalendarSource, error) {
