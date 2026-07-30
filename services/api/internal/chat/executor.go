@@ -99,7 +99,7 @@ func (e *Executor) createTask(ctx context.Context, userID uuid.UUID, now time.Ti
 		UserID: userID,
 		Title:  intent.Title,
 		Date:   date,
-		Source: "chat",
+		Source: constant.TaskOccurrenceSourceManual,
 	})
 	if err != nil {
 		return "", err
@@ -289,6 +289,13 @@ func friendlyErr(err error) string {
 		return ""
 	}
 	msg := err.Error()
+	lower := strings.ToLower(msg)
+	if strings.Contains(lower, "sqlstate") ||
+		strings.Contains(lower, "violates") ||
+		strings.Contains(lower, "pq:") ||
+		strings.Contains(lower, "constraint") {
+		return "Something went wrong on my end. Try again."
+	}
 	if i := strings.LastIndex(msg, ": "); i >= 0 && i+2 < len(msg) {
 		return msg[i+2:]
 	}
