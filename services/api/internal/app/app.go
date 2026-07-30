@@ -8,9 +8,11 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/RandomThacker/donna/services/api/internal/actions"
 	"github.com/RandomThacker/donna/services/api/internal/buildinfo"
 	"github.com/RandomThacker/donna/services/api/internal/business"
 	"github.com/RandomThacker/donna/services/api/internal/calendarprovider"
+	"github.com/RandomThacker/donna/services/api/internal/chat"
 	"github.com/RandomThacker/donna/services/api/internal/config"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/database"
@@ -29,6 +31,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/seal"
 	"github.com/RandomThacker/donna/services/api/internal/server"
 	"github.com/RandomThacker/donna/services/api/internal/session"
+	"github.com/RandomThacker/donna/services/api/internal/webpush"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -90,32 +93,123 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	dailyNoteRepo := repository.NewDailyNoteRepository(pool)
 	taskTagRepo := repository.NewTaskTagRepository(pool)
 	taskSvc := business.NewTaskJournalService(taskRepo, occurrenceRepo, dailyNoteRepo, taskTagRepo)
-	taskHandler := handler.NewTaskHandler(taskSvc, taskLog)
+
+	donnaEventRepo := repository.NewDonnaEventRepository(pool)
+	donnaReminderRepo := repository.NewDonnaReminderRepository(pool)
+	calendarEventsRepo := repository.NewCalendarEventRepository(pool)
+	donnaEventSvc := business.NewDonnaEventService(donnaEventRepo)
+	donnaReminderSvc := business.NewDonnaReminderService(donnaReminderRepo)
+	timelineSvc := business.NewTimelineService(business.TimelineServiceDeps{
+		Providers: []business.TimelineProvider{
+			business.NewGoogleTimelineProvider(calendarEventsRepo),
+			business.NewMicrosoftICSTimelineProvider(calendarEventsRepo),
+			business.NewDonnaEventTimelineProvider(donnaEventRepo),
+			business.NewDonnaReminderTimelineProvider(donnaReminderRepo),
+		},
+	})
+	notificationRepo := repository.NewNotificationRepository(pool)
+	notificationSvc := business.NewNotificationService(
+		notificationRepo,
+		timelineSvc,
+		business.NewNotificationPolicyResolver(),
+	)
+
+	actionRegistry := actions.NewRegistry(actions.Deps{
+		Events:        donnaEventSvc,
+		Reminders:     donnaReminderSvc,
+		Tasks:         taskSvc,
+		Timeline:      timelineSvc,
+		Notifications: notificationSvc,
+		Publisher:     actions.NoopPublisher{},
+	})
+
+	taskHandler := handler.NewTaskHandler(
+		taskSvc,
+		actionRegistry.CreateTask,
+		actionRegistry.UpdateTask,
+		actionRegistry.CompleteTask,
+		actionRegistry.DeleteTask,
+		taskLog,
+	)
 
 	noteLog := logFactory.Module(constant.ModuleNote)
 	noteRepo := repository.NewNoteRepository(pool)
 	noteSvc := business.NewNoteService(noteRepo)
 	noteHandler := handler.NewNoteHandler(noteSvc, noteLog)
 
+	timelineLog := logFactory.Module(constant.ModuleTimeline)
+	timelineHandler := handler.NewTimelineHandler(actionRegistry.QueryTimeline, timelineLog)
+	donnaEventHandler := handler.NewDonnaEventHandler(
+		donnaEventSvc,
+		actionRegistry.CreateEvent,
+		actionRegistry.UpdateEvent,
+		actionRegistry.DeleteEvent,
+		timelineLog,
+	)
+	donnaReminderHandler := handler.NewDonnaReminderHandler(
+		donnaReminderSvc,
+		actionRegistry.CreateReminder,
+		actionRegistry.UpdateReminder,
+		actionRegistry.DeleteReminder,
+		timelineLog,
+	)
+
+	notificationLog := logFactory.Module(constant.ModuleNotification)
+	notificationHandler := handler.NewNotificationHandler(
+		actionRegistry.GetNotifications,
+		actionRegistry.MarkNotificationRead,
+		actionRegistry.DismissNotification,
+		notificationLog,
+	)
+	notificationScheduler := business.NewNotificationScheduler(notificationSvc, userRepo, notificationLog)
+
+	chatLog := logFactory.Module(constant.ModuleChat)
+	chatExecutor := chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
+	chatHandler := handler.NewChatHandler(chatExecutor, userSvc, chatLog)
+
+	pushSubRepo := repository.NewPushSubscriptionRepository(pool)
+	pushSubSvc := business.NewPushSubscriptionService(pushSubRepo)
+	pushHandler := handler.NewPushHandler(pushSubSvc, cfg.App.VAPIDPublicKey, notificationLog)
+	pushSender := webpush.NewSender(cfg.App.VAPIDPublicKey, cfg.App.VAPIDPrivateKey, cfg.App.VAPIDSubject)
+	notificationDispatcher := business.NewNotificationDispatcher(
+		notificationRepo,
+		pushSubRepo,
+		pushSender,
+		notificationLog,
+	)
+	if !pushSender.Configured() {
+		appLog.Warn(ctx, "web push VAPID keys not configured; dispatcher will mark WEB_PUSH deliveries as FAILED")
+	}
+
 	engine := router.New(router.Options{
-		Environment:        cfg.App.Environment,
-		CORSOrigins:        cfg.App.CORSOrigins,
-		HTTPLogger:         httpLog,
-		HealthHandler:      healthHandler,
-		UserHandler:        userHandler,
-		AuthHandler:        authParts.handler,
-		MeHandler:          handler.NewMeHandler(userSvc, cfg.App.CookieSecure),
-		CalendarHandler:    calendarParts.handler,
-		IntegrationHandler: calendarParts.integrationHandler,
-		TaskHandler:        taskHandler,
-		NoteHandler:        noteHandler,
-		TokenIssuer:        authParts.issuer,
+		Environment:           cfg.App.Environment,
+		CORSOrigins:           cfg.App.CORSOrigins,
+		HTTPLogger:            httpLog,
+		HealthHandler:         healthHandler,
+		UserHandler:           userHandler,
+		AuthHandler:           authParts.handler,
+		MeHandler:             handler.NewMeHandler(userSvc, cfg.App.CookieSecure),
+		CalendarHandler:       calendarParts.handler,
+		IntegrationHandler:    calendarParts.integrationHandler,
+		TaskHandler:           taskHandler,
+		NoteHandler:           noteHandler,
+		TimelineHandler:       timelineHandler,
+		DonnaEventHandler:     donnaEventHandler,
+		DonnaReminderHandler:  donnaReminderHandler,
+		NotificationHandler:   notificationHandler,
+		PushHandler:           pushHandler,
+		ChatHandler:           chatHandler,
+		TokenIssuer:           authParts.issuer,
 	})
 
 	srv := server.New(cfg.App.Addr, engine, appLog)
 
 	runCtx, runCancel := context.WithCancel(ctx)
 	defer runCancel()
+	go notificationScheduler.Run(runCtx)
+	appLog.Info(ctx, "notification scheduler started")
+	go notificationDispatcher.Run(runCtx)
+	appLog.Info(ctx, "notification dispatcher started")
 	if calendarParts.service != nil {
 		jobsRepo := repository.NewSchedulerJobRepository(pool)
 		platformJobs := []scheduler.Job{

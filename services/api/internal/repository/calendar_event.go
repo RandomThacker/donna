@@ -61,6 +61,19 @@ WHERE e.user_id = $1
   AND e.ends_at > $2
 ORDER BY e.starts_at ASC`
 
+	sqlSelectCalendarEventsByUserRangeWithProvider = `
+SELECT` + calendarEventColumnsAliased + `, ca.provider, s.color
+FROM calendar_events e
+JOIN calendar_sources s ON s.id = e.calendar_source_id
+JOIN connected_accounts ca ON ca.id = s.connected_account_id
+WHERE e.user_id = $1
+  AND e.deleted_at IS NULL
+  AND s.deleted_at IS NULL
+  AND ca.deleted_at IS NULL
+  AND e.starts_at < $3
+  AND e.ends_at > $2
+ORDER BY e.starts_at ASC`
+
 	sqlUpdateCalendarEventFromSync = `
 UPDATE calendar_events SET
 	title = $2,
@@ -134,6 +147,7 @@ type CalendarEventRepository interface {
 	Create(ctx context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error)
 	GetBySourceAndProviderEvent(ctx context.Context, sourceID uuid.UUID, providerEventID string) (entity.CalendarEvent, error)
 	ListByUserInRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEvent, error)
+	ListByUserInRangeWithProvider(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEventWithProvider, error)
 	UpdateFromSync(ctx context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error)
 	SoftDeleteByProviderEventID(ctx context.Context, sourceID uuid.UUID, providerEventID string, deletedAt time.Time) (entity.CalendarEvent, error)
 	SoftDeleteMissing(ctx context.Context, sourceID uuid.UUID, keepProviderIDs []string, deletedAt time.Time) (int64, error)
@@ -231,6 +245,19 @@ func (r *calendarEventRepository) ListByUserInRange(
 	}
 	defer rows.Close()
 	return collectCalendarEvents(rows)
+}
+
+func (r *calendarEventRepository) ListByUserInRangeWithProvider(
+	ctx context.Context,
+	userID uuid.UUID,
+	from, to time.Time,
+) ([]entity.CalendarEventWithProvider, error) {
+	rows, err := r.q.Query(ctx, sqlSelectCalendarEventsByUserRangeWithProvider, userID, from, to)
+	if err != nil {
+		return nil, fmt.Errorf("list calendar events with provider: %w", err)
+	}
+	defer rows.Close()
+	return collectCalendarEventsWithProvider(rows)
 }
 
 func (r *calendarEventRepository) UpdateFromSync(ctx context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error) {
@@ -351,6 +378,18 @@ func collectCalendarEvents(rows pgx.Rows) ([]entity.CalendarEvent, error) {
 	return out, rows.Err()
 }
 
+func collectCalendarEventsWithProvider(rows pgx.Rows) ([]entity.CalendarEventWithProvider, error) {
+	out := make([]entity.CalendarEventWithProvider, 0)
+	for rows.Next() {
+		item, err := scanCalendarEventWithProvider(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
 func scanCalendarEvent(row scannable) (entity.CalendarEvent, error) {
 	var e entity.CalendarEvent
 	err := row.Scan(
@@ -382,4 +421,48 @@ func scanCalendarEvent(row scannable) (entity.CalendarEvent, error) {
 		&e.DeletedAt,
 	)
 	return e, err
+}
+
+func scanCalendarEventWithProvider(row scannable) (entity.CalendarEventWithProvider, error) {
+	var e entity.CalendarEvent
+	var provider string
+	var sourceColor *string
+	err := row.Scan(
+		&e.ID,
+		&e.PublicID,
+		&e.UserID,
+		&e.CalendarSourceID,
+		&e.Title,
+		&e.Description,
+		&e.Location,
+		&e.StartsAt,
+		&e.EndsAt,
+		&e.IsAllDay,
+		&e.Status,
+		&e.Visibility,
+		&e.Timezone,
+		&e.OrganizerSummary,
+		&e.AttendeesSummary,
+		&e.RecurrenceRule,
+		&e.RecurringEventID,
+		&e.ProviderRecurringEventID,
+		&e.ProviderEventID,
+		&e.ProviderETag,
+		&e.ProviderUpdatedAt,
+		&e.ProviderPayload,
+		&e.Origin,
+		&e.CreatedAt,
+		&e.UpdatedAt,
+		&e.DeletedAt,
+		&provider,
+		&sourceColor,
+	)
+	if err != nil {
+		return entity.CalendarEventWithProvider{}, err
+	}
+	return entity.CalendarEventWithProvider{
+		Event:       e,
+		Provider:    provider,
+		SourceColor: sourceColor,
+	}, nil
 }

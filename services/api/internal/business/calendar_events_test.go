@@ -60,6 +60,25 @@ func (m *mockEventRepo) ListByUserInRange(_ context.Context, userID uuid.UUID, f
 	return out, nil
 }
 
+func (m *mockEventRepo) ListByUserInRangeWithProvider(
+	_ context.Context,
+	userID uuid.UUID,
+	from, to time.Time,
+) ([]entity.CalendarEventWithProvider, error) {
+	events, err := m.ListByUserInRange(context.Background(), userID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]entity.CalendarEventWithProvider, 0, len(events))
+	for _, event := range events {
+		out = append(out, entity.CalendarEventWithProvider{
+			Event:    event,
+			Provider: constant.AuthProviderGoogle,
+		})
+	}
+	return out, nil
+}
+
 func (m *mockEventRepo) UpdateFromSync(_ context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error) {
 	pid := ""
 	if event.ProviderEventID != nil {

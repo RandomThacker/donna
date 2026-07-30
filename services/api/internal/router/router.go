@@ -20,9 +20,15 @@ type Options struct {
 	MeHandler          *handler.MeHandler
 	CalendarHandler    *handler.CalendarHandler
 	IntegrationHandler *handler.IntegrationHandler
-	TaskHandler        *handler.TaskHandler
-	NoteHandler        *handler.NoteHandler
-	TokenIssuer        *session.Issuer
+	TaskHandler           *handler.TaskHandler
+	NoteHandler           *handler.NoteHandler
+	TimelineHandler       *handler.TimelineHandler
+	DonnaEventHandler       *handler.DonnaEventHandler
+	DonnaReminderHandler    *handler.DonnaReminderHandler
+	NotificationHandler     *handler.NotificationHandler
+	PushHandler             *handler.PushHandler
+	ChatHandler             *handler.ChatHandler
+	TokenIssuer             *session.Issuer
 }
 
 // New builds a Gin engine with middleware and /api/v1 routes.
@@ -117,6 +123,46 @@ func New(opts Options) *gin.Engine {
 			v1.POST(constant.PathNotes, auth, opts.NoteHandler.Create)
 			v1.PATCH(constant.PathNoteByID, auth, opts.NoteHandler.Update)
 			v1.DELETE(constant.PathNoteByID, auth, opts.NoteHandler.Delete)
+		}
+
+		if opts.TimelineHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathTimeline, auth, opts.TimelineHandler.List)
+		}
+
+		if opts.DonnaEventHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathDonnaEvents, auth, opts.DonnaEventHandler.List)
+			v1.POST(constant.PathDonnaEvents, auth, opts.DonnaEventHandler.Create)
+			v1.PATCH(constant.PathDonnaEventByID, auth, opts.DonnaEventHandler.Update)
+			v1.DELETE(constant.PathDonnaEventByID, auth, opts.DonnaEventHandler.Delete)
+		}
+
+		if opts.DonnaReminderHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathDonnaReminders, auth, opts.DonnaReminderHandler.List)
+			v1.POST(constant.PathDonnaReminders, auth, opts.DonnaReminderHandler.Create)
+			v1.PATCH(constant.PathDonnaReminderByID, auth, opts.DonnaReminderHandler.Update)
+			v1.DELETE(constant.PathDonnaReminderByID, auth, opts.DonnaReminderHandler.Delete)
+		}
+
+		if opts.NotificationHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathNotifications, auth, opts.NotificationHandler.List)
+			v1.PATCH(constant.PathNotificationRead, auth, opts.NotificationHandler.MarkRead)
+			v1.PATCH(constant.PathNotificationDismiss, auth, opts.NotificationHandler.MarkDismissed)
+		}
+
+		if opts.PushHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathPushVAPIDPublicKey, auth, opts.PushHandler.VAPIDPublicKey)
+			v1.POST(constant.PathPushSubscribe, auth, opts.PushHandler.Subscribe)
+			v1.DELETE(constant.PathPushUnsubscribe, auth, opts.PushHandler.Unsubscribe)
+		}
+
+		if opts.ChatHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.POST(constant.PathChatCommand, auth, opts.ChatHandler.Command)
 		}
 	}
 

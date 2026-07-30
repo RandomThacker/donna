@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 
 import { Icon } from "@/components/common";
@@ -57,8 +58,8 @@ export function Settings() {
             <header className={styles.intro}>
               <h1 className={styles.pageTitle}>Settings</h1>
               <p className={styles.body}>
-                Appearance and account. Calendar connections live under
-                Integrations.
+                Appearance, account, and a shortcut to chat commands.
+                Calendar connections live under Integrations.
               </p>
             </header>
 
@@ -91,6 +92,31 @@ export function Settings() {
                       {theme === "dark" ? "Light mode" : "Dark mode"}
                     </span>
                   </button>
+                </div>
+              </div>
+            </section>
+
+            <section className={styles.section} aria-labelledby="commands-heading">
+              <div>
+                <h2 id="commands-heading" className={styles.sectionTitle}>
+                  Commands
+                </h2>
+                <p className={styles.sectionHint}>
+                  Phrases Donna understands in chat right now.
+                </p>
+              </div>
+              <div className={styles.card}>
+                <div className={styles.row}>
+                  <div className={styles.rowMain}>
+                    <p className={styles.rowLabel}>Command guide</p>
+                    <p className={styles.rowMeta}>
+                      Browse every working phrase — copy or try in chat
+                    </p>
+                  </div>
+                  <Link href="/dashboard/commands" className={styles.themeBtn}>
+                    <Icon name="compose" className="h-4 w-4" />
+                    <span>Open</span>
+                  </Link>
                 </div>
               </div>
             </section>

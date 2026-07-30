@@ -155,6 +155,12 @@ func assemble(appFile appconfigFile, dbFile databaseFile, apisFile apiFile) (*Co
 			IntegrationFrontendSuccessURL: integrationFrontendURL,
 			CookieSecure:                  cookieSecure,
 			ShutdownTimeout:               shutdownTimeout,
+			VAPIDPublicKey:                strings.TrimSpace(appFile.VAPIDPublicKey),
+			VAPIDPrivateKey:               strings.TrimSpace(appFile.VAPIDPrivateKey),
+			VAPIDSubject: firstNonEmpty(
+				strings.TrimSpace(appFile.VAPIDSubject),
+				"mailto:donna@localhost",
+			),
 		},
 		Database: DatabaseConfig{
 			URL:                strings.TrimSpace(dbFile.URL),

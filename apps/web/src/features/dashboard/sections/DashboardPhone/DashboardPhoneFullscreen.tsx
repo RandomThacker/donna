@@ -59,6 +59,7 @@ export function DashboardPhoneFullscreen({
         {activeConversation ? (
           <IMessageChat
             conversation={activeConversation}
+            live={activeConversation.id === "donna"}
             onBack={() => setActiveId(null)}
             onClose={onClose}
           />

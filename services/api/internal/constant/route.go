@@ -50,6 +50,23 @@ const (
 
 	PathNotes    = "/notes"
 	PathNoteByID = "/notes/:id"
+
+	PathTimeline = "/timeline"
+
+	PathDonnaEvents       = "/donna/events"
+	PathDonnaEventByID    = "/donna/events/:id"
+	PathDonnaReminders    = "/donna/reminders"
+	PathDonnaReminderByID = "/donna/reminders/:id"
+
+	PathNotifications           = "/notifications"
+	PathNotificationRead        = "/notifications/:id/read"
+	PathNotificationDismiss     = "/notifications/:id/dismiss"
+
+	PathPushSubscribe         = "/push/subscribe"
+	PathPushUnsubscribe       = "/push/unsubscribe"
+	PathPushVAPIDPublicKey    = "/push/vapid-public-key"
+
+	PathChatCommand = "/chat/command"
 )
 
 // Full paths (prefix + relative). Useful for docs, clients, and tests.

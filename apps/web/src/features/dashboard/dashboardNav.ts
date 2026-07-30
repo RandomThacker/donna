@@ -10,6 +10,18 @@ export type DashboardNavItem = {
 export const dashboardNavItems: DashboardNavItem[] = [
   { id: "home", label: "Home", icon: "home", href: "/dashboard" },
   {
+    id: "chat",
+    label: "Chat",
+    icon: "spark",
+    href: "/dashboard/chat",
+  },
+  {
+    id: "commands",
+    label: "Commands",
+    icon: "compose",
+    href: "/dashboard/commands",
+  },
+  {
     id: "calendar",
     label: "Calendar",
     icon: "calendar",
@@ -40,9 +52,9 @@ export const dashboardNavItems: DashboardNavItem[] = [
 /** Mobile bottom bar — subset of primary nav. */
 export const dashboardBottomNavIds = [
   "home",
-  "calendar",
+  "chat",
+  "commands",
   "tasks",
-  "notes",
   "settings",
 ] as const;
 

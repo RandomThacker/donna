@@ -177,4 +177,8 @@ export const iMessageStyles = {
     "placeholder:text-[var(--im-muted)] focus:outline-none",
   ].join(" "),
   mic: "grid h-7 w-7 shrink-0 place-items-center text-[var(--im-blue)]",
+  send: [
+    "grid h-7 w-7 shrink-0 place-items-center rounded-full",
+    "bg-[var(--im-blue)] text-white",
+  ].join(" "),
 } as const;

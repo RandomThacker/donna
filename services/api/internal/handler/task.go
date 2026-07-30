@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/RandomThacker/donna/services/api/internal/actions"
 	"github.com/RandomThacker/donna/services/api/internal/apperr"
 	"github.com/RandomThacker/donna/services/api/internal/business"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
@@ -15,15 +16,33 @@ import (
 	"github.com/google/uuid"
 )
 
-// TaskHandler maps task journal HTTP endpoints to the business layer.
+// TaskHandler maps task journal HTTP endpoints to Actions / services.
 type TaskHandler struct {
-	svc *business.TaskJournalService
-	log *logger.Logger
+	svc          *business.TaskJournalService
+	createTask   *actions.CreateTaskAction
+	updateTask   *actions.UpdateTaskAction
+	completeTask *actions.CompleteTaskAction
+	deleteTask   *actions.DeleteTaskAction
+	log          *logger.Logger
 }
 
 // NewTaskHandler constructs a TaskHandler.
-func NewTaskHandler(svc *business.TaskJournalService, log *logger.Logger) *TaskHandler {
-	return &TaskHandler{svc: svc, log: log}
+func NewTaskHandler(
+	svc *business.TaskJournalService,
+	createTask *actions.CreateTaskAction,
+	updateTask *actions.UpdateTaskAction,
+	completeTask *actions.CompleteTaskAction,
+	deleteTask *actions.DeleteTaskAction,
+	log *logger.Logger,
+) *TaskHandler {
+	return &TaskHandler{
+		svc:          svc,
+		createTask:   createTask,
+		updateTask:   updateTask,
+		completeTask: completeTask,
+		deleteTask:   deleteTask,
+		log:          log,
+	}
 }
 
 // GetDay handles GET /tasks/day/:date.
@@ -63,7 +82,8 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		h.writeTaskError(c, err)
 		return
 	}
-	occ, err := h.svc.CreateTask(c.Request.Context(), userID, business.CreateTaskInput{
+	occ, err := h.createTask.Execute(c.Request.Context(), actions.CreateTaskRequest{
+		UserID:         userID,
 		Title:          req.Title,
 		Description:    req.Description,
 		Priority:       req.Priority,
@@ -78,7 +98,7 @@ func (h *TaskHandler) CreateTask(c *gin.Context) {
 		h.writeTaskError(c, err)
 		return
 	}
-	response.JSON(c, http.StatusCreated, constant.MessageOK, model.TaskOccurrenceFromEntity(occ))
+	response.JSON(c, http.StatusCreated, constant.MessageOK, taskOccurrenceFromAction(occ))
 }
 
 // UpdateTask handles PATCH /tasks/:id.
@@ -98,7 +118,9 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "invalid request body", constant.ErrorCodeInvalidRequest, err.Error())
 		return
 	}
-	update := business.UpdateTaskInput{
+	update := actions.UpdateTaskRequest{
+		UserID:         userID,
+		TaskID:         taskID,
 		Title:          req.Title,
 		Description:    req.Description,
 		Priority:       req.Priority,
@@ -110,17 +132,12 @@ func (h *TaskHandler) UpdateTask(c *gin.Context) {
 		ids := parseUUIDList(*req.TagIDs)
 		update.TagIDs = &ids
 	}
-	task, err := h.svc.UpdateTask(c.Request.Context(), userID, taskID, update)
+	task, err := h.updateTask.Execute(c.Request.Context(), update)
 	if err != nil {
 		h.writeTaskError(c, err)
 		return
 	}
-	tags, err := h.svc.ListTaskTagsForTask(c.Request.Context(), userID, taskID)
-	if err != nil {
-		h.writeTaskError(c, err)
-		return
-	}
-	response.OK(c, constant.MessageOK, model.TaskFromEntityWithTags(task, tags))
+	response.OK(c, constant.MessageOK, taskFromAction(task))
 }
 
 // DeleteTask handles DELETE /tasks/:id.
@@ -135,7 +152,10 @@ func (h *TaskHandler) DeleteTask(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "invalid task id", constant.ErrorCodeInvalidRequest, err.Error())
 		return
 	}
-	if err := h.svc.DeleteTask(c.Request.Context(), userID, taskID); err != nil {
+	if err := h.deleteTask.Execute(c.Request.Context(), actions.DeleteTaskRequest{
+		UserID: userID,
+		TaskID: taskID,
+	}); err != nil {
 		h.writeTaskError(c, err)
 		return
 	}
@@ -163,12 +183,16 @@ func (h *TaskHandler) UpdateOccurrence(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "completed is required", constant.ErrorCodeInvalidRequest, "missing completed")
 		return
 	}
-	occ, err := h.svc.UpdateOccurrence(c.Request.Context(), userID, occID, *req.Completed)
+	occ, err := h.completeTask.Execute(c.Request.Context(), actions.CompleteTaskRequest{
+		UserID:       userID,
+		OccurrenceID: occID,
+		Completed:    *req.Completed,
+	})
 	if err != nil {
 		h.writeTaskError(c, err)
 		return
 	}
-	response.OK(c, constant.MessageOK, model.TaskOccurrenceFromEntity(occ))
+	response.OK(c, constant.MessageOK, taskOccurrenceFromAction(occ))
 }
 
 // ReorderOccurrences handles PATCH /task-occurrences/reorder.
