@@ -163,6 +163,7 @@ func New(opts Options) *gin.Engine {
 		if opts.ChatHandler != nil && opts.TokenIssuer != nil {
 			auth := middleware.RequireAuth(opts.TokenIssuer)
 			v1.POST(constant.PathChatCommand, auth, opts.ChatHandler.Command)
+			v1.GET(constant.PathChatMessages, auth, opts.ChatHandler.Messages)
 		}
 	}
 

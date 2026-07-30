@@ -45,7 +45,7 @@ export function Chat() {
           <header className={styles.header}>
             <h1 className={styles.title}>Donna</h1>
             <p className={styles.subtitle}>
-              Command chat — same iMessage thread as the phone. Session only.{" "}
+              Command chat — same iMessage thread as the phone. History is saved.{" "}
               <Link
                 href="/dashboard/commands"
                 className="text-donna-accent underline-offset-2 hover:underline"

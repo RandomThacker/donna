@@ -6,4 +6,6 @@ export type DashboardSidebarProps = {
   profileInitials: string;
   profileEmail?: string | null;
   profileAvatarUrl?: string | null;
+  /** Optional unread/count badges keyed by nav item id. */
+  badgeByNavId?: Partial<Record<string, number>>;
 };

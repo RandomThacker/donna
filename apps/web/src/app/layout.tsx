@@ -4,7 +4,7 @@ import { Instrument_Serif, Manrope } from "next/font/google";
 import { ThemeProvider } from "@/components/theme";
 import { AuthProvider } from "@/features/auth";
 import { siteMetadata } from "@/features/landing/Landing.logic";
-import { PwaInstallPrompt, PushSubscribe } from "@/features/pwa";
+import { PwaInstallPrompt } from "@/features/pwa";
 import { QueryProvider } from "@/providers/QueryProvider";
 
 import "./globals.css";
@@ -83,7 +83,6 @@ export default function RootLayout({
           <QueryProvider>
             <AuthProvider>
               {children}
-              <PushSubscribe />
               <PwaInstallPrompt />
             </AuthProvider>
           </QueryProvider>

@@ -27,6 +27,12 @@ export const dashboardNavItems: DashboardNavItem[] = [
     icon: "calendar",
     href: "/dashboard/calendar",
   },
+  {
+    id: "notifications",
+    label: "Notifications",
+    icon: "bell",
+    href: "/dashboard/notifications",
+  },
   { id: "tasks", label: "Todo", icon: "tasks", href: "/dashboard/tasks" },
   { id: "notes", label: "Notes", icon: "notes", href: "/dashboard/notes" },
   {
@@ -53,7 +59,7 @@ export const dashboardNavItems: DashboardNavItem[] = [
 export const dashboardBottomNavIds = [
   "home",
   "calendar",
-  "chat",
+  "notifications",
   "tasks",
   "settings",
 ] as const;

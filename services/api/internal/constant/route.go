@@ -66,7 +66,8 @@ const (
 	PathPushUnsubscribe       = "/push/unsubscribe"
 	PathPushVAPIDPublicKey    = "/push/vapid-public-key"
 
-	PathChatCommand = "/chat/command"
+	PathChatCommand  = "/chat/command"
+	PathChatMessages = "/chat/messages"
 )
 
 // Full paths (prefix + relative). Useful for docs, clients, and tests.

@@ -42,7 +42,7 @@ export function IMessageChat({
   initialDraft = "",
   showBack = true,
 }: IMessageChatProps) {
-  const session = useChatSession(live ? initialDraft : "");
+  const session = useChatSession(live ? initialDraft : "", { enabled: live });
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   const bubbles: IMessageBubble[] = live
@@ -54,7 +54,11 @@ export function IMessageChat({
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [live, session.messages, session.sending]);
 
-  const canSend = live && session.draft.trim().length > 0 && !session.sending;
+  const canSend =
+    live &&
+    session.draft.trim().length > 0 &&
+    !session.sending &&
+    !session.loadingHistory;
 
   return (
     <div className={styles.chatRoot}>
@@ -89,8 +93,15 @@ export function IMessageChat({
 
       <div className={styles.chatBody}>
         <p className={styles.stamp}>
-          Today {conversation.messages[0]?.time ?? ""}
+          {live
+            ? "Donna"
+            : `Today ${conversation.messages[0]?.time ?? ""}`}
         </p>
+        {live && session.loadingHistory && bubbles.length === 0 ? (
+          <p className={styles.typing} aria-live="polite">
+            Loading…
+          </p>
+        ) : null}
         {bubbles.map((message, index) => {
           const incoming = message.role === "donna";
           const last = isLastInGroup(bubbles, index);

@@ -18,6 +18,10 @@ export const sidebarStyles = {
   ].join(" "),
   itemActive: "bg-donna-accent-soft text-donna-text",
   itemIcon: "shrink-0 text-current opacity-80",
+  navBadge: [
+    "ml-auto grid h-5 min-w-5 shrink-0 place-items-center rounded-full",
+    "bg-donna-accent px-1.5 text-[0.65rem] font-semibold text-donna-on-accent",
+  ].join(" "),
   footer: "mt-auto p-3",
   profile: [
     "flex items-center gap-3 rounded-xl border border-donna-border",

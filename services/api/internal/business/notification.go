@@ -145,8 +145,7 @@ func (s *NotificationService) enqueueItem(
 		return false, err
 	}
 	channelStatus, err := json.Marshal(map[string]string{
-		constant.DeliveryChannelWebPush: constant.ChannelDeliveryPending,
-		constant.DeliveryChannelChat:    constant.ChannelDeliveryPending,
+		constant.DeliveryChannelChat: constant.ChannelDeliveryPending,
 	})
 	if err != nil {
 		return false, err

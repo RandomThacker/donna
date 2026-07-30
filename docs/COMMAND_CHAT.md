@@ -52,9 +52,11 @@ Everything else → help reply. Expand only after these feel effortless.
 
 ## API
 
-`POST /api/v1/chat/command` → `{ "reply", "intent" }`
+`POST /api/v1/chat/command` → `{ "reply", "intent", …message ids }`
 
-History is browser session only — not persisted.
+`GET /api/v1/chat/messages` → primary web thread history (persisted).
+
+User and Donna turns are stored in `conversations` / `messages` for the primary `web` + `general` conversation.
 
 ## Command guide (web)
 

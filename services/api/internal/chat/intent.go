@@ -93,7 +93,8 @@ Try something like
 
 // CommandRequest is POST /chat/command.
 type CommandRequest struct {
-	Message string `json:"message"`
+	Message         string `json:"message"`
+	ClientMessageID string `json:"client_message_id,omitempty"`
 }
 
 // CommandResult is returned to any chat UI.

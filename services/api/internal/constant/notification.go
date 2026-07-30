@@ -17,9 +17,9 @@ const (
 	NotificationTypeReminder = "REMINDER"
 )
 
-// Intended delivery channels (no delivery in Phase 2.2).
+// Intended delivery channels.
 const (
-	DeliveryChannelWebPush  = "WEB_PUSH"
+	DeliveryChannelWebPush  = "WEB_PUSH" // disabled — skipped by dispatcher
 	DeliveryChannelChat     = "CHAT"
 	DeliveryChannelTelegram = "TELEGRAM"
 	DeliveryChannelWhatsApp = "WHATSAPP"
@@ -43,8 +43,8 @@ const (
 )
 
 // Default intended channels until user preferences exist.
+// Web Push is disabled — Notification Center + Chat only.
 var DefaultDeliveryChannels = []string{
-	DeliveryChannelWebPush,
 	DeliveryChannelChat,
 }
 

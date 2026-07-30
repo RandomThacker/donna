@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { sendChatCommand } from "./Chat.api";
-import type { ChatMessage } from "./Chat.types";
+import { fetchChatMessages, sendChatCommand } from "./Chat.api";
+import type { ChatHistoryMessage, ChatMessage } from "./Chat.types";
 
 function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -16,12 +16,58 @@ const WELCOME: ChatMessage = {
   createdAt: Date.now(),
 };
 
-export function useChatSession(initialDraft = "") {
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
+function mapHistoryMessage(m: ChatHistoryMessage): ChatMessage {
+  return {
+    id: m.public_id || m.id,
+    role: m.role === "user" ? "user" : "donna",
+    text: m.content,
+    createdAt: Date.parse(m.created_at) || Date.now(),
+  };
+}
+
+export function useChatSession(
+  initialDraft = "",
+  options: { enabled?: boolean } = {},
+) {
+  const enabled = options.enabled !== false;
+  const [messages, setMessages] = useState<ChatMessage[]>(
+    enabled ? [] : [WELCOME],
+  );
   const [draft, setDraft] = useState(initialDraft);
   const [sending, setSending] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(enabled);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const appliedPrefill = useRef(false);
+
+  useEffect(() => {
+    if (!enabled) {
+      setLoadingHistory(false);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const history = await fetchChatMessages();
+        if (cancelled) return;
+        if (history.messages.length === 0) {
+          setMessages([WELCOME]);
+        } else {
+          setMessages(history.messages.map(mapHistoryMessage));
+        }
+      } catch {
+        if (!cancelled) {
+          setMessages([WELCOME]);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoadingHistory(false);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [enabled]);
 
   useEffect(() => {
     if (appliedPrefill.current) return;
@@ -32,29 +78,38 @@ export function useChatSession(initialDraft = "") {
   }, [initialDraft]);
 
   useEffect(() => {
+    if (loadingHistory) return;
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, sending]);
+  }, [messages, sending, loadingHistory]);
 
   const send = useCallback(async () => {
     const text = draft.trim();
-    if (!text || sending) {
+    if (!text || sending || loadingHistory) {
       return;
     }
+    const clientId = newId();
     const userMsg: ChatMessage = {
-      id: newId(),
+      id: clientId,
       role: "user",
       text,
       createdAt: Date.now(),
     };
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages((prev) => {
+      const withoutWelcome = prev.filter((m) => m.id !== "welcome");
+      return [...withoutWelcome, userMsg];
+    });
     setDraft("");
     setSending(true);
     try {
-      const result = await sendChatCommand(text);
+      const result = await sendChatCommand(text, clientId);
       setMessages((prev) => [
-        ...prev,
+        ...prev.map((m) =>
+          m.id === clientId && result.user_message_public_id
+            ? { ...m, id: result.user_message_public_id }
+            : m,
+        ),
         {
-          id: newId(),
+          id: result.reply_message_public_id || newId(),
           role: "donna",
           text: result.reply,
           createdAt: Date.now(),
@@ -73,13 +128,14 @@ export function useChatSession(initialDraft = "") {
     } finally {
       setSending(false);
     }
-  }, [draft, sending]);
+  }, [draft, sending, loadingHistory]);
 
   return {
     messages,
     draft,
     setDraft,
     sending,
+    loadingHistory,
     send,
     bottomRef,
   };

@@ -12,8 +12,12 @@ export const bottomBarStyles = {
     "active:opacity-80",
   ].join(" "),
   itemActive: "text-donna-accent",
-  iconWrap: "grid h-8 w-8 place-items-center rounded-xl",
+  iconWrap: "relative grid h-8 w-8 place-items-center rounded-xl",
   iconWrapActive: "bg-donna-accent-soft text-donna-accent",
   icon: "h-[1.15rem] w-[1.15rem]",
+  badge: [
+    "absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full",
+    "bg-donna-accent px-0.5 text-[0.55rem] font-semibold leading-none text-donna-on-accent",
+  ].join(" "),
   label: "truncate",
 } as const;

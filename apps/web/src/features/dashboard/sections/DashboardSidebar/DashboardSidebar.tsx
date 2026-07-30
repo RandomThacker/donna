@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { Icon } from "@/components/common";
 import { cn } from "@/lib/cn";
+import { useNotificationsCenter } from "@/features/notifications";
 
 import { sidebarStyles as styles } from "./DashboardSidebar.styles";
 import type { DashboardSidebarProps } from "./DashboardSidebar.types";
@@ -15,8 +16,10 @@ export function DashboardSidebar({
   profileInitials,
   profileEmail,
   profileAvatarUrl,
+  badgeByNavId,
 }: DashboardSidebarProps) {
   const [avatarFailed, setAvatarFailed] = useState(false);
+  const { badgeCount } = useNotificationsCenter();
 
   useEffect(() => {
     setAvatarFailed(false);
@@ -34,17 +37,32 @@ export function DashboardSidebar({
         <span className={styles.brandWord}>Donna</span>
       </Link>
       <nav className={styles.nav}>
-        {items.map((item) => (
-          <Link
-            key={item.id}
-            href={item.href}
-            aria-current={item.active ? "page" : undefined}
-            className={cn(styles.item, item.active && styles.itemActive)}
-          >
-            <Icon name={item.icon} className={cn("h-4 w-4", styles.itemIcon)} />
-            {item.label}
-          </Link>
-        ))}
+        {items.map((item) => {
+          const badge =
+            badgeByNavId?.[item.id] ??
+            (item.id === "notifications" && badgeCount > 0
+              ? badgeCount
+              : undefined);
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              aria-current={item.active ? "page" : undefined}
+              className={cn(styles.item, item.active && styles.itemActive)}
+            >
+              <Icon
+                name={item.icon}
+                className={cn("h-4 w-4", styles.itemIcon)}
+              />
+              <span className="min-w-0 flex-1 truncate">{item.label}</span>
+              {badge != null && badge > 0 ? (
+                <span className={styles.navBadge} aria-label={`${badge} unread`}>
+                  {badge > 99 ? "99+" : badge}
+                </span>
+              ) : null}
+            </Link>
+          );
+        })}
       </nav>
       <div className={styles.footer}>
         <div className={styles.profile}>

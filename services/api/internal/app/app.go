@@ -31,7 +31,6 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/seal"
 	"github.com/RandomThacker/donna/services/api/internal/server"
 	"github.com/RandomThacker/donna/services/api/internal/session"
-	"github.com/RandomThacker/donna/services/api/internal/webpush"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -92,7 +91,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	occurrenceRepo := repository.NewTaskOccurrenceRepository(pool)
 	dailyNoteRepo := repository.NewDailyNoteRepository(pool)
 	taskTagRepo := repository.NewTaskTagRepository(pool)
-	taskSvc := business.NewTaskJournalService(taskRepo, occurrenceRepo, dailyNoteRepo, taskTagRepo)
+	taskSvc := business.NewTaskJournalService(taskRepo, occurrenceRepo, dailyNoteRepo, taskTagRepo, userRepo)
 
 	donnaEventRepo := repository.NewDonnaEventRepository(pool)
 	donnaReminderRepo := repository.NewDonnaReminderRepository(pool)
@@ -165,21 +164,16 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 
 	chatLog := logFactory.Module(constant.ModuleChat)
 	chatExecutor := chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
-	chatHandler := handler.NewChatHandler(chatExecutor, userSvc, chatLog)
+	tx := repository.NewTxManager(pool)
+	conversationRepo := repository.NewConversationRepository(pool)
+	messageRepo := repository.NewMessageRepository(pool)
+	conversationSvc := business.NewConversationService(conversationRepo, messageRepo, tx)
+	chatHandler := handler.NewChatHandler(chatExecutor, conversationSvc, userSvc, chatLog)
 
-	pushSubRepo := repository.NewPushSubscriptionRepository(pool)
-	pushSubSvc := business.NewPushSubscriptionService(pushSubRepo)
-	pushHandler := handler.NewPushHandler(pushSubSvc, cfg.App.VAPIDPublicKey, notificationLog)
-	pushSender := webpush.NewSender(cfg.App.VAPIDPublicKey, cfg.App.VAPIDPrivateKey, cfg.App.VAPIDSubject)
 	notificationDispatcher := business.NewNotificationDispatcher(
 		notificationRepo,
-		pushSubRepo,
-		pushSender,
 		notificationLog,
 	)
-	if !pushSender.Configured() {
-		appLog.Warn(ctx, "web push VAPID keys not configured; dispatcher will mark WEB_PUSH deliveries as FAILED")
-	}
 
 	engine := router.New(router.Options{
 		Environment:           cfg.App.Environment,
@@ -197,7 +191,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		DonnaEventHandler:     donnaEventHandler,
 		DonnaReminderHandler:  donnaReminderHandler,
 		NotificationHandler:   notificationHandler,
-		PushHandler:           pushHandler,
+		PushHandler:           nil, // Web Push disabled — Notification Center + Chat only
 		ChatHandler:           chatHandler,
 		TokenIssuer:           authParts.issuer,
 	})

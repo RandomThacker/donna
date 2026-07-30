@@ -21,6 +21,7 @@ type TaskJournalService struct {
 	occurrences repository.TaskOccurrenceRepository
 	notes       repository.DailyNoteRepository
 	tags        repository.TaskTagRepository
+	users       repository.UserRepository
 	now         func() time.Time
 }
 
@@ -30,12 +31,14 @@ func NewTaskJournalService(
 	occurrences repository.TaskOccurrenceRepository,
 	notes repository.DailyNoteRepository,
 	tags repository.TaskTagRepository,
+	users repository.UserRepository,
 ) *TaskJournalService {
 	return &TaskJournalService{
 		tasks:       tasks,
 		occurrences: occurrences,
 		notes:       notes,
 		tags:        tags,
+		users:       users,
 		now:         time.Now,
 	}
 }
@@ -112,9 +115,13 @@ func (s *TaskJournalService) GetDay(ctx context.Context, userID uuid.UUID, date 
 // EnsureDay materializes incomplete tasks from the previous day onto today/past.
 // Future dates stay empty until the user adds a task there.
 // Carry-forward is idempotent: tasks already present on the day are skipped.
+// "Today" is the user's timezone civil day (not UTC).
 func (s *TaskJournalService) EnsureDay(ctx context.Context, userID uuid.UUID, date time.Time) error {
 	date = civilDate(date)
-	today := civilDate(s.now())
+	today, err := s.journalToday(ctx, userID)
+	if err != nil {
+		return err
+	}
 	if date.After(today) {
 		return nil
 	}
@@ -127,7 +134,10 @@ func (s *TaskJournalService) CarryForward(ctx context.Context, userID uuid.UUID,
 		return fmt.Errorf("%w: user id is required", apperr.ErrValidation)
 	}
 	date = civilDate(date)
-	today := civilDate(s.now())
+	today, err := s.journalToday(ctx, userID)
+	if err != nil {
+		return err
+	}
 	if date.After(today) {
 		return fmt.Errorf("%w: cannot carry forward into a future day", apperr.ErrValidation)
 	}
@@ -135,9 +145,13 @@ func (s *TaskJournalService) CarryForward(ctx context.Context, userID uuid.UUID,
 }
 
 // purgeFutureCarryForwards removes auto-cloned backlog rows that should never
-// have been materialized on days after today.
+// have been materialized on days after the user's local today.
 func (s *TaskJournalService) purgeFutureCarryForwards(ctx context.Context, userID uuid.UUID) error {
-	_, err := s.occurrences.DeleteCarryForwardAfter(ctx, userID, civilDate(s.now()))
+	today, err := s.journalToday(ctx, userID)
+	if err != nil {
+		return err
+	}
+	_, err = s.occurrences.DeleteCarryForwardAfter(ctx, userID, today)
 	return err
 }
 
@@ -530,8 +544,34 @@ func civilDate(t time.Time) time.Time {
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }
 
+// civilDateIn returns the civil calendar day of t in loc, stored as UTC midnight.
+func civilDateIn(t time.Time, loc *time.Location) time.Time {
+	if loc == nil {
+		loc = time.UTC
+	}
+	y, m, d := t.In(loc).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
 func sameCivilDay(a, b time.Time) bool {
 	return civilDate(a).Equal(civilDate(b))
+}
+
+// journalToday is the user's local civil "today" for carry-forward gates.
+func (s *TaskJournalService) journalToday(ctx context.Context, userID uuid.UUID) (time.Time, error) {
+	tz := constant.DefaultUserTimezone
+	if s.users != nil && userID != uuid.Nil {
+		if user, err := s.users.GetByID(ctx, userID); err == nil {
+			if trimmed := strings.TrimSpace(user.Timezone); trimmed != "" {
+				tz = trimmed
+			}
+		}
+	}
+	loc, err := loadTimezone(tz)
+	if err != nil {
+		loc = time.UTC
+	}
+	return civilDateIn(s.now(), loc), nil
 }
 
 // ParseCivilDate parses YYYY-MM-DD.

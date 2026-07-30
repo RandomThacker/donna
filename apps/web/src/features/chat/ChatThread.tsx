@@ -12,18 +12,23 @@ type ChatThreadProps = {
   initialDraft?: string;
 };
 
-/** Session-only command chat thread (no persistence). */
+/** Persisted command chat thread (primary web conversation). */
 export function ChatThread({
   className,
   compact = false,
   initialDraft = "",
 }: ChatThreadProps) {
-  const { messages, draft, setDraft, sending, send, bottomRef } =
+  const { messages, draft, setDraft, sending, loadingHistory, send, bottomRef } =
     useChatSession(initialDraft);
 
   return (
     <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
       <div className={cn(styles.thread, compact && "px-3 py-3")}>
+        {loadingHistory && messages.length === 0 ? (
+          <p className={styles.typing} aria-live="polite">
+            Loading conversation…
+          </p>
+        ) : null}
         {messages.map((message) => (
           <div
             key={message.id}
@@ -62,7 +67,7 @@ export function ChatThread({
             value={draft}
             placeholder="Tell Donna what to do…"
             aria-label="Message Donna"
-            disabled={sending}
+            disabled={sending || loadingHistory}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {
@@ -74,7 +79,7 @@ export function ChatThread({
           <button
             type="submit"
             className={styles.send}
-            disabled={sending || !draft.trim()}
+            disabled={sending || loadingHistory || !draft.trim()}
             aria-label="Send"
           >
             <Icon name="send" className="h-4 w-4" />

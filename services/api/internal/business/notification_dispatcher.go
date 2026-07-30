@@ -9,31 +9,25 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
-	"github.com/RandomThacker/donna/services/api/internal/webpush"
 )
 
-// NotificationDispatcher delivers due PENDING notifications via Web Push.
+// NotificationDispatcher promotes due PENDING notifications to SENT for
+// in-app surfaces (Notification Center + Chat). Web Push is disabled.
 type NotificationDispatcher struct {
 	notifications repository.NotificationRepository
-	subs          repository.PushSubscriptionRepository
-	sender        webpush.Sender
 	log           *logger.Logger
 	interval      time.Duration
 	now           func() time.Time
 	batchLimit    int
 }
 
-// NewNotificationDispatcher constructs a minute-tick Web Push dispatcher.
+// NewNotificationDispatcher constructs a minute-tick in-app publisher.
 func NewNotificationDispatcher(
 	notifications repository.NotificationRepository,
-	subs repository.PushSubscriptionRepository,
-	sender webpush.Sender,
 	log *logger.Logger,
 ) *NotificationDispatcher {
 	return &NotificationDispatcher{
 		notifications: notifications,
-		subs:          subs,
-		sender:        sender,
 		log:           log,
 		interval:      constant.NotificationDispatcherInterval,
 		now:           time.Now,
@@ -43,7 +37,7 @@ func NewNotificationDispatcher(
 
 // Run blocks until ctx is canceled, ticking every minute.
 func (d *NotificationDispatcher) Run(ctx context.Context) {
-	if d.notifications == nil || d.subs == nil {
+	if d.notifications == nil {
 		return
 	}
 	ticker := time.NewTicker(d.interval)
@@ -60,7 +54,7 @@ func (d *NotificationDispatcher) Run(ctx context.Context) {
 	}
 }
 
-// Tick delivers all due PENDING notifications once (exported for tests).
+// Tick publishes all due PENDING notifications once (exported for tests).
 func (d *NotificationDispatcher) Tick(ctx context.Context) {
 	now := d.now().UTC()
 	due, err := d.notifications.ListDuePending(ctx, now, d.batchLimit)
@@ -72,10 +66,9 @@ func (d *NotificationDispatcher) Tick(ctx context.Context) {
 	}
 	var sent, failed int
 	for _, n := range due {
-		outcome, err := d.deliverOne(ctx, n, now)
-		if err != nil {
+		if err := d.publishOne(ctx, n, now); err != nil {
 			if d.log != nil {
-				d.log.Warn(ctx, "notification dispatch failed",
+				d.log.Warn(ctx, "notification publish failed",
 					"notification_id", n.ID.String(),
 					constant.LogAttrError, err,
 				)
@@ -83,12 +76,7 @@ func (d *NotificationDispatcher) Tick(ctx context.Context) {
 			failed++
 			continue
 		}
-		switch outcome {
-		case deliverOutcomeSent:
-			sent++
-		case deliverOutcomeFailed:
-			failed++
-		}
+		sent++
 	}
 	if d.log != nil && (sent > 0 || failed > 0) {
 		d.log.Info(ctx, "notification dispatcher tick",
@@ -99,75 +87,34 @@ func (d *NotificationDispatcher) Tick(ctx context.Context) {
 	}
 }
 
-func (d *NotificationDispatcher) deliverOne(ctx context.Context, n entity.Notification, now time.Time) (deliverOutcome, error) {
-	if !wantsWebPush(n) {
-		// Leave PENDING until a supported channel exists; do not mark FAILED.
-		return deliverOutcomeSkipped, nil
-	}
-
+func (d *NotificationDispatcher) publishOne(ctx context.Context, n entity.Notification, now time.Time) error {
 	channelStatus := parseChannelStatus(n.ChannelDeliveryStatus)
-	payload := webpush.PayloadFromNotification(n)
-
-	subs, err := d.subs.ListByUser(ctx, n.UserID)
-	if err != nil {
-		return deliverOutcomeFailed, err
-	}
-
-	success := false
-	if d.sender != nil && d.sender.Configured() && len(subs) > 0 {
-		for _, sub := range subs {
-			res, sendErr := d.sender.Send(ctx, sub, payload)
-			if sendErr != nil {
-				if res.Gone {
-					_ = d.subs.SoftDeleteByEndpoint(ctx, n.UserID, sub.Endpoint, now)
-				}
-				continue
-			}
-			success = true
-		}
-	}
-
-	if success {
-		channelStatus[constant.DeliveryChannelWebPush] = constant.ChannelDeliverySent
-		statusJSON, err := json.Marshal(channelStatus)
-		if err != nil {
-			return deliverOutcomeFailed, err
-		}
-		sentAt := now
-		_, err = d.notifications.UpdateDelivery(ctx, n.ID, constant.NotificationStatusSent, statusJSON, &sentAt, now)
-		if err != nil {
-			return deliverOutcomeFailed, err
-		}
-		return deliverOutcomeSent, nil
-	}
-
-	channelStatus[constant.DeliveryChannelWebPush] = constant.ChannelDeliveryFailed
-	statusJSON, err := json.Marshal(channelStatus)
-	if err != nil {
-		return deliverOutcomeFailed, err
-	}
-	_, err = d.notifications.UpdateDelivery(ctx, n.ID, constant.NotificationStatusFailed, statusJSON, nil, now)
-	if err != nil {
-		return deliverOutcomeFailed, err
-	}
-	return deliverOutcomeFailed, nil
-}
-
-type deliverOutcome int
-
-const (
-	deliverOutcomeSkipped deliverOutcome = iota
-	deliverOutcomeSent
-	deliverOutcomeFailed
-)
-
-func wantsWebPush(n entity.Notification) bool {
+	marked := false
 	for _, ch := range n.DeliveryChannels {
 		if ch == constant.DeliveryChannelWebPush {
-			return true
+			// Web Push is intentionally disabled — skip without failing the row.
+			continue
 		}
+		channelStatus[ch] = constant.ChannelDeliverySent
+		marked = true
 	}
-	return false
+	if !marked {
+		channelStatus[constant.DeliveryChannelChat] = constant.ChannelDeliverySent
+	}
+	statusJSON, err := json.Marshal(channelStatus)
+	if err != nil {
+		return err
+	}
+	sentAt := now
+	_, err = d.notifications.UpdateDelivery(
+		ctx,
+		n.ID,
+		constant.NotificationStatusSent,
+		statusJSON,
+		&sentAt,
+		now,
+	)
+	return err
 }
 
 func parseChannelStatus(raw []byte) map[string]string {

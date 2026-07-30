@@ -1,0 +1,46 @@
+export const detailsStyles = {
+  root: "space-y-5 px-4 py-4",
+  title: "font-display text-2xl tracking-tight text-donna-text",
+  body: "mt-1 text-sm leading-relaxed text-donna-muted",
+  metaRow: "mt-3 flex flex-wrap gap-1.5",
+  chip: [
+    "inline-flex rounded-full border border-donna-hairline bg-donna-bg/40",
+    "px-2.5 py-1 text-[0.7rem] text-donna-faint",
+  ].join(" "),
+  statusChip: "inline-flex rounded-full px-2.5 py-1 text-[0.7rem] font-medium",
+  field: "space-y-1",
+  label: "text-[11px] font-semibold uppercase tracking-[0.12em] text-donna-faint",
+  value: "break-words text-sm text-donna-text",
+  muted: "text-sm text-donna-muted",
+  actions: "flex flex-wrap gap-2",
+  primary: [
+    "rounded-full bg-donna-accent px-3.5 py-2 text-sm font-medium text-donna-on-accent",
+    "disabled:opacity-50",
+  ].join(" "),
+  secondary: [
+    "rounded-full border border-donna-border px-3.5 py-2 text-sm text-donna-muted",
+    "hover:border-donna-accent/40 hover:text-donna-text disabled:opacity-50",
+  ].join(" "),
+  timeline: "space-y-0 rounded-xl border border-donna-hairline bg-donna-bg/30 p-3",
+  timelineTitle: "mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-donna-faint",
+  step: "grid grid-cols-[5.5rem_1fr] gap-2 border-b border-donna-hairline py-1.5 last:border-b-0",
+  stepTime: "font-mono text-[0.65rem] tabular-nums text-donna-faint",
+  stepLabel: "text-xs text-donna-text",
+  stepPending: "text-donna-faint",
+  fail: "rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300",
+  dev: "rounded-xl border border-donna-hairline bg-donna-bg/40",
+  devHead: [
+    "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left",
+    "text-xs font-medium text-donna-muted",
+  ].join(" "),
+  devBody: "space-y-2 border-t border-donna-hairline px-3 py-3",
+  mono: "break-all font-mono text-[0.7rem] text-donna-faint",
+  pre: [
+    "max-h-48 overflow-auto rounded-lg bg-donna-bg p-2",
+    "font-mono text-[0.65rem] leading-relaxed text-donna-muted scrollbar-hidden",
+  ].join(" "),
+  copyBtn: [
+    "rounded-full border border-donna-border px-2.5 py-1 text-[0.65rem] text-donna-muted",
+    "hover:border-donna-accent/40 hover:text-donna-text",
+  ].join(" "),
+} as const;

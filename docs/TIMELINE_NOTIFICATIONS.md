@@ -25,8 +25,8 @@ Unique live index on `(occurrence_id, notification_type)`. Re-running the schedu
 ## Status vs channel delivery
 
 - `status` — overall lifecycle: `PENDING` → `SENT` / `READ` / `DISMISSED` / `FAILED`
-- `delivery_channels` — intended channels (`WEB_PUSH`, `CHAT`, …)
-- `channel_delivery_status` — per-channel map for the future delivery phase, e.g. `{"WEB_PUSH":"PENDING","CHAT":"PENDING"}`
+- `delivery_channels` — intended channels (`CHAT` by default; Web Push disabled)
+- `channel_delivery_status` — per-channel map, e.g. `{"CHAT":"PENDING"}` → `{"CHAT":"SENT"}`
 
 ## APIs
 
@@ -38,8 +38,20 @@ No delete — notifications are history.
 
 ## Out of scope
 
-Telegram, WhatsApp, Chat delivery, AI, retries.
+Telegram, WhatsApp, Web Push, Email, retries.
 
 ## Delivery
 
-Web Push delivery is Phase 2.3 — see [TIMELINE_WEB_PUSH.md](./TIMELINE_WEB_PUSH.md).
+In-app only (Notification Center + Chat channel) — see [TIMELINE_WEB_PUSH.md](./TIMELINE_WEB_PUSH.md).
+
+## Notification Center (web)
+
+Inbox UI lives in `apps/web/src/features/notifications/`.
+
+- Dedicated tab at `/dashboard/notifications` (sidebar + mobile bottom nav), same shell as Calendar / Todo
+- Unread badge on the nav item (`SENT` count)
+- Filters, search, day grouping, details pane, status timeline
+- Reuses existing APIs only — no new notification endpoints
+- Client-side pagination (50 + Load more); polls every 30s
+- Developer Info (ids, payload, channel delivery) is visible in development builds only
+- Opening a notification with an `occurrence_id` navigates to `/dashboard/calendar?event=…` and marks SENT → READ
