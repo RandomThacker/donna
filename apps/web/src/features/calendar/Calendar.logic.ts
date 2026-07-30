@@ -265,7 +265,7 @@ export function useCalendarController() {
         map.set(source.id, TIMELINE_COLORS.donnaEvent);
         return;
       }
-      map.set(source.id, colorForSource(source.id, source.color, index));
+      map.set(source.id, colorForSource(source.id, source.color, index, source.provider_calendar_id));
     });
     map.set(DONNA_EVENT_SOURCE_ID, TIMELINE_COLORS.donnaEvent);
     map.set(DONNA_REMINDER_SOURCE_ID, TIMELINE_COLORS.donnaReminder);

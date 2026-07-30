@@ -634,6 +634,11 @@ func (s *CalendarService) upsertSource(
 	var color *string
 	if c := strings.TrimSpace(remote.Color); c != "" {
 		color = &c
+	} else if account.Provider == constant.AuthProviderICS {
+		// ICS feeds rarely embed a color; keep a stable warm default so they
+		// don't shuffle through the FE fallback palette as sources are added.
+		def := constant.ICSDefaultCalendarColor
+		color = &def
 	}
 	var tz *string
 	if t := strings.TrimSpace(remote.TimeZone); t != "" {
@@ -675,7 +680,15 @@ func (s *CalendarService) upsertSource(
 		return entity.CalendarSource{}, false, err
 	default:
 		existing.Name = name
-		existing.Color = color
+		if color != nil {
+			existing.Color = color
+		} else if existing.Color == nil || strings.TrimSpace(*existing.Color) == "" {
+			// Preserve any stored color; only fill empty ICS rows with the default.
+			if account.Provider == constant.AuthProviderICS {
+				def := constant.ICSDefaultCalendarColor
+				existing.Color = &def
+			}
+		}
 		existing.IsPrimaryOnProvider = remote.Primary
 		existing.IsWritable = remote.Writable
 		existing.AccessRole = accessRole

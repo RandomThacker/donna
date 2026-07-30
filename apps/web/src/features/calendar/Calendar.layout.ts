@@ -49,9 +49,15 @@ export function colorForSource(
   sourceId: string,
   color: string | undefined,
   index: number,
+  providerCalendarId?: string,
 ): string {
   if (color && /^#?[0-9a-fA-F]{3,8}$/.test(color)) {
     return color.startsWith("#") ? color : `#${color}`;
+  }
+  // ICS feeds rarely ship a color — keep the classic warm gold so they don't
+  // jump to a blue palette slot when other calendars are added.
+  if (providerCalendarId?.startsWith("ics_")) {
+    return "#c9a87c";
   }
   return FALLBACK_PALETTE[index % FALLBACK_PALETTE.length] ?? FALLBACK_PALETTE[0];
 }

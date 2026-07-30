@@ -44,6 +44,9 @@ const (
 	ICSScopeCalendar          = "ics.calendar"
 	ICSDefaultSyncIntervalMin = 15
 	ICSHTTPUserAgent          = "DonnaCalendar/1.0"
+	// ICSDefaultCalendarColor is used when an ICS feed has no embedded color.
+	// Matches Donna's warm gold so work ICS calendars stay distinct from Google blues.
+	ICSDefaultCalendarColor = "#c9a87c"
 )
 
 // Connected account statuses.
