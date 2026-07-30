@@ -32,7 +32,8 @@ type UpdateTaskRequest struct {
 
 // UpdateTaskOccurrenceRequest is PATCH /task-occurrences/:id.
 type UpdateTaskOccurrenceRequest struct {
-	Completed *bool `json:"completed"`
+	Completed *bool   `json:"completed"`
+	Date      *string `json:"date,omitempty"`
 }
 
 // ReorderTaskOccurrencesRequest is PATCH /task-occurrences/reorder.

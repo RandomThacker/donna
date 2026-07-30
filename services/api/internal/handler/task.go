@@ -179,20 +179,40 @@ func (h *TaskHandler) UpdateOccurrence(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "invalid request body", constant.ErrorCodeInvalidRequest, err.Error())
 		return
 	}
-	if req.Completed == nil {
-		response.Error(c, http.StatusBadRequest, "completed is required", constant.ErrorCodeInvalidRequest, "missing completed")
+	if req.Completed == nil && req.Date == nil {
+		response.Error(c, http.StatusBadRequest, "completed or date is required", constant.ErrorCodeInvalidRequest, "missing fields")
 		return
 	}
-	occ, err := h.completeTask.Execute(c.Request.Context(), actions.CompleteTaskRequest{
-		UserID:       userID,
-		OccurrenceID: occID,
-		Completed:    *req.Completed,
-	})
-	if err != nil {
-		h.writeTaskError(c, err)
-		return
+
+	var body model.TaskOccurrenceResponse
+	if req.Date != nil {
+		date, parseErr := business.ParseCivilDate(*req.Date)
+		if parseErr != nil {
+			h.writeTaskError(c, parseErr)
+			return
+		}
+		moved, moveErr := h.svc.RescheduleOccurrence(c.Request.Context(), userID, occID, date)
+		if moveErr != nil {
+			h.writeTaskError(c, moveErr)
+			return
+		}
+		body = model.TaskOccurrenceFromEntity(moved)
 	}
-	response.OK(c, constant.MessageOK, taskOccurrenceFromAction(occ))
+
+	if req.Completed != nil {
+		updated, completeErr := h.completeTask.Execute(c.Request.Context(), actions.CompleteTaskRequest{
+			UserID:       userID,
+			OccurrenceID: occID,
+			Completed:    *req.Completed,
+		})
+		if completeErr != nil {
+			h.writeTaskError(c, completeErr)
+			return
+		}
+		body = taskOccurrenceFromAction(updated)
+	}
+
+	response.OK(c, constant.MessageOK, body)
 }
 
 // ReorderOccurrences handles PATCH /task-occurrences/reorder.

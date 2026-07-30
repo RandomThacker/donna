@@ -42,7 +42,7 @@ export function DashboardQuickTasks() {
 
   const toggleMutation = useMutation({
     mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      updateTaskOccurrence(id, completed),
+      updateTaskOccurrence(id, { completed }),
     onSuccess: async () => {
       await invalidate();
     },

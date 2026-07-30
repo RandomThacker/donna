@@ -94,6 +94,22 @@ export const journalStyles = {
     "hover:bg-donna-accent-soft hover:text-donna-text",
     "disabled:opacity-50",
   ].join(" "),
+  menuRoot: "relative shrink-0",
+  menuTrigger: [
+    "mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-lg",
+    "text-donna-faint transition-colors",
+    "hover:bg-donna-accent-soft hover:text-donna-text",
+    "disabled:opacity-50",
+  ].join(" "),
+  menuPanel: [
+    "absolute right-0 top-full z-30 mt-1 min-w-[8.5rem] overflow-hidden rounded-xl",
+    "border border-donna-border bg-donna-surface py-1 shadow-lg",
+  ].join(" "),
+  menuItem: [
+    "flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-donna-text",
+    "transition-colors hover:bg-donna-accent-soft",
+  ].join(" "),
+  menuItemDanger: "text-rose-400 hover:bg-rose-500/10",
   dragHandle: [
     "mt-0.5 grid h-7 w-7 shrink-0 cursor-grab place-items-center rounded-lg",
     "text-donna-faint transition-colors active:cursor-grabbing",

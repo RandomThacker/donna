@@ -238,8 +238,8 @@ func (s *TaskJournalService) CreateTask(ctx context.Context, userID uuid.UUID, i
 		return entity.TaskOccurrenceWithTask{}, err
 	}
 
-	sortOrder, err := s.occurrences.MaxSortOrder(ctx, userID, date)
-	if err != nil {
+	sortOrder := 0
+	if err := s.occurrences.BumpSortOrders(ctx, userID, date, 1, now); err != nil {
 		return entity.TaskOccurrenceWithTask{}, err
 	}
 	occID, err := idgen.NewUUIDv7()
@@ -252,7 +252,7 @@ func (s *TaskJournalService) CreateTask(ctx context.Context, userID uuid.UUID, i
 		TaskID:    task.ID,
 		UserID:    userID,
 		Date:      date,
-		SortOrder: sortOrder + 1,
+		SortOrder: sortOrder,
 		Completed: false,
 		Source:    source,
 		CreatedAt: now,
@@ -324,6 +324,53 @@ func (s *TaskJournalService) UpdateOccurrence(ctx context.Context, userID, occur
 	}
 	_, err = s.occurrences.UpdateCompletion(ctx, occurrenceID, userID, completed, completedAt, now)
 	if err != nil {
+		return entity.TaskOccurrenceWithTask{}, err
+	}
+	// Keep completed rows at the bottom of the day list.
+	if completed {
+		maxSort, maxErr := s.occurrences.MaxSortOrder(ctx, userID, existing.Date)
+		if maxErr != nil {
+			return entity.TaskOccurrenceWithTask{}, maxErr
+		}
+		if err := s.occurrences.UpdateSortOrder(ctx, occurrenceID, userID, maxSort+1, existing.Date, now); err != nil {
+			return entity.TaskOccurrenceWithTask{}, err
+		}
+	}
+	occ, err := s.occurrences.GetByID(ctx, occurrenceID)
+	if err != nil {
+		return entity.TaskOccurrenceWithTask{}, err
+	}
+	return s.occurrenceWithTags(ctx, userID, occ)
+}
+
+// RescheduleOccurrence moves a journal row to another civil date (prepends there).
+func (s *TaskJournalService) RescheduleOccurrence(ctx context.Context, userID, occurrenceID uuid.UUID, newDate time.Time) (entity.TaskOccurrenceWithTask, error) {
+	if userID == uuid.Nil || occurrenceID == uuid.Nil {
+		return entity.TaskOccurrenceWithTask{}, fmt.Errorf("%w: user and occurrence id are required", apperr.ErrValidation)
+	}
+	existing, err := s.occurrences.GetByID(ctx, occurrenceID)
+	if err != nil {
+		return entity.TaskOccurrenceWithTask{}, err
+	}
+	if existing.UserID != userID {
+		return entity.TaskOccurrenceWithTask{}, apperr.ErrForbidden
+	}
+	target := civilDate(newDate)
+	if civilDate(existing.Date).Equal(target) {
+		return s.occurrenceWithTags(ctx, userID, existing)
+	}
+	exists, err := s.occurrences.ExistsForTaskDate(ctx, existing.TaskID, target)
+	if err != nil {
+		return entity.TaskOccurrenceWithTask{}, err
+	}
+	if exists {
+		return entity.TaskOccurrenceWithTask{}, fmt.Errorf("%w: task already exists on that day", apperr.ErrValidation)
+	}
+	now := s.now().UTC()
+	if err := s.occurrences.BumpSortOrders(ctx, userID, target, 1, now); err != nil {
+		return entity.TaskOccurrenceWithTask{}, err
+	}
+	if _, err := s.occurrences.UpdateDateAndSort(ctx, occurrenceID, userID, target, 0, now); err != nil {
 		return entity.TaskOccurrenceWithTask{}, err
 	}
 	occ, err := s.occurrences.GetByID(ctx, occurrenceID)

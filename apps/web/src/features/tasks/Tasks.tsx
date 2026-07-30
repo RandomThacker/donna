@@ -1,7 +1,15 @@
 "use client";
 
 import { format } from "date-fns";
-import { useMemo, useState, type DragEvent, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { usePathname } from "next/navigation";
 
 import { Icon } from "@/components/common";
@@ -16,6 +24,7 @@ import { useFlipList } from "./Tasks.flip";
 import { useTaskJournal } from "./Tasks.logic";
 import { journalStyles as styles } from "./Tasks.styles";
 import type { TaskOccurrence } from "./Tasks.types";
+import { TaskEditModal } from "./sections/TaskEditModal";
 import { TaskTagPicker } from "./sections/TaskTagPicker";
 import { TaskTagPill } from "./sections/TaskTagPill";
 import { TaskTagsPanel } from "./sections/TaskTagsPanel";
@@ -38,6 +47,7 @@ function JournalTaskRow({
   tags,
   onToggle,
   onDelete,
+  onEdit,
   onTagsChange,
   deleting,
   draggingId,
@@ -52,6 +62,7 @@ function JournalTaskRow({
   tags: TaskOccurrence["tags"];
   onToggle: (occurrence: TaskOccurrence) => void;
   onDelete: (occurrence: TaskOccurrence) => void;
+  onEdit: (occurrence: TaskOccurrence) => void;
   onTagsChange: (taskId: string, tagIds: string[]) => void;
   deleting: boolean;
   draggingId: string | null;
@@ -65,6 +76,21 @@ function JournalTaskRow({
   const isDragging = draggingId === occurrence.id;
   const isOver = overId === occurrence.id && draggingId !== occurrence.id;
   const selectedTagIds = (occurrence.tags ?? []).map((tag) => tag.id);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [tagOpen, setTagOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+        setTagOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    return () => document.removeEventListener("mousedown", onPointerDown);
+  }, [menuOpen]);
 
   return (
     <li
@@ -115,24 +141,73 @@ function JournalTaskRow({
           </div>
         ) : null}
       </div>
-      <TaskTagPicker
-        tags={tags ?? []}
-        selectedIds={selectedTagIds}
-        disabled={deleting}
-        onChange={(tagIds) => onTagsChange(occurrence.task_id, tagIds)}
-      />
-      <button
-        type="button"
-        className={styles.deleteBtn}
-        aria-label="Delete task"
-        disabled={deleting}
-        onClick={(event) => {
-          event.stopPropagation();
-          onDelete(occurrence);
-        }}
-      >
-        <Icon name="trash" className="h-3.5 w-3.5" />
-      </button>
+
+      <div ref={menuRef} className={styles.menuRoot}>
+        <button
+          type="button"
+          className={styles.menuTrigger}
+          aria-label="Task actions"
+          aria-expanded={menuOpen}
+          disabled={deleting}
+          onClick={() => {
+            setMenuOpen((value) => !value);
+            setTagOpen(false);
+          }}
+        >
+          <Icon name="more" className="h-3.5 w-3.5" />
+        </button>
+        {menuOpen && !tagOpen ? (
+          <div className={styles.menuPanel} role="menu">
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.menuItem}
+              onClick={() => {
+                setMenuOpen(false);
+                onEdit(occurrence);
+              }}
+            >
+              <Icon name="compose" className="h-3.5 w-3.5" />
+              Edit
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={styles.menuItem}
+              disabled={(tags ?? []).length === 0}
+              onClick={() => setTagOpen(true)}
+            >
+              <Icon name="pin" className="h-3.5 w-3.5" />
+              Tag
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              className={cn(styles.menuItem, styles.menuItemDanger)}
+              onClick={() => {
+                setMenuOpen(false);
+                onDelete(occurrence);
+              }}
+            >
+              <Icon name="trash" className="h-3.5 w-3.5" />
+              Delete
+            </button>
+          </div>
+        ) : null}
+        <TaskTagPicker
+          tags={tags ?? []}
+          selectedIds={selectedTagIds}
+          disabled={deleting}
+          hideTrigger
+          open={tagOpen}
+          onOpenChange={(next) => {
+            setTagOpen(next);
+            if (!next) setMenuOpen(false);
+          }}
+          onChange={(tagIds) => onTagsChange(occurrence.task_id, tagIds)}
+        />
+      </div>
+
       <span
         role="button"
         tabIndex={0}
@@ -155,6 +230,7 @@ export function Tasks() {
   const nav = navItemsForPath(pathname);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<TaskOccurrence | null>(null);
 
   const occurrenceIds = useMemo(
     () => journal.occurrences.map((occurrence) => occurrence.id),
@@ -249,7 +325,6 @@ export function Tasks() {
         />
         <main className={styles.workspace}>
           <div className={styles.workspaceInner}>
-            {/* Header: date + nav — full width */}
             <header className={styles.header}>
               <DateMark
                 date={journal.selectedDate}
@@ -286,191 +361,202 @@ export function Tasks() {
               </div>
             </header>
 
-            {/* Three-column body: [calendar+tags] | [tasks] | [stats] */}
             <div className={styles.main}>
               <aside className={styles.sidebar}>
-                  <MiniCalendar
-                    month={journal.miniMonth}
-                    selected={journal.selectedDate}
-                    onSelectDay={journal.selectDay}
-                    onMonthShift={journal.shiftMiniMonth}
-                    aria-label="Journal calendar"
-                    dayExtra={(day) => {
-                      const summary = journal.historyByDate.get(
-                        format(day, "yyyy-MM-dd"),
-                      );
-                      if (!summary || summary.total <= 0) {
-                        return null;
-                      }
-                      return `${summary.completed}/${summary.total}`;
-                    }}
-                  />
-                  {tagsPanel}
-                </aside>
+                <MiniCalendar
+                  month={journal.miniMonth}
+                  selected={journal.selectedDate}
+                  onSelectDay={journal.selectDay}
+                  onMonthShift={journal.shiftMiniMonth}
+                  aria-label="Journal calendar"
+                  dayExtra={(day) => {
+                    const summary = journal.historyByDate.get(
+                      format(day, "yyyy-MM-dd"),
+                    );
+                    if (!summary || summary.total <= 0) {
+                      return null;
+                    }
+                    return `${summary.completed}/${summary.total}`;
+                  }}
+                />
+                {tagsPanel}
+              </aside>
 
-              {/* Center: tasks */}
               <div className={styles.tasksCol}>
                 <div className={styles.mobileTags}>{tagsPanel}</div>
 
-                  <section className={styles.tasksCard} aria-label="Tasks">
-                    {isFiltered ? (
-                      <div className={styles.filterRow}>
-                        {journal.tags
-                          .filter((tag) => journal.filterTagIds.includes(tag.id))
-                          .map((tag) => (
-                            <TaskTagPill
-                              key={tag.id}
-                              tag={tag}
-                              selected
-                              onClick={() => journal.toggleFilterTag(tag.id)}
-                            />
-                          ))}
-                        <span className={styles.filterHint}>
-                          Showing tasks with selected tags
-                        </span>
-                      </div>
-                    ) : null}
-
-                    <form className={styles.addRow} onSubmit={onAddTaskSubmit}>
-                      <input
-                        className={styles.addInput}
-                        name="title"
-                        placeholder="Add a task for this day…"
-                        value={journal.draftTitle}
-                        autoComplete="off"
-                        enterKeyHint="done"
-                        onKeyDown={onAddTaskKeyDown}
-                        onChange={(event) =>
-                          journal.setDraftTitle(event.target.value)
-                        }
-                      />
-                      <button
-                        type="submit"
-                        className={styles.addBtn}
-                        disabled={journal.isSaving}
-                      >
-                        Add
-                      </button>
-                    </form>
-
-                    <div className={styles.tasksBody}>
-                      {journal.isLoading ? (
-                        <p className={styles.state}>Loading notebook…</p>
-                      ) : null}
-                      {!journal.isLoading && journal.isError ? (
-                        <p className={styles.state}>
-                          Couldn&apos;t load this day.
-                        </p>
-                      ) : null}
-                      {!journal.isLoading &&
-                      !journal.isError &&
-                      journal.allOccurrences.length === 0 ? (
-                        <p className={styles.empty}>
-                          Nothing here yet. Add a task — it stays on this
-                          day&apos;s page.
-                        </p>
-                      ) : null}
-                      {showEmptyFiltered ? (
-                        <p className={styles.empty}>
-                          No tasks match the selected tags.
-                        </p>
-                      ) : null}
-                      {!journal.isLoading && journal.occurrences.length > 0 ? (
-                        <ul className={styles.list}>
-                          {journal.occurrences.map((occurrence) => (
-                            <JournalTaskRow
-                              key={occurrence.id}
-                              occurrence={occurrence}
-                              tags={journal.tags}
-                              onToggle={journal.toggleComplete}
-                              onDelete={journal.removeTask}
-                              onTagsChange={journal.setTaskTags}
-                              deleting={journal.isSaving}
-                              draggingId={draggingId}
-                              overId={overId}
-                              onDragStartRow={onDragStartRow}
-                              onDragOverRow={onDragOverRow}
-                              onDropRow={onDropRow}
-                              onDragEndRow={onDragEndRow}
-                              setNodeRef={setFlipRef(occurrence.id)}
-                            />
-                          ))}
-                        </ul>
-                      ) : null}
-                    </div>
-                  </section>
-
-              </div>
-
-              {/* Right: statistics */}
-              <aside className={styles.statsCol}>
-              <div className={styles.statsCard}>
-              <h2 className={styles.statsTitle}>Statistics</h2>
-              {stats ? (
-                <div className={styles.statsGrid}>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Completion</span>
-                    <span className={styles.statValue}>
-                      {Math.round(stats.completion_pct)}%
-                    </span>
-                  </div>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Completed</span>
-                    <span className={styles.statValue}>{stats.completed}</span>
-                  </div>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Pending</span>
-                    <span className={styles.statValue}>{stats.pending}</span>
-                  </div>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Carried forward</span>
-                    <span className={styles.statValue}>
-                      {stats.carried_forward}
-                    </span>
-                  </div>
-                  <div className={styles.statRow}>
-                    <span className={styles.statLabel}>Streak</span>
-                    <span className={styles.statValue}>{stats.streak}</span>
-                  </div>
-                  {stats.average_completion_min != null ? (
-                    <div className={styles.statRow}>
-                      <span className={styles.statLabel}>Avg completion</span>
-                      <span className={styles.statValue}>
-                        {Math.round(stats.average_completion_min)}m
+                <section className={styles.tasksCard} aria-label="Tasks">
+                  {isFiltered ? (
+                    <div className={styles.filterRow}>
+                      {journal.tags
+                        .filter((tag) => journal.filterTagIds.includes(tag.id))
+                        .map((tag) => (
+                          <TaskTagPill
+                            key={tag.id}
+                            tag={tag}
+                            selected
+                            onClick={() => journal.toggleFilterTag(tag.id)}
+                          />
+                        ))}
+                      <span className={styles.filterHint}>
+                        Showing tasks with selected tags
                       </span>
                     </div>
                   ) : null}
-                </div>
-              ) : (
-                <p className={styles.state}>—</p>
-              )}
 
-              {journal.tags.length > 0 ? (
-                <>
-                  <h2 className={cn(styles.statsTitle, "mt-4")}>By Tag</h2>
-                  <div className={styles.statsGrid}>
-                    {journal.tags.map((tag) => {
-                      const count = journal.allOccurrences.filter((o) =>
-                        (o.tags ?? []).some((t) => t.id === tag.id),
-                      ).length;
-                      return (
-                        <div key={tag.id} className={styles.statRow}>
-                          <span className={styles.statLabel} style={{ color: tag.color }}>
-                            {tag.name}
-                          </span>
-                          <span className={styles.statValue}>{count}</span>
-                        </div>
-                      );
-                    })}
+                  <form className={styles.addRow} onSubmit={onAddTaskSubmit}>
+                    <input
+                      className={styles.addInput}
+                      name="title"
+                      placeholder="Add a task for this day…"
+                      value={journal.draftTitle}
+                      autoComplete="off"
+                      enterKeyHint="done"
+                      onKeyDown={onAddTaskKeyDown}
+                      onChange={(event) =>
+                        journal.setDraftTitle(event.target.value)
+                      }
+                    />
+                    <button
+                      type="submit"
+                      className={styles.addBtn}
+                      disabled={journal.isSaving}
+                    >
+                      Add
+                    </button>
+                  </form>
+
+                  <div className={styles.tasksBody}>
+                    {journal.isLoading ? (
+                      <p className={styles.state}>Loading notebook…</p>
+                    ) : null}
+                    {!journal.isLoading && journal.isError ? (
+                      <p className={styles.state}>
+                        Couldn&apos;t load this day.
+                      </p>
+                    ) : null}
+                    {!journal.isLoading &&
+                    !journal.isError &&
+                    journal.allOccurrences.length === 0 ? (
+                      <p className={styles.empty}>
+                        Nothing here yet. Add a task — it stays on this
+                        day&apos;s page.
+                      </p>
+                    ) : null}
+                    {showEmptyFiltered ? (
+                      <p className={styles.empty}>
+                        No tasks match the selected tags.
+                      </p>
+                    ) : null}
+                    {!journal.isLoading && journal.occurrences.length > 0 ? (
+                      <ul className={styles.list}>
+                        {journal.occurrences.map((occurrence) => (
+                          <JournalTaskRow
+                            key={occurrence.id}
+                            occurrence={occurrence}
+                            tags={journal.tags}
+                            onToggle={journal.toggleComplete}
+                            onDelete={journal.removeTask}
+                            onEdit={setEditing}
+                            onTagsChange={journal.setTaskTags}
+                            deleting={journal.isSaving}
+                            draggingId={draggingId}
+                            overId={overId}
+                            onDragStartRow={onDragStartRow}
+                            onDragOverRow={onDragOverRow}
+                            onDropRow={onDropRow}
+                            onDragEndRow={onDragEndRow}
+                            setNodeRef={setFlipRef(occurrence.id)}
+                          />
+                        ))}
+                      </ul>
+                    ) : null}
                   </div>
-                </>
-              ) : null}
+                </section>
               </div>
+
+              <aside className={styles.statsCol}>
+                <div className={styles.statsCard}>
+                  <h2 className={styles.statsTitle}>Statistics</h2>
+                  {stats ? (
+                    <div className={styles.statsGrid}>
+                      <div className={styles.statRow}>
+                        <span className={styles.statLabel}>Completion</span>
+                        <span className={styles.statValue}>
+                          {Math.round(stats.completion_pct)}%
+                        </span>
+                      </div>
+                      <div className={styles.statRow}>
+                        <span className={styles.statLabel}>Completed</span>
+                        <span className={styles.statValue}>{stats.completed}</span>
+                      </div>
+                      <div className={styles.statRow}>
+                        <span className={styles.statLabel}>Pending</span>
+                        <span className={styles.statValue}>{stats.pending}</span>
+                      </div>
+                      <div className={styles.statRow}>
+                        <span className={styles.statLabel}>Carried forward</span>
+                        <span className={styles.statValue}>
+                          {stats.carried_forward}
+                        </span>
+                      </div>
+                      <div className={styles.statRow}>
+                        <span className={styles.statLabel}>Streak</span>
+                        <span className={styles.statValue}>{stats.streak}</span>
+                      </div>
+                      {stats.average_completion_min != null ? (
+                        <div className={styles.statRow}>
+                          <span className={styles.statLabel}>Avg completion</span>
+                          <span className={styles.statValue}>
+                            {Math.round(stats.average_completion_min)}m
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : (
+                    <p className={styles.state}>—</p>
+                  )}
+
+                  {journal.tags.length > 0 ? (
+                    <>
+                      <h2 className={cn(styles.statsTitle, "mt-4")}>By Tag</h2>
+                      <div className={styles.statsGrid}>
+                        {journal.tags.map((tag) => {
+                          const count = journal.allOccurrences.filter((o) =>
+                            (o.tags ?? []).some((t) => t.id === tag.id),
+                          ).length;
+                          return (
+                            <div key={tag.id} className={styles.statRow}>
+                              <span
+                                className={styles.statLabel}
+                                style={{ color: tag.color }}
+                              >
+                                {tag.name}
+                              </span>
+                              <span className={styles.statValue}>{count}</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  ) : null}
+                </div>
               </aside>
             </div>
           </div>
         </main>
       </div>
+
+      <TaskEditModal
+        open={Boolean(editing)}
+        occurrence={editing}
+        saving={journal.isSaving}
+        onClose={() => setEditing(null)}
+        onSave={async (input) => {
+          if (!editing) return;
+          await journal.editTask(editing, input);
+        }}
+      />
     </div>
   );
 }

@@ -10,6 +10,10 @@ export const tagPickerStyles = {
     "absolute right-0 top-full z-20 mt-1 w-44 rounded-xl",
     "border border-donna-border bg-donna-surface p-1 shadow-lg",
   ].join(" "),
+  menuFromMenu: [
+    "absolute right-0 top-0 z-40 w-44 rounded-xl",
+    "border border-donna-border bg-donna-surface p-1 shadow-lg",
+  ].join(" "),
   empty: "px-2 py-2 text-xs text-donna-muted",
   list: "max-h-48 space-y-0.5 overflow-y-auto scrollbar-hidden",
   option: [

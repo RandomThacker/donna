@@ -16,6 +16,7 @@ import {
   fetchTaskDay,
   fetchTaskHistory,
   reorderTaskOccurrences,
+  updateTask,
   updateTaskOccurrence,
 } from "./Tasks.api";
 import {
@@ -84,12 +85,19 @@ export function useTaskJournal() {
   const tags = tagsQuery.data ?? [];
 
   const filteredOccurrences = useMemo(() => {
-    if (filterTagIds.length === 0) {
-      return occurrences;
-    }
-    return occurrences.filter((occurrence) => {
-      const taskTagIds = (occurrence.tags ?? []).map((tag) => tag.id);
-      return filterTagIds.some((id) => taskTagIds.includes(id));
+    const list =
+      filterTagIds.length === 0
+        ? occurrences
+        : occurrences.filter((occurrence) => {
+            const taskTagIds = (occurrence.tags ?? []).map((tag) => tag.id);
+            return filterTagIds.some((id) => taskTagIds.includes(id));
+          });
+    // Incomplete first, completed at the bottom (matches API ORDER BY).
+    return [...list].sort((a, b) => {
+      if (a.completed !== b.completed) {
+        return a.completed ? 1 : -1;
+      }
+      return a.sort_order - b.sort_order;
     });
   }, [filterTagIds, occurrences]);
 
@@ -97,29 +105,107 @@ export function useTaskJournal() {
     await queryClient.invalidateQueries({ queryKey: taskQueryKeys.day(dateKey) });
   }, [queryClient, dateKey]);
 
+  const invalidateHistory = useCallback(async () => {
+    await queryClient.invalidateQueries({
+      queryKey: taskQueryKeys.history(historyFrom, historyTo),
+    });
+  }, [queryClient, historyFrom, historyTo]);
+
   const invalidateTags = useCallback(async () => {
     await queryClient.invalidateQueries({ queryKey: taskQueryKeys.tags });
   }, [queryClient]);
 
   const createMutation = useMutation({
     mutationFn: (title: string) => createTask({ title, date: dateKey }),
-    onSuccess: async () => {
+    onSuccess: async (created) => {
       setDraftTitle("");
-      await invalidateDay();
-      await queryClient.invalidateQueries({
-        queryKey: taskQueryKeys.history(historyFrom, historyTo),
+      const previous = queryClient.getQueryData<TaskDayResponse>(
+        taskQueryKeys.day(dateKey),
+      );
+      const existing = previous?.occurrences ?? [];
+      const others = existing.filter((o) => o.id !== created.id);
+      const incomplete = others.filter((o) => !o.completed);
+      const completed = others.filter((o) => o.completed);
+      const nextIds = [
+        created.id,
+        ...incomplete.map((o) => o.id),
+        ...completed.map((o) => o.id),
+      ];
+
+      queryClient.setQueryData<TaskDayResponse>(taskQueryKeys.day(dateKey), {
+        date: dateKey,
+        note: previous?.note ?? { content: "" },
+        statistics: previous?.statistics ?? {
+          total: nextIds.length,
+          completed: completed.length,
+          pending: incomplete.length + 1,
+          carried: previous?.statistics?.carried ?? 0,
+          completion_pct: previous?.statistics?.completion_pct ?? 0,
+          completed_today: previous?.statistics?.completed_today ?? 0,
+          carried_forward: previous?.statistics?.carried_forward ?? 0,
+          longest_carried_streak:
+            previous?.statistics?.longest_carried_streak ?? 0,
+          streak: previous?.statistics?.streak ?? 0,
+        },
+        occurrences: [
+          { ...created, sort_order: 0, completed: false },
+          ...incomplete.map((o, i) => ({ ...o, sort_order: i + 1 })),
+          ...completed.map((o, i) => ({
+            ...o,
+            sort_order: incomplete.length + 1 + i,
+          })),
+        ],
       });
+
+      try {
+        await reorderTaskOccurrences({
+          date: dateKey,
+          occurrence_ids: nextIds,
+        });
+      } catch {
+        // Soft-fail: list already shows the new task on top locally.
+      }
+      await invalidateDay();
+      await invalidateHistory();
     },
   });
 
   const completeMutation = useMutation({
     mutationFn: ({ id, completed }: { id: string; completed: boolean }) =>
-      updateTaskOccurrence(id, completed),
+      updateTaskOccurrence(id, { completed }),
     onSuccess: async () => {
       await invalidateDay();
-      await queryClient.invalidateQueries({
-        queryKey: taskQueryKeys.history(historyFrom, historyTo),
-      });
+      await invalidateHistory();
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({
+      taskId,
+      occurrenceId,
+      title,
+      date,
+      currentDate,
+    }: {
+      taskId: string;
+      occurrenceId: string;
+      title: string;
+      date: string;
+      currentDate: string;
+    }) => {
+      await updateTask(taskId, { title });
+      if (date !== currentDate) {
+        await updateTaskOccurrence(occurrenceId, { date });
+      }
+    },
+    onSuccess: async (_data, variables) => {
+      await invalidateDay();
+      await invalidateHistory();
+      if (variables.date !== variables.currentDate) {
+        await queryClient.invalidateQueries({
+          queryKey: taskQueryKeys.day(variables.date),
+        });
+      }
     },
   });
 
@@ -160,9 +246,7 @@ export function useTaskJournal() {
     mutationFn: (taskId: string) => deleteTask(taskId),
     onSuccess: async () => {
       await invalidateDay();
-      await queryClient.invalidateQueries({
-        queryKey: taskQueryKeys.history(historyFrom, historyTo),
-      });
+      await invalidateHistory();
     },
   });
 
@@ -238,12 +322,28 @@ export function useTaskJournal() {
     [completeMutation],
   );
 
+  const editTask = useCallback(
+    async (occurrence: TaskOccurrence, input: { title: string; date: string }) => {
+      await updateMutation.mutateAsync({
+        taskId: occurrence.task_id,
+        occurrenceId: occurrence.id,
+        title: input.title,
+        date: input.date,
+        currentDate: occurrence.date,
+      });
+      if (input.date !== occurrence.date) {
+        setSelectedDate(new Date(`${input.date}T12:00:00`));
+      }
+    },
+    [updateMutation],
+  );
+
   const reorder = useCallback(
     (fromId: string, toId: string) => {
       if (fromId === toId) {
         return;
       }
-      const ids = occurrences.map((o) => o.id);
+      const ids = filteredOccurrences.map((o) => o.id);
       const fromIndex = ids.indexOf(fromId);
       const toIndex = ids.indexOf(toId);
       if (fromIndex < 0 || toIndex < 0) {
@@ -254,7 +354,7 @@ export function useTaskJournal() {
       next.splice(toIndex, 0, moved!);
       reorderMutation.mutate(next);
     },
-    [occurrences, reorderMutation],
+    [filteredOccurrences, reorderMutation],
   );
 
   const removeTask = useCallback(
@@ -319,6 +419,7 @@ export function useTaskJournal() {
     isSaving:
       createMutation.isPending ||
       completeMutation.isPending ||
+      updateMutation.isPending ||
       reorderMutation.isPending ||
       deleteMutation.isPending ||
       createTagMutation.isPending ||
@@ -331,6 +432,7 @@ export function useTaskJournal() {
     shiftMiniMonth,
     addTask,
     toggleComplete,
+    editTask,
     reorder,
     removeTask,
     toggleFilterTag,

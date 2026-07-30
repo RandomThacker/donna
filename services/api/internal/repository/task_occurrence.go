@@ -38,7 +38,7 @@ SELECT` + occurrenceColumnsAliased + `,
 FROM task_occurrences o
 JOIN tasks t ON t.id = o.task_id AND t.deleted_at IS NULL
 WHERE o.user_id = $1 AND o.date = $2
-ORDER BY o.sort_order ASC, o.created_at ASC`
+ORDER BY o.completed ASC, o.sort_order ASC, o.created_at ASC`
 
 const sqlSelectOccurrenceByID = `
 SELECT` + occurrenceColumnsAliased + `,
@@ -72,6 +72,15 @@ const sqlUpdateOccurrenceSortOrder = `
 UPDATE task_occurrences SET sort_order = $3, updated_at = $4
 WHERE id = $1 AND user_id = $2 AND date = $5`
 
+const sqlBumpOccurrenceSortOrders = `
+UPDATE task_occurrences SET sort_order = sort_order + $3, updated_at = $4
+WHERE user_id = $1 AND date = $2`
+
+const sqlUpdateOccurrenceDateAndSort = `
+UPDATE task_occurrences SET date = $2, sort_order = $3, updated_at = $4
+WHERE id = $1 AND user_id = $5
+RETURNING` + occurrenceColumns
+
 const sqlSummariesByUserDateRange = `
 SELECT
 	o.date,
@@ -95,6 +104,8 @@ type TaskOccurrenceRepository interface {
 	MaxSortOrder(ctx context.Context, userID uuid.UUID, date time.Time) (int, error)
 	UpdateCompletion(ctx context.Context, id, userID uuid.UUID, completed bool, completedAt *time.Time, updatedAt time.Time) (entity.TaskOccurrence, error)
 	UpdateSortOrder(ctx context.Context, id, userID uuid.UUID, sortOrder int, date time.Time, updatedAt time.Time) error
+	BumpSortOrders(ctx context.Context, userID uuid.UUID, date time.Time, delta int, updatedAt time.Time) error
+	UpdateDateAndSort(ctx context.Context, id, userID uuid.UUID, date time.Time, sortOrder int, updatedAt time.Time) (entity.TaskOccurrence, error)
 	SummariesByDateRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.TaskDaySummary, error)
 	ExistsForTaskDate(ctx context.Context, taskID uuid.UUID, date time.Time) (bool, error)
 	DeleteCarryForwardAfter(ctx context.Context, userID uuid.UUID, after time.Time) (int64, error)
@@ -174,6 +185,16 @@ func (r *taskOccurrenceRepository) UpdateCompletion(ctx context.Context, id, use
 func (r *taskOccurrenceRepository) UpdateSortOrder(ctx context.Context, id, userID uuid.UUID, sortOrder int, date time.Time, updatedAt time.Time) error {
 	_, err := r.q.Exec(ctx, sqlUpdateOccurrenceSortOrder, id, userID, sortOrder, updatedAt, civilDate(date))
 	return err
+}
+
+func (r *taskOccurrenceRepository) BumpSortOrders(ctx context.Context, userID uuid.UUID, date time.Time, delta int, updatedAt time.Time) error {
+	_, err := r.q.Exec(ctx, sqlBumpOccurrenceSortOrders, userID, civilDate(date), delta, updatedAt)
+	return err
+}
+
+func (r *taskOccurrenceRepository) UpdateDateAndSort(ctx context.Context, id, userID uuid.UUID, date time.Time, sortOrder int, updatedAt time.Time) (entity.TaskOccurrence, error) {
+	row := r.q.QueryRow(ctx, sqlUpdateOccurrenceDateAndSort, id, civilDate(date), sortOrder, updatedAt, userID)
+	return scanOccurrence(row)
 }
 
 func (r *taskOccurrenceRepository) SummariesByDateRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.TaskDaySummary, error) {

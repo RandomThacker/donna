@@ -13,6 +13,11 @@ type TaskTagPickerProps = {
   selectedIds: string[];
   disabled?: boolean;
   onChange: (tagIds: string[]) => void;
+  /** Controlled open state (e.g. from row overflow menu). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Hide the + trigger when opened from another control. */
+  hideTrigger?: boolean;
 };
 
 export function TaskTagPicker({
@@ -20,8 +25,19 @@ export function TaskTagPicker({
   selectedIds,
   disabled,
   onChange,
+  open: openProp,
+  onOpenChange,
+  hideTrigger,
 }: TaskTagPickerProps) {
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : uncontrolledOpen;
+  const setOpen = (next: boolean) => {
+    if (!controlled) {
+      setUncontrolledOpen(next);
+    }
+    onOpenChange?.(next);
+  };
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,19 +58,22 @@ export function TaskTagPicker({
       ? selectedIds.filter((id) => id !== tagId)
       : [...selectedIds, tagId];
     onChange(next);
+    setOpen(false);
   };
 
   return (
     <div ref={rootRef} className={styles.root}>
-      <button
-        type="button"
-        className={styles.trigger}
-        aria-label="Edit tags"
-        disabled={disabled || tags.length === 0}
-        onClick={() => setOpen((value) => !value)}
-      >
-        <Icon name="plus" className="h-3.5 w-3.5" />
-      </button>
+      {!hideTrigger ? (
+        <button
+          type="button"
+          className={styles.trigger}
+          aria-label="Edit tags"
+          disabled={disabled || tags.length === 0}
+          onClick={() => setOpen(!open)}
+        >
+          <Icon name="plus" className="h-3.5 w-3.5" />
+        </button>
+      ) : null}
       {open ? (
         <div className={styles.menu} role="menu">
           {tags.length === 0 ? (

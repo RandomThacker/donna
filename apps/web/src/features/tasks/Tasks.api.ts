@@ -36,13 +36,23 @@ export async function createTask(input: {
   });
 }
 
+export async function updateTask(
+  id: string,
+  input: { title?: string },
+): Promise<unknown> {
+  return apiRequest<unknown>(`/api/v1/tasks/${id}`, {
+    method: "PATCH",
+    body: input,
+  });
+}
+
 export async function updateTaskOccurrence(
   id: string,
-  completed: boolean,
+  body: { completed?: boolean; date?: string },
 ): Promise<TaskOccurrence> {
   return apiRequest<TaskOccurrence>(`/api/v1/task-occurrences/${id}`, {
     method: "PATCH",
-    body: { completed },
+    body,
   });
 }
 
