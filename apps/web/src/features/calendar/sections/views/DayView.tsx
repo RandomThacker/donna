@@ -138,6 +138,7 @@ export function DayView({
                 <EventCard
                   event={item.event}
                   color={colorFor(item.event.calendar_source_id, item.event)}
+                  compact
                   className="h-full"
                   onClick={() => onEventClick(item.event)}
                 />

@@ -1,31 +1,60 @@
 import { parseISO } from "date-fns";
 
-import type { CalendarEvent } from "@/features/calendar/Calendar.types";
 import { formatZonedTime } from "@/features/calendar/Calendar.timezone";
-import { formatEventTime } from "@/features/calendar/Calendar.utils";
+import type { TimelineItem } from "@/features/timeline/Timeline.types";
+import { sourceLabel } from "@/features/timeline/Timeline.utils";
 
 import type { DashboardTimelineItem } from "../../Dashboard.types";
 
-function timelineMeta(event: CalendarEvent, timeZone: string): string {
-  if (event.location?.trim()) {
-    return event.location.trim();
-  }
-  if (event.all_day) {
-    return "All day";
-  }
-  return formatEventTime(event, timeZone);
+function itemStart(item: TimelineItem): string {
+  return item.occurrence_start || item.start_at;
 }
 
-export function calendarEventsToTimelineItems(
-  events: CalendarEvent[],
+function itemEnd(item: TimelineItem): string {
+  return item.occurrence_end || item.end_at;
+}
+
+function timelineMeta(item: TimelineItem, timeZone: string): string {
+  if (item.type === "REMINDER") {
+    return "Reminder";
+  }
+  const label = sourceLabel(item);
+  if (item.all_day) {
+    return `${label} · All day`;
+  }
+  const start = formatZonedTime(parseISO(itemStart(item)), timeZone);
+  const end = formatZonedTime(parseISO(itemEnd(item)), timeZone);
+  if (start && end && start !== end) {
+    return `${start} – ${end}`;
+  }
+  return label;
+}
+
+export function isDashboardTimelineVisible(item: TimelineItem): boolean {
+  const status = String(item.status || "").toUpperCase();
+  return status !== "CANCELLED";
+}
+
+export function timelineItemsToDashboardItems(
+  items: TimelineItem[],
   timeZone: string,
 ): DashboardTimelineItem[] {
-  return events.map((event) => ({
-    id: event.id,
-    time: event.all_day
+  const visible = items
+    .filter(isDashboardTimelineVisible)
+    .slice()
+    .sort((a, b) => {
+      if (a.all_day !== b.all_day) {
+        return a.all_day ? -1 : 1;
+      }
+      return itemStart(a).localeCompare(itemStart(b));
+    });
+
+  return visible.map((item) => ({
+    id: item.occurrence_id || item.id,
+    time: item.all_day
       ? "All day"
-      : formatZonedTime(parseISO(event.start_time), timeZone),
-    title: event.title?.trim() || "(No title)",
-    meta: timelineMeta(event, timeZone),
+      : formatZonedTime(parseISO(itemStart(item)), timeZone),
+    title: item.title?.trim() || "(No title)",
+    meta: timelineMeta(item, timeZone),
   }));
 }

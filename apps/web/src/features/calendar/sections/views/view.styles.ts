@@ -18,7 +18,7 @@ export const timelineStyles = {
   nowLine: "pointer-events-none absolute inset-x-0 z-20",
   nowDot: "absolute -left-[5px] top-1/2 h-2.5 w-2.5 -translate-y-1/2 rounded-full bg-rose-500",
   nowRule: "h-px w-full bg-rose-500/90",
-  eventAbs: "pointer-events-auto absolute px-0.5",
+  eventAbs: "pointer-events-auto absolute flex px-0.5",
   empty: "flex flex-1 items-center justify-center p-8 text-sm text-donna-muted",
   weekHeader: [
     "sticky top-0 z-20 grid border-b border-donna-hairline",

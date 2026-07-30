@@ -9,14 +9,16 @@ import { formatEventTime } from "../../Calendar.utils";
 
 export const eventCardStyles = {
   root: [
-    "group flex w-full cursor-pointer flex-col gap-0.5 overflow-hidden rounded-lg",
-    "border border-black/10 px-2 py-1.5 text-left shadow-sm",
+    "group box-border flex h-full w-full min-h-0 cursor-pointer flex-col",
+    "justify-center overflow-hidden rounded-lg border border-black/10",
+    "px-2.5 py-1 text-left shadow-sm",
     "transition hover:brightness-110 focus-visible:outline-none",
     "focus-visible:ring-2 focus-visible:ring-donna-accent/50",
   ].join(" "),
-  titleRow: "flex items-start gap-1.5",
-  title: "min-w-0 flex-1 truncate text-[12px] font-medium leading-tight",
-  meta: "truncate text-[10px] opacity-80",
+  titleRow: "flex min-w-0 items-center gap-1",
+  title: "min-w-0 truncate text-[12px] font-medium leading-none",
+  titleGrow: "flex-1",
+  meta: "truncate text-[10px] leading-none opacity-80",
   badges: "mt-0.5 flex flex-wrap items-center gap-1",
   badge:
     "rounded px-1 py-px text-[9px] font-medium uppercase tracking-wide opacity-90 bg-black/15",
@@ -41,12 +43,16 @@ export function EventCard({
   onClick,
 }: EventCardProps) {
   const ink = contrastTextFor(color);
+  const recurring = isRecurring(event);
 
   return (
     <button
       type="button"
       className={cn(eventCardStyles.root, className)}
       style={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
         backgroundColor: color,
         color: ink,
         ...style,
@@ -54,10 +60,15 @@ export function EventCard({
       onClick={onClick}
     >
       <div className={eventCardStyles.titleRow}>
-        <span className={eventCardStyles.title}>
+        <span
+          className={cn(
+            eventCardStyles.title,
+            !compact && eventCardStyles.titleGrow,
+          )}
+        >
           {event.title || "(No title)"}
         </span>
-        {isRecurring(event) ? (
+        {recurring ? (
           <Icon name="repeat" className={eventCardStyles.icon} />
         ) : null}
       </div>

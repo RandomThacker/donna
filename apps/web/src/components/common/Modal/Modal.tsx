@@ -16,6 +16,7 @@ export function Modal({
   children,
   labelledBy,
   describedBy,
+  className,
 }: ModalProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -49,7 +50,7 @@ export function Modal({
   }
 
   return createPortal(
-    <div className={styles.root} role="presentation">
+    <div className={cn(styles.root, className)} role="presentation">
       <button
         type="button"
         className={styles.backdrop}

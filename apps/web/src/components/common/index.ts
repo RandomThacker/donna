@@ -13,6 +13,9 @@ export type { IconName, IconProps } from "./Icon";
 export { Logo } from "./Logo";
 export type { LogoProps } from "./Logo";
 
+export { ConfirmDialog } from "./ConfirmDialog";
+export type { ConfirmDialogProps } from "./ConfirmDialog";
+
 export { Modal } from "./Modal";
 export type { ModalProps } from "./Modal";
 

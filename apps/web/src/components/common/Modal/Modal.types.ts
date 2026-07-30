@@ -6,4 +6,6 @@ export type ModalProps = {
   children: React.ReactNode;
   labelledBy?: string;
   describedBy?: string;
+  /** Extra classes on the fixed root (e.g. higher z-index when stacked). */
+  className?: string;
 };
