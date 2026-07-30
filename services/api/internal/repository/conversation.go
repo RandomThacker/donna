@@ -42,11 +42,27 @@ SET last_message_at = $2, updated_at = $2
 WHERE id = $1 AND deleted_at IS NULL
 RETURNING` + conversationColumns
 
+const sqlBumpConversationUnread = `
+UPDATE conversations
+SET unread_count = unread_count + $2,
+    last_message_at = $3,
+    updated_at = $3
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + conversationColumns
+
+const sqlClearConversationUnread = `
+UPDATE conversations
+SET unread_count = 0, updated_at = $2
+WHERE id = $1 AND deleted_at IS NULL
+RETURNING` + conversationColumns
+
 // ConversationRepository persists chat threads.
 type ConversationRepository interface {
 	Create(ctx context.Context, c entity.Conversation) (entity.Conversation, error)
 	FindPrimaryWeb(ctx context.Context, userID uuid.UUID) (entity.Conversation, error)
 	TouchLastMessage(ctx context.Context, id uuid.UUID, at time.Time) (entity.Conversation, error)
+	BumpUnread(ctx context.Context, id uuid.UUID, delta int, at time.Time) (entity.Conversation, error)
+	ClearUnread(ctx context.Context, id uuid.UUID, at time.Time) (entity.Conversation, error)
 	WithTx(tx pgx.Tx) ConversationRepository
 }
 
@@ -83,6 +99,17 @@ func (r *conversationRepository) FindPrimaryWeb(ctx context.Context, userID uuid
 
 func (r *conversationRepository) TouchLastMessage(ctx context.Context, id uuid.UUID, at time.Time) (entity.Conversation, error) {
 	return scanConversation(r.q.QueryRow(ctx, sqlTouchConversationLastMessage, id, at))
+}
+
+func (r *conversationRepository) BumpUnread(ctx context.Context, id uuid.UUID, delta int, at time.Time) (entity.Conversation, error) {
+	if delta < 1 {
+		delta = 1
+	}
+	return scanConversation(r.q.QueryRow(ctx, sqlBumpConversationUnread, id, delta, at))
+}
+
+func (r *conversationRepository) ClearUnread(ctx context.Context, id uuid.UUID, at time.Time) (entity.Conversation, error) {
+	return scanConversation(r.q.QueryRow(ctx, sqlClearConversationUnread, id, at))
 }
 
 func scanConversation(row pgx.Row) (entity.Conversation, error) {

@@ -35,7 +35,7 @@ func TestDispatcherPublishesDueToChat(t *testing.T) {
 		ChannelDeliveryStatus: channelStatus,
 	}
 
-	d := NewNotificationDispatcher(notifRepo, nil)
+	d := NewNotificationDispatcher(notifRepo, nil, nil)
 	d.now = func() time.Time { return now }
 	d.Tick(context.Background())
 
@@ -68,7 +68,7 @@ func TestDispatcherSkipsWebPushWithoutFailing(t *testing.T) {
 		ChannelDeliveryStatus: json.RawMessage(`{"WEB_PUSH":"PENDING","CHAT":"PENDING"}`),
 	}
 
-	d := NewNotificationDispatcher(notifRepo, nil)
+	d := NewNotificationDispatcher(notifRepo, nil, nil)
 	d.now = func() time.Time { return now }
 	d.Tick(context.Background())
 
@@ -99,7 +99,7 @@ func TestDispatcherIgnoresFuturePending(t *testing.T) {
 		Status: constant.NotificationStatusPending, ScheduledFor: &future,
 		DeliveryChannels: []string{constant.DeliveryChannelChat},
 	}
-	d := NewNotificationDispatcher(notifRepo, nil)
+	d := NewNotificationDispatcher(notifRepo, nil, nil)
 	d.now = func() time.Time { return now }
 	d.Tick(context.Background())
 

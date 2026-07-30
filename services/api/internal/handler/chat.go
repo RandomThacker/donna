@@ -92,7 +92,7 @@ func (h *ChatHandler) Command(c *gin.Context) {
 	response.OK(c, constant.MessageOK, out)
 }
 
-// Messages handles GET /chat/messages — primary web thread history.
+// Messages handles GET /chat/messages — primary web thread history (marks read).
 func (h *ChatHandler) Messages(c *gin.Context) {
 	userID, ok := middleware.UserIDFromContext(c)
 	if !ok {
@@ -112,4 +112,26 @@ func (h *ChatHandler) Messages(c *gin.Context) {
 		return
 	}
 	response.OK(c, constant.MessageOK, model.ChatHistoryFromEntities(history.Conversation, history.Messages))
+}
+
+// Summary handles GET /chat/summary — preview + unread for the phone list / FAB.
+func (h *ChatHandler) Summary(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "authentication required", constant.ErrorCodeUnauthorized, "missing user")
+		return
+	}
+	if h.conversations == nil {
+		response.OK(c, constant.MessageOK, model.ChatSummaryResponse{})
+		return
+	}
+	summary, err := h.conversations.GetPrimarySummary(c.Request.Context(), userID)
+	if err != nil {
+		if h.log != nil {
+			h.log.Error(c.Request.Context(), "chat summary load failed", constant.LogAttrError, err)
+		}
+		response.Error(c, http.StatusInternalServerError, "failed to load chat summary", constant.ErrorCodeInternal, err.Error())
+		return
+	}
+	response.OK(c, constant.MessageOK, model.ChatSummaryFromEntities(summary.Conversation, summary.LastMessage))
 }

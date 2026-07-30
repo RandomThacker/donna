@@ -3,6 +3,7 @@ package business
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/RandomThacker/donna/services/api/internal/constant"
@@ -15,6 +16,7 @@ import (
 // in-app surfaces (Notification Center + Chat). Web Push is disabled.
 type NotificationDispatcher struct {
 	notifications repository.NotificationRepository
+	chat          *ConversationService
 	log           *logger.Logger
 	interval      time.Duration
 	now           func() time.Time
@@ -24,10 +26,12 @@ type NotificationDispatcher struct {
 // NewNotificationDispatcher constructs a minute-tick in-app publisher.
 func NewNotificationDispatcher(
 	notifications repository.NotificationRepository,
+	chat *ConversationService,
 	log *logger.Logger,
 ) *NotificationDispatcher {
 	return &NotificationDispatcher{
 		notifications: notifications,
+		chat:          chat,
 		log:           log,
 		interval:      constant.NotificationDispatcherInterval,
 		now:           time.Now,
@@ -78,21 +82,32 @@ func (d *NotificationDispatcher) Tick(ctx context.Context) {
 		}
 		sent++
 	}
-	if d.log != nil && (sent > 0 || failed > 0) {
+
+	// Backfill chat bubbles for already-SENT notifications that never got a message
+	// (status-only CHAT delivery from before chat posting existed).
+	backfilled := d.backfillChatNotices(ctx, now)
+
+	if d.log != nil && (sent > 0 || failed > 0 || backfilled > 0) {
 		d.log.Info(ctx, "notification dispatcher tick",
 			"due", len(due),
 			"sent", sent,
 			"failed", failed,
+			"chat_backfill", backfilled,
 		)
 	}
 }
 
 func (d *NotificationDispatcher) publishOne(ctx context.Context, n entity.Notification, now time.Time) error {
+	if wantsChatChannel(n) {
+		if _, err := d.postChatNotice(ctx, n); err != nil {
+			return err
+		}
+	}
+
 	channelStatus := parseChannelStatus(n.ChannelDeliveryStatus)
 	marked := false
 	for _, ch := range n.DeliveryChannels {
 		if ch == constant.DeliveryChannelWebPush {
-			// Web Push is intentionally disabled — skip without failing the row.
 			continue
 		}
 		channelStatus[ch] = constant.ChannelDeliverySent
@@ -115,6 +130,84 @@ func (d *NotificationDispatcher) publishOne(ctx context.Context, n entity.Notifi
 		now,
 	)
 	return err
+}
+
+func (d *NotificationDispatcher) backfillChatNotices(ctx context.Context, now time.Time) int {
+	if d.chat == nil || d.notifications == nil {
+		return 0
+	}
+	since := now.Add(-7 * 24 * time.Hour)
+	rows, err := d.notifications.ListRecentChatDelivered(ctx, since, d.batchLimit)
+	if err != nil {
+		if d.log != nil {
+			d.log.Warn(ctx, "notification chat backfill list failed", constant.LogAttrError, err)
+		}
+		return 0
+	}
+	var n int
+	for _, row := range rows {
+		created, err := d.postChatNotice(ctx, row)
+		if err != nil {
+			if d.log != nil {
+				d.log.Warn(ctx, "notification chat backfill failed",
+					"notification_id", row.ID.String(),
+					constant.LogAttrError, err,
+				)
+			}
+			continue
+		}
+		if created {
+			n++
+		}
+	}
+	return n
+}
+
+func (d *NotificationDispatcher) postChatNotice(ctx context.Context, n entity.Notification) (bool, error) {
+	if d.chat == nil {
+		return false, nil
+	}
+	text := notificationChatText(n)
+	if text == "" {
+		return false, nil
+	}
+	clientID := notificationChatClientMessageID(n)
+	_, created, err := d.chat.PostAssistantNotice(ctx, n.UserID, text, clientID)
+	return created, err
+}
+
+func wantsChatChannel(n entity.Notification) bool {
+	for _, ch := range n.DeliveryChannels {
+		if ch == constant.DeliveryChannelChat {
+			return true
+		}
+	}
+	status := parseChannelStatus(n.ChannelDeliveryStatus)
+	if _, ok := status[constant.DeliveryChannelChat]; ok {
+		return true
+	}
+	// Default when channels empty: in-app chat.
+	return len(n.DeliveryChannels) == 0
+}
+
+func notificationChatText(n entity.Notification) string {
+	title := strings.TrimSpace(n.Title)
+	body := strings.TrimSpace(n.Body)
+	switch {
+	case title != "" && body != "" && !strings.EqualFold(title, body):
+		return title + "\n" + body
+	case title != "":
+		return title
+	default:
+		return body
+	}
+}
+
+func notificationChatClientMessageID(n entity.Notification) string {
+	if n.PublicID != "" {
+		return "notif:" + n.PublicID
+	}
+	return "notif:" + n.ID.String()
 }
 
 func parseChannelStatus(raw []byte) map[string]string {

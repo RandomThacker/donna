@@ -68,6 +68,7 @@ const (
 
 	PathChatCommand  = "/chat/command"
 	PathChatMessages = "/chat/messages"
+	PathChatSummary  = "/chat/summary"
 )
 
 // Full paths (prefix + relative). Useful for docs, clients, and tests.

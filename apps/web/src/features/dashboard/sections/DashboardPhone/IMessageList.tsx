@@ -55,7 +55,10 @@ export function IMessageList({ conversations, onOpen, onClose }: IMessageListPro
               <span className={styles.rowBottom}>
                 <span className={styles.rowPreview}>{conversation.preview}</span>
                 {conversation.unread > 0 ? (
-                  <span className={styles.unread}>{conversation.unread}</span>
+                  <span
+                    className={styles.unread}
+                    aria-label="Unread messages"
+                  />
                 ) : null}
               </span>
             </span>

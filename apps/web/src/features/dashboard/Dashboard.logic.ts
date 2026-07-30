@@ -53,9 +53,9 @@ export const dashboardData: DashboardData = {
       {
         id: "donna",
         name: "Donna",
-        preview: "Perfect. I'll help keep us on track today.",
-        time: "9:41 AM",
-        unread: 2,
+        preview: "Tell Donna what to do…",
+        time: "",
+        unread: 0,
         messages: [
           {
             id: "m1",

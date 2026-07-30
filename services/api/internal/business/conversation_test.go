@@ -65,6 +65,32 @@ func (m *memConversationRepo) TouchLastMessage(_ context.Context, id uuid.UUID, 
 	return c, nil
 }
 
+func (m *memConversationRepo) BumpUnread(_ context.Context, id uuid.UUID, delta int, at time.Time) (entity.Conversation, error) {
+	c, ok := m.byID[id]
+	if !ok || c.DeletedAt != nil {
+		return entity.Conversation{}, apperr.ErrNotFound
+	}
+	if delta < 1 {
+		delta = 1
+	}
+	c.UnreadCount += delta
+	c.LastMessageAt = &at
+	c.UpdatedAt = at
+	m.byID[id] = c
+	return c, nil
+}
+
+func (m *memConversationRepo) ClearUnread(_ context.Context, id uuid.UUID, at time.Time) (entity.Conversation, error) {
+	c, ok := m.byID[id]
+	if !ok || c.DeletedAt != nil {
+		return entity.Conversation{}, apperr.ErrNotFound
+	}
+	c.UnreadCount = 0
+	c.UpdatedAt = at
+	m.byID[id] = c
+	return c, nil
+}
+
 func (m *memConversationRepo) WithTx(pgx.Tx) repository.ConversationRepository { return m }
 
 type memMessageRepo struct {
@@ -86,6 +112,23 @@ func (m *memMessageRepo) ListByConversation(_ context.Context, conversationID uu
 		return append([]entity.Message(nil), all[:limit]...), nil
 	}
 	return append([]entity.Message(nil), all...), nil
+}
+
+func (m *memMessageRepo) LatestByConversation(_ context.Context, conversationID uuid.UUID) (entity.Message, error) {
+	all := m.byConv[conversationID]
+	if len(all) == 0 {
+		return entity.Message{}, apperr.ErrNotFound
+	}
+	return all[len(all)-1], nil
+}
+
+func (m *memMessageRepo) ExistsByClientMessageID(_ context.Context, conversationID uuid.UUID, clientMessageID string) (bool, error) {
+	for _, msg := range m.byConv[conversationID] {
+		if msg.ClientMessageID != nil && *msg.ClientMessageID == clientMessageID {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (m *memMessageRepo) WithTx(pgx.Tx) repository.MessageRepository { return m }

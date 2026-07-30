@@ -172,6 +172,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 
 	notificationDispatcher := business.NewNotificationDispatcher(
 		notificationRepo,
+		conversationSvc,
 		notificationLog,
 	)
 

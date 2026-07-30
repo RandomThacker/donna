@@ -106,8 +106,7 @@ export const iMessageStyles = {
     "line-clamp-2",
   ].join(" "),
   unread: [
-    "mt-0.5 grid h-[16px] min-w-[16px] shrink-0 place-items-center rounded-full",
-    "bg-[var(--im-blue)] px-[5px] text-[10px] font-semibold leading-none text-white",
+    "mt-1 h-2.5 w-2.5 shrink-0 rounded-full bg-[#ff3b30]",
   ].join(" "),
 
   chatRoot: "relative flex min-h-0 flex-1 flex-col bg-[var(--im-bg)]",

@@ -19,7 +19,18 @@ type ChatMessageResponse struct {
 type ChatHistoryResponse struct {
 	ConversationID string                `json:"conversation_id"`
 	PublicID       string                `json:"conversation_public_id"`
+	UnreadCount    int                   `json:"unread_count"`
 	Messages       []ChatMessageResponse `json:"messages"`
+}
+
+// ChatSummaryResponse is GET /chat/summary — list preview + unread.
+type ChatSummaryResponse struct {
+	ConversationID       string     `json:"conversation_id"`
+	ConversationPublicID string     `json:"conversation_public_id"`
+	UnreadCount          int        `json:"unread_count"`
+	Preview              string     `json:"preview"`
+	LastMessageAt        *time.Time `json:"last_message_at,omitempty"`
+	LastMessageRole      string     `json:"last_message_role,omitempty"`
 }
 
 // ChatCommandResponse is POST /chat/command with optional persisted ids.
@@ -56,6 +67,26 @@ func ChatHistoryFromEntities(conv entity.Conversation, messages []entity.Message
 	return ChatHistoryResponse{
 		ConversationID: conv.ID.String(),
 		PublicID:       conv.PublicID,
+		UnreadCount:    conv.UnreadCount,
 		Messages:       ChatMessagesFromEntities(messages),
 	}
+}
+
+// ChatSummaryFromEntities builds the list summary response.
+func ChatSummaryFromEntities(conv entity.Conversation, last *entity.Message) ChatSummaryResponse {
+	out := ChatSummaryResponse{
+		ConversationID:       conv.ID.String(),
+		ConversationPublicID: conv.PublicID,
+		UnreadCount:          conv.UnreadCount,
+		Preview:              "",
+	}
+	if last != nil {
+		out.Preview = last.Content
+		out.LastMessageRole = last.Role
+		at := last.CreatedAt
+		out.LastMessageAt = &at
+	} else if conv.LastMessageAt != nil {
+		out.LastMessageAt = conv.LastMessageAt
+	}
+	return out
 }

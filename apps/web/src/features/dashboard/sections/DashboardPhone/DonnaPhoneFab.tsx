@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
-
+import { useDonnaThreadSummary } from "@/features/chat/useDonnaThreadSummary";
 import { cn } from "@/lib/cn";
 
 import { getDashboardContent } from "../../Dashboard.logic";
@@ -12,11 +11,8 @@ import { useDonnaPhoneFab } from "./DonnaPhoneFab.logic";
 export function DonnaPhoneFab() {
   const fab = useDonnaPhoneFab();
   const { data } = getDashboardContent();
-
-  const hasNotification = useMemo(
-    () => data.phone.conversations.some((conversation) => conversation.unread > 0),
-    [data.phone.conversations],
-  );
+  const donna = useDonnaThreadSummary();
+  const hasNotification = donna.unread > 0;
 
   return (
     <>

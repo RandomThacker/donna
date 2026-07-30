@@ -49,14 +49,21 @@ type ChatHistory struct {
 	Messages     []entity.Message
 }
 
+// ChatSummary is list-row metadata for the primary web thread.
+type ChatSummary struct {
+	Conversation entity.Conversation
+	LastMessage  *entity.Message
+}
+
 // AppendTurnResult is the persisted user + assistant pair.
 type AppendTurnResult struct {
-	Conversation   entity.Conversation
-	UserMessage    entity.Message
+	Conversation     entity.Conversation
+	UserMessage      entity.Message
 	AssistantMessage entity.Message
 }
 
 // GetPrimaryHistory returns the primary web conversation messages (creates thread if missing).
+// Loading history marks the thread as read.
 func (s *ConversationService) GetPrimaryHistory(ctx context.Context, userID uuid.UUID) (ChatHistory, error) {
 	if userID == uuid.Nil {
 		return ChatHistory{}, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
@@ -69,7 +76,90 @@ func (s *ConversationService) GetPrimaryHistory(ctx context.Context, userID uuid
 	if err != nil {
 		return ChatHistory{}, err
 	}
+	if conv.UnreadCount > 0 {
+		cleared, clearErr := s.conversations.ClearUnread(ctx, conv.ID, s.now().UTC())
+		if clearErr == nil {
+			conv = cleared
+		}
+	}
 	return ChatHistory{Conversation: conv, Messages: msgs}, nil
+}
+
+// GetPrimarySummary returns preview + unread for the messages list / FAB badge.
+func (s *ConversationService) GetPrimarySummary(ctx context.Context, userID uuid.UUID) (ChatSummary, error) {
+	if userID == uuid.Nil {
+		return ChatSummary{}, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
+	}
+	conv, err := s.getOrCreatePrimary(ctx, s.conversations, userID)
+	if err != nil {
+		return ChatSummary{}, err
+	}
+	last, err := s.messages.LatestByConversation(ctx, conv.ID)
+	if err != nil {
+		if errors.Is(err, apperr.ErrNotFound) {
+			return ChatSummary{Conversation: conv}, nil
+		}
+		return ChatSummary{}, err
+	}
+	return ChatSummary{Conversation: conv, LastMessage: &last}, nil
+}
+
+// PostAssistantNotice appends a Donna-only message (notifications, system prompts).
+// clientMessageID makes the write idempotent when set.
+// created is false when the notice was already present (unique client_message_id).
+func (s *ConversationService) PostAssistantNotice(
+	ctx context.Context,
+	userID uuid.UUID,
+	content string,
+	clientMessageID string,
+) (entity.Message, bool, error) {
+	if userID == uuid.Nil {
+		return entity.Message{}, false, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
+	}
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return entity.Message{}, false, fmt.Errorf("%w: content is required", apperr.ErrValidation)
+	}
+
+	var out entity.Message
+	var created bool
+	err := s.tx.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
+		convs := s.conversations.WithTx(tx)
+		msgs := s.messages.WithTx(tx)
+
+		conv, err := s.getOrCreatePrimary(ctx, convs, userID)
+		if err != nil {
+			return err
+		}
+		now := s.now().UTC()
+		var clientID *string
+		if trimmed := strings.TrimSpace(clientMessageID); trimmed != "" {
+			clientID = &trimmed
+			exists, err := msgs.ExistsByClientMessageID(ctx, conv.ID, trimmed)
+			if err != nil {
+				return err
+			}
+			if exists {
+				created = false
+				out = entity.Message{}
+				return nil
+			}
+		}
+		msg, err := s.createMessage(ctx, msgs, userID, conv.ID, constant.MessageRoleAssistant, content, clientID, now)
+		if err != nil {
+			return err
+		}
+		if _, err := convs.BumpUnread(ctx, conv.ID, 1, now); err != nil {
+			return err
+		}
+		out = msg
+		created = true
+		return nil
+	})
+	if err != nil {
+		return entity.Message{}, false, err
+	}
+	return out, created, nil
 }
 
 // AppendTurn persists a user message and Donna reply on the primary web thread.

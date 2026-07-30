@@ -26,5 +26,15 @@ export type ChatHistoryMessage = {
 export type ChatHistoryResponse = {
   conversation_id: string;
   conversation_public_id: string;
+  unread_count?: number;
   messages: ChatHistoryMessage[];
+};
+
+export type ChatSummaryResponse = {
+  conversation_id: string;
+  conversation_public_id: string;
+  unread_count: number;
+  preview: string;
+  last_message_at?: string | null;
+  last_message_role?: string;
 };

@@ -163,6 +163,26 @@ func (m *memNotificationRepo) ListDuePending(_ context.Context, asOf time.Time, 
 	return out, nil
 }
 
+func (m *memNotificationRepo) ListRecentChatDelivered(_ context.Context, since time.Time, limit int) ([]entity.Notification, error) {
+	out := make([]entity.Notification, 0)
+	for _, n := range m.byID {
+		if n.DeletedAt != nil {
+			continue
+		}
+		if n.Status != constant.NotificationStatusSent && n.Status != constant.NotificationStatusRead {
+			continue
+		}
+		if n.SentAt == nil || n.SentAt.Before(since) {
+			continue
+		}
+		out = append(out, n)
+	}
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+
 func (m *memNotificationRepo) UpdateDelivery(
 	_ context.Context,
 	id uuid.UUID,

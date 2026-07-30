@@ -81,6 +81,20 @@ WHERE deleted_at IS NULL
 ORDER BY scheduled_for ASC
 LIMIT $2`
 
+	sqlListRecentChatDeliveredNotifications = `
+SELECT` + notificationColumns + `
+FROM notifications
+WHERE deleted_at IS NULL
+  AND status IN ('SENT', 'READ')
+  AND sent_at IS NOT NULL
+  AND sent_at >= $1
+  AND (
+    'CHAT' = ANY(delivery_channels)
+    OR COALESCE(channel_delivery_status->>'CHAT', '') IN ('SENT', 'PENDING')
+  )
+ORDER BY sent_at DESC
+LIMIT $2`
+
 	sqlUpdateNotificationDelivery = `
 UPDATE notifications SET
 	status = $2,
@@ -100,6 +114,7 @@ type NotificationRepository interface {
 	MarkDismissed(ctx context.Context, id, userID uuid.UUID, at time.Time) (entity.Notification, error)
 	ExistsByOccurrence(ctx context.Context, occurrenceID, notificationType string) (bool, error)
 	ListDuePending(ctx context.Context, asOf time.Time, limit int) ([]entity.Notification, error)
+	ListRecentChatDelivered(ctx context.Context, since time.Time, limit int) ([]entity.Notification, error)
 	UpdateDelivery(ctx context.Context, id uuid.UUID, status string, channelStatus []byte, sentAt *time.Time, updatedAt time.Time) (entity.Notification, error)
 	WithTx(tx pgx.Tx) NotificationRepository
 }
@@ -208,6 +223,26 @@ func (r *notificationRepository) ListDuePending(ctx context.Context, asOf time.T
 		limit = 100
 	}
 	rows, err := r.q.Query(ctx, sqlListDuePendingNotifications, asOf, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]entity.Notification, 0)
+	for rows.Next() {
+		n, err := scanNotification(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, n)
+	}
+	return out, rows.Err()
+}
+
+func (r *notificationRepository) ListRecentChatDelivered(ctx context.Context, since time.Time, limit int) ([]entity.Notification, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	rows, err := r.q.Query(ctx, sqlListRecentChatDeliveredNotifications, since, limit)
 	if err != nil {
 		return nil, err
 	}

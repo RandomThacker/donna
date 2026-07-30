@@ -2,6 +2,9 @@
 
 import { useMemo, useState } from "react";
 
+import { useDonnaThreadSummary } from "@/features/chat/useDonnaThreadSummary";
+
+import type { IMessageConversation } from "../../Dashboard.types";
 import { phoneStyles as styles } from "./DashboardPhone.styles";
 import type { DashboardPhoneProps } from "./DashboardPhone.types";
 import { IMessageChat } from "./IMessageChat";
@@ -9,12 +12,36 @@ import { IMessageList } from "./IMessageList";
 import { StatusBarIcons } from "./StatusBarIcons";
 import { StatusBarTime } from "./StatusBarTime";
 
+function withDonnaSummary(
+  conversations: IMessageConversation[],
+  preview: string,
+  time: string,
+  unread: number,
+): IMessageConversation[] {
+  return conversations.map((conversation) =>
+    conversation.id === "donna"
+      ? {
+          ...conversation,
+          preview,
+          time: time || conversation.time,
+          unread,
+        }
+      : conversation,
+  );
+}
+
 export function DashboardPhone({ phone }: DashboardPhoneProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const donna = useDonnaThreadSummary();
+
+  const conversations = useMemo(
+    () => withDonnaSummary(phone.conversations, donna.preview, donna.time, donna.unread),
+    [phone.conversations, donna.preview, donna.time, donna.unread],
+  );
 
   const activeConversation = useMemo(
-    () => phone.conversations.find((item) => item.id === activeId) ?? null,
-    [activeId, phone.conversations],
+    () => conversations.find((item) => item.id === activeId) ?? null,
+    [activeId, conversations],
   );
 
   return (
@@ -34,11 +61,14 @@ export function DashboardPhone({ phone }: DashboardPhoneProps) {
               <IMessageChat
                 conversation={activeConversation}
                 live={activeConversation.id === "donna"}
-                onBack={() => setActiveId(null)}
+                onBack={() => {
+                  setActiveId(null);
+                  donna.refresh();
+                }}
               />
             ) : (
               <IMessageList
-                conversations={phone.conversations}
+                conversations={conversations}
                 onOpen={setActiveId}
               />
             )}

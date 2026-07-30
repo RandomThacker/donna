@@ -31,10 +31,27 @@ WHERE conversation_id = $1 AND deleted_at IS NULL
 ORDER BY created_at ASC
 LIMIT $2`
 
+const sqlLatestMessageByConversation = `
+SELECT` + messageColumns + `
+FROM messages
+WHERE conversation_id = $1 AND deleted_at IS NULL
+ORDER BY created_at DESC
+LIMIT 1`
+
+const sqlExistsMessageClientID = `
+SELECT EXISTS(
+  SELECT 1 FROM messages
+  WHERE conversation_id = $1
+    AND client_message_id = $2
+    AND deleted_at IS NULL
+)`
+
 // MessageRepository persists conversation turns.
 type MessageRepository interface {
 	Create(ctx context.Context, m entity.Message) (entity.Message, error)
 	ListByConversation(ctx context.Context, conversationID uuid.UUID, limit int) ([]entity.Message, error)
+	LatestByConversation(ctx context.Context, conversationID uuid.UUID) (entity.Message, error)
+	ExistsByClientMessageID(ctx context.Context, conversationID uuid.UUID, clientMessageID string) (bool, error)
 	WithTx(tx pgx.Tx) MessageRepository
 }
 
@@ -81,6 +98,16 @@ func (r *messageRepository) ListByConversation(ctx context.Context, conversation
 		out = append(out, m)
 	}
 	return out, rows.Err()
+}
+
+func (r *messageRepository) LatestByConversation(ctx context.Context, conversationID uuid.UUID) (entity.Message, error) {
+	return scanMessage(r.q.QueryRow(ctx, sqlLatestMessageByConversation, conversationID))
+}
+
+func (r *messageRepository) ExistsByClientMessageID(ctx context.Context, conversationID uuid.UUID, clientMessageID string) (bool, error) {
+	var exists bool
+	err := r.q.QueryRow(ctx, sqlExistsMessageClientID, conversationID, clientMessageID).Scan(&exists)
+	return exists, err
 }
 
 func scanMessage(row pgx.Row) (entity.Message, error) {

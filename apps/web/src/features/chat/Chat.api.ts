@@ -3,6 +3,7 @@ import { apiRequest } from "@/lib/api/client";
 import type {
   ChatCommandResponse,
   ChatHistoryResponse,
+  ChatSummaryResponse,
 } from "./Chat.types";
 
 export async function sendChatCommand(
@@ -20,4 +21,8 @@ export async function sendChatCommand(
 
 export async function fetchChatMessages(): Promise<ChatHistoryResponse> {
   return apiRequest<ChatHistoryResponse>("/api/v1/chat/messages");
+}
+
+export async function fetchChatSummary(): Promise<ChatSummaryResponse> {
+  return apiRequest<ChatSummaryResponse>("/api/v1/chat/summary");
 }

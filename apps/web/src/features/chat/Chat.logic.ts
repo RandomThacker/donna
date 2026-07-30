@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { fetchChatMessages, sendChatCommand } from "./Chat.api";
 import type { ChatHistoryMessage, ChatMessage } from "./Chat.types";
+import { chatSummaryQueryKey } from "./useDonnaThreadSummary";
 
 function newId(): string {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -30,6 +32,7 @@ export function useChatSession(
   options: { enabled?: boolean } = {},
 ) {
   const enabled = options.enabled !== false;
+  const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>(
     enabled ? [] : [WELCOME],
   );
@@ -38,6 +41,10 @@ export function useChatSession(
   const [loadingHistory, setLoadingHistory] = useState(enabled);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const appliedPrefill = useRef(false);
+
+  const refreshSummary = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: chatSummaryQueryKey });
+  }, [queryClient]);
 
   useEffect(() => {
     if (!enabled) {
@@ -54,6 +61,7 @@ export function useChatSession(
         } else {
           setMessages(history.messages.map(mapHistoryMessage));
         }
+        refreshSummary();
       } catch {
         if (!cancelled) {
           setMessages([WELCOME]);
@@ -67,7 +75,7 @@ export function useChatSession(
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, refreshSummary]);
 
   useEffect(() => {
     if (appliedPrefill.current) return;
@@ -127,8 +135,9 @@ export function useChatSession(
       ]);
     } finally {
       setSending(false);
+      refreshSummary();
     }
-  }, [draft, sending, loadingHistory]);
+  }, [draft, sending, loadingHistory, refreshSummary]);
 
   return {
     messages,
