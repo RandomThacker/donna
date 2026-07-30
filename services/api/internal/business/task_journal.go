@@ -362,6 +362,9 @@ func (s *TaskJournalService) UpdateOccurrence(ctx context.Context, userID, occur
 }
 
 // RescheduleOccurrence moves a journal row to another civil date (prepends there).
+// The moved row becomes a manual occurrence so future-day CF purge cannot delete it,
+// and other incomplete siblings of the same task are removed so EnsureDay cannot
+// re-carry the task onto the original day.
 func (s *TaskJournalService) RescheduleOccurrence(ctx context.Context, userID, occurrenceID uuid.UUID, newDate time.Time) (entity.TaskOccurrenceWithTask, error) {
 	if userID == uuid.Nil || occurrenceID == uuid.Nil {
 		return entity.TaskOccurrenceWithTask{}, fmt.Errorf("%w: user and occurrence id are required", apperr.ErrValidation)
@@ -389,6 +392,9 @@ func (s *TaskJournalService) RescheduleOccurrence(ctx context.Context, userID, o
 		return entity.TaskOccurrenceWithTask{}, err
 	}
 	if _, err := s.occurrences.UpdateDateAndSort(ctx, occurrenceID, userID, target, 0, now); err != nil {
+		return entity.TaskOccurrenceWithTask{}, err
+	}
+	if _, err := s.occurrences.DeleteIncompleteForTaskExcept(ctx, existing.TaskID, userID, occurrenceID); err != nil {
 		return entity.TaskOccurrenceWithTask{}, err
 	}
 	occ, err := s.occurrences.GetByID(ctx, occurrenceID)

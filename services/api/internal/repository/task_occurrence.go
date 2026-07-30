@@ -99,9 +99,21 @@ UPDATE task_occurrences SET sort_order = sort_order + $3, updated_at = $4
 WHERE user_id = $1 AND date = $2`
 
 const sqlUpdateOccurrenceDateAndSort = `
-UPDATE task_occurrences SET date = $2, sort_order = $3, updated_at = $4
+UPDATE task_occurrences
+SET date = $2,
+    sort_order = $3,
+    updated_at = $4,
+    source = 'manual',
+    carried_forward = false
 WHERE id = $1 AND user_id = $5
 RETURNING` + occurrenceColumns
+
+const sqlDeleteIncompleteForTaskExcept = `
+DELETE FROM task_occurrences
+WHERE task_id = $1
+  AND user_id = $2
+  AND completed = false
+  AND id <> $3`
 
 const sqlSummariesByUserDateRange = `
 SELECT
@@ -132,6 +144,7 @@ type TaskOccurrenceRepository interface {
 	UpdateDateAndSort(ctx context.Context, id, userID uuid.UUID, date time.Time, sortOrder int, updatedAt time.Time) (entity.TaskOccurrence, error)
 	SummariesByDateRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.TaskDaySummary, error)
 	ExistsForTaskDate(ctx context.Context, taskID uuid.UUID, date time.Time) (bool, error)
+	DeleteIncompleteForTaskExcept(ctx context.Context, taskID, userID, keepID uuid.UUID) (int64, error)
 	DeleteCarryForwardAfter(ctx context.Context, userID uuid.UUID, after time.Time) (int64, error)
 	DeleteByTaskID(ctx context.Context, taskID, userID uuid.UUID) (int64, error)
 	WithTx(tx pgx.Tx) TaskOccurrenceRepository
@@ -243,6 +256,17 @@ func (r *taskOccurrenceRepository) BumpSortOrders(ctx context.Context, userID uu
 func (r *taskOccurrenceRepository) UpdateDateAndSort(ctx context.Context, id, userID uuid.UUID, date time.Time, sortOrder int, updatedAt time.Time) (entity.TaskOccurrence, error) {
 	row := r.q.QueryRow(ctx, sqlUpdateOccurrenceDateAndSort, id, civilDate(date), sortOrder, updatedAt, userID)
 	return scanOccurrence(row)
+}
+
+func (r *taskOccurrenceRepository) DeleteIncompleteForTaskExcept(
+	ctx context.Context,
+	taskID, userID, keepID uuid.UUID,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlDeleteIncompleteForTaskExcept, taskID, userID, keepID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (r *taskOccurrenceRepository) SummariesByDateRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.TaskDaySummary, error) {

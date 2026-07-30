@@ -92,6 +92,9 @@ func (s *stubOccurrences) SummariesByDateRange(context.Context, uuid.UUID, time.
 func (s *stubOccurrences) ExistsForTaskDate(_ context.Context, taskID uuid.UUID, date time.Time) (bool, error) {
 	return s.exists[taskID.String()+"|"+s.key(date)], nil
 }
+func (s *stubOccurrences) DeleteIncompleteForTaskExcept(context.Context, uuid.UUID, uuid.UUID, uuid.UUID) (int64, error) {
+	return 0, nil
+}
 func (s *stubOccurrences) DeleteCarryForwardAfter(context.Context, uuid.UUID, time.Time) (int64, error) {
 	return 0, nil
 }
