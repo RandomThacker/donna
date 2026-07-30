@@ -33,6 +33,7 @@ export function DashboardPhone({ phone }: DashboardPhoneProps) {
             {activeConversation ? (
               <IMessageChat
                 conversation={activeConversation}
+                live={activeConversation.id === "donna"}
                 onBack={() => setActiveId(null)}
               />
             ) : (

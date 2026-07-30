@@ -14,6 +14,10 @@ export type IMessageChatProps = {
   conversation: IMessageConversation;
   onBack: () => void;
   onClose?: () => void;
+  /** Wire composer to command chat API (Donna thread). */
+  live?: boolean;
+  initialDraft?: string;
+  showBack?: boolean;
 };
 
 export type DashboardPhoneFullscreenProps = {

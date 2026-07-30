@@ -15,6 +15,9 @@ type appconfigFile struct {
 	FrontendSuccessURL            string `json:"frontend_success_url"`
 	IntegrationFrontendSuccessURL string `json:"integration_frontend_success_url"`
 	CookieSecure                  string `json:"cookie_secure"`
+	VAPIDPublicKey                string `json:"vapid_public_key"`
+	VAPIDPrivateKey               string `json:"vapid_private_key"`
+	VAPIDSubject                  string `json:"vapid_subject"`
 }
 
 type databaseFile struct {

@@ -7,8 +7,11 @@
   "jwt_secret": "${JWT_SECRET}",
   "session_secret": "${SESSION_SECRET}",
   "jwt_expiry": "${JWT_EXPIRY:24h}",
-  "credentials_encryption_key": "${CREDENTIALS_ENCRYPTION_KEY}",
+	"credentials_encryption_key": "${CREDENTIALS_ENCRYPTION_KEY}",
   "frontend_success_url": "${AUTH_FRONTEND_SUCCESS_URL:http://localhost:3000/auth/callback}",
   "integration_frontend_success_url": "${INTEGRATION_FRONTEND_SUCCESS_URL:http://localhost:3000/dashboard/settings}",
-  "cookie_secure": "${COOKIE_SECURE:false}"
+  "cookie_secure": "${COOKIE_SECURE:false}",
+  "vapid_public_key": "${VAPID_PUBLIC_KEY}",
+  "vapid_private_key": "${VAPID_PRIVATE_KEY}",
+  "vapid_subject": "${VAPID_SUBJECT:mailto:donna@localhost}"
 }

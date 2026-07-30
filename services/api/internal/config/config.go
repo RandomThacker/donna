@@ -20,8 +20,11 @@ type AppConfig struct {
 	CredentialsKey                 string
 	FrontendSuccessURL             string
 	IntegrationFrontendSuccessURL  string
-	CookieSecure                   bool
-	ShutdownTimeout                time.Duration
+	CookieSecure                  bool
+	ShutdownTimeout               time.Duration
+	VAPIDPublicKey                string
+	VAPIDPrivateKey               string
+	VAPIDSubject                  string
 }
 
 // DatabaseConfig holds Postgres pool settings from database.json.

@@ -68,6 +68,13 @@ WHERE id = $1 AND deleted_at IS NULL
 RETURNING
 	id, public_id, email, email_verified, display_name, avatar_url,
 	timezone, locale, status, last_login_at, created_at, updated_at, deleted_at`
+
+	sqlListActiveUserIDs = `
+SELECT id
+FROM users
+WHERE deleted_at IS NULL
+  AND status = 'active'
+ORDER BY id`
 )
 
 // UserUpdateFields holds nullable columns for a partial update.
@@ -88,6 +95,7 @@ type UserRepository interface {
 	Update(ctx context.Context, id uuid.UUID, fields UserUpdateFields, updatedAt time.Time) (entity.User, error)
 	SoftDelete(ctx context.Context, id uuid.UUID, status string, deletedAt time.Time) error
 	TouchLastLogin(ctx context.Context, id uuid.UUID, at time.Time) (entity.User, error)
+	ListActiveIDs(ctx context.Context) ([]uuid.UUID, error)
 	WithTx(tx pgx.Tx) UserRepository
 }
 
@@ -189,6 +197,23 @@ func (r *userRepository) TouchLastLogin(ctx context.Context, id uuid.UUID, at ti
 		return entity.User{}, fmt.Errorf("touch last login: %w", err)
 	}
 	return user, nil
+}
+
+func (r *userRepository) ListActiveIDs(ctx context.Context) ([]uuid.UUID, error) {
+	rows, err := r.q.Query(ctx, sqlListActiveUserIDs)
+	if err != nil {
+		return nil, fmt.Errorf("list active user ids: %w", err)
+	}
+	defer rows.Close()
+	out := make([]uuid.UUID, 0)
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
 }
 
 type scannable interface {

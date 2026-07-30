@@ -73,9 +73,16 @@ sequenceDiagram
 
 - Versioned REST under `/api/v1`
 - Handlers validate and map HTTP only
-- Services own business logic
+- **Actions** own cross-service workflows (see [ACTION_LAYER.md](./ACTION_LAYER.md))
+- Services own entity business logic
 - Repositories own SQL / migrations consumers
 - Typed JSON request and response contracts live in `packages/types`
+
+```text
+Handler → Actions → Services → Repositories
+```
+
+Future Chat / Telegram / AI call the same Actions — never duplicate workflows in transport adapters.
 
 ## Calendar unification
 

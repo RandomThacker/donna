@@ -73,6 +73,10 @@ func (m mockUserRepo) TouchLastLogin(ctx context.Context, id uuid.UUID, at time.
 	return entity.User{ID: id, LastLoginAt: &at}, nil
 }
 
+func (m mockUserRepo) ListActiveIDs(context.Context) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
 func (m mockUserRepo) WithTx(pgx.Tx) repository.UserRepository {
 	return m
 }

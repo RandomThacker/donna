@@ -7,20 +7,22 @@ Read before implementing:
 3. [docs/CURSOR_RULES.md](docs/CURSOR_RULES.md) — engineering standards
 4. [docs/DONNA_PERSONALITY.md](docs/DONNA_PERSONALITY.md) — voice and assistant behavior
 5. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — system boundaries
-6. [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) — logging, metrics, tracing, audit, AI usage
-7. [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md) — business entities, aggregates, ownership (no SQL)
-8. [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — logical data model: fields, constraints, indexes (no SQL)
-9. [docs/SCHEMA_DECISIONS.md](docs/SCHEMA_DECISIONS.md) — schema ADRs + formal review (no SQL)
-10. [docs/PHYSICAL_DATABASE_DESIGN.md](docs/PHYSICAL_DATABASE_DESIGN.md) — PostgreSQL physical design (no CREATE TABLE yet)
-11. [docs/DATABASE.md](docs/DATABASE.md) — persistence standards (no tables yet)
-12. [docs/PHASE1_PLAN.md](docs/PHASE1_PLAN.md) — milestone order
+6. [docs/ACTION_LAYER.md](docs/ACTION_LAYER.md) — Action Layer (Handler → Actions → Services)
+7. [docs/COMMAND_CHAT.md](docs/COMMAND_CHAT.md) — Command Chat MVP (rule-based intents)
+8. [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md) — logging, metrics, tracing, audit, AI usage
+9. [docs/DOMAIN_MODEL.md](docs/DOMAIN_MODEL.md) — business entities, aggregates, ownership (no SQL)
+10. [docs/DATA_MODEL.md](docs/DATA_MODEL.md) — logical data model: fields, constraints, indexes (no SQL)
+11. [docs/SCHEMA_DECISIONS.md](docs/SCHEMA_DECISIONS.md) — schema ADRs + formal review (no SQL)
+12. [docs/PHYSICAL_DATABASE_DESIGN.md](docs/PHYSICAL_DATABASE_DESIGN.md) — PostgreSQL physical design (no CREATE TABLE yet)
+13. [docs/DATABASE.md](docs/DATABASE.md) — persistence standards (no tables yet)
+14. [docs/PHASE1_PLAN.md](docs/PHASE1_PLAN.md) — milestone order
 
 Project rules also live in `.cursor/rules/`.
 
 ## Non-negotiables
 
 - AI never writes to the database; API executes all mutations.
-- Handler → Business → Repository in Go (models at the edge; entities in the domain).
+- Handler → Actions → Services → Repository in Go (models at the edge; Action DTOs in the domain; entities in services).
 - Observability: module loggers from the Logger Factory only; follow [docs/OBSERVABILITY.md](docs/OBSERVABILITY.md).
 - Feature folders in web: UI / logic / styles / types separation.
 - Pass the Donna Test: would a great human personal assistant behave this way?

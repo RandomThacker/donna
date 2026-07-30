@@ -57,3 +57,11 @@ type CalendarEvent struct {
 	UpdatedAt                time.Time
 	DeletedAt                *time.Time
 }
+
+// CalendarEventWithProvider is a calendar event plus its connected-account provider.
+// Used by the Timeline Builder; not a persisted table.
+type CalendarEventWithProvider struct {
+	Event       CalendarEvent
+	Provider    string
+	SourceColor *string
+}
