@@ -98,7 +98,7 @@ export function IMessageChat({
             : `Today ${conversation.messages[0]?.time ?? ""}`}
         </p>
         {live && session.loadingHistory && bubbles.length === 0 ? (
-          <p className={styles.typing} aria-live="polite">
+          <p className={cn(styles.stamp, "mt-2")} aria-live="polite">
             Loading…
           </p>
         ) : null}
