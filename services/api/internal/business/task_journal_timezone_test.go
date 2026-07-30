@@ -74,6 +74,9 @@ func (s *stubOccurrences) UpdateCompletion(context.Context, uuid.UUID, uuid.UUID
 func (s *stubOccurrences) CompleteIncompleteForTask(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time) (int64, error) {
 	panic("unused")
 }
+func (s *stubOccurrences) UncompleteForTask(context.Context, uuid.UUID, uuid.UUID, time.Time) (int64, error) {
+	panic("unused")
+}
 func (s *stubOccurrences) SyncIncompleteFromCompletedPeers(context.Context, uuid.UUID, time.Time) (int64, error) {
 	return 0, nil
 }

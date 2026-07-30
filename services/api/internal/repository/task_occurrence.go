@@ -77,6 +77,15 @@ WHERE task_id = $1
   AND user_id = $2
   AND completed = false`
 
+const sqlUncompleteForTask = `
+UPDATE task_occurrences SET
+	completed = false,
+	completed_at = NULL,
+	updated_at = $3
+WHERE task_id = $1
+  AND user_id = $2
+  AND completed = true`
+
 // Syncs incomplete rows when another day already completed the same task.
 const sqlSyncIncompleteFromCompletedPeers = `
 UPDATE task_occurrences AS o
@@ -138,6 +147,7 @@ type TaskOccurrenceRepository interface {
 	MaxSortOrder(ctx context.Context, userID uuid.UUID, date time.Time) (int, error)
 	UpdateCompletion(ctx context.Context, id, userID uuid.UUID, completed bool, completedAt *time.Time, updatedAt time.Time) (entity.TaskOccurrence, error)
 	CompleteIncompleteForTask(ctx context.Context, taskID, userID uuid.UUID, completedAt, updatedAt time.Time) (int64, error)
+	UncompleteForTask(ctx context.Context, taskID, userID uuid.UUID, updatedAt time.Time) (int64, error)
 	SyncIncompleteFromCompletedPeers(ctx context.Context, userID uuid.UUID, at time.Time) (int64, error)
 	UpdateSortOrder(ctx context.Context, id, userID uuid.UUID, sortOrder int, date time.Time, updatedAt time.Time) error
 	BumpSortOrders(ctx context.Context, userID uuid.UUID, date time.Time, delta int, updatedAt time.Time) error
@@ -225,6 +235,18 @@ func (r *taskOccurrenceRepository) CompleteIncompleteForTask(
 	completedAt, updatedAt time.Time,
 ) (int64, error) {
 	tag, err := r.q.Exec(ctx, sqlCompleteIncompleteForTask, taskID, userID, completedAt, updatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *taskOccurrenceRepository) UncompleteForTask(
+	ctx context.Context,
+	taskID, userID uuid.UUID,
+	updatedAt time.Time,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlUncompleteForTask, taskID, userID, updatedAt)
 	if err != nil {
 		return 0, err
 	}

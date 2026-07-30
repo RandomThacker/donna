@@ -322,8 +322,8 @@ func (s *TaskJournalService) UpdateTask(ctx context.Context, userID, taskID uuid
 }
 
 // UpdateOccurrence toggles completion for a journal row.
-// Completing also marks every other incomplete occurrence of the same task
-// (e.g. the original day that was carried forward). Uncomplete only affects this row.
+// Completing and uncompleting both apply to every occurrence of the same task
+// so carry-forward peers cannot immediately re-complete an unchecked row.
 func (s *TaskJournalService) UpdateOccurrence(ctx context.Context, userID, occurrenceID uuid.UUID, completed bool) (entity.TaskOccurrenceWithTask, error) {
 	if userID == uuid.Nil || occurrenceID == uuid.Nil {
 		return entity.TaskOccurrenceWithTask{}, fmt.Errorf("%w: user and occurrence id are required", apperr.ErrValidation)
@@ -350,7 +350,7 @@ func (s *TaskJournalService) UpdateOccurrence(ctx context.Context, userID, occur
 			return entity.TaskOccurrenceWithTask{}, err
 		}
 	} else {
-		if _, err := s.occurrences.UpdateCompletion(ctx, occurrenceID, userID, false, nil, now); err != nil {
+		if _, err := s.occurrences.UncompleteForTask(ctx, existing.TaskID, userID, now); err != nil {
 			return entity.TaskOccurrenceWithTask{}, err
 		}
 	}

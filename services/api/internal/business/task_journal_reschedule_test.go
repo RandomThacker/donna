@@ -50,6 +50,9 @@ func (s *rescheduleOccStub) UpdateCompletion(context.Context, uuid.UUID, uuid.UU
 func (s *rescheduleOccStub) CompleteIncompleteForTask(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time) (int64, error) {
 	panic("unused")
 }
+func (s *rescheduleOccStub) UncompleteForTask(context.Context, uuid.UUID, uuid.UUID, time.Time) (int64, error) {
+	panic("unused")
+}
 func (s *rescheduleOccStub) SyncIncompleteFromCompletedPeers(context.Context, uuid.UUID, time.Time) (int64, error) {
 	return 0, nil
 }
