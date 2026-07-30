@@ -12,7 +12,7 @@ import { timelineStyles as styles } from "./view.styles";
 type MonthViewProps = {
   cursor: Date;
   events: CalendarEvent[];
-  colorFor: (sourceId: string) => string;
+  colorFor: (sourceId: string, event?: CalendarEvent) => string;
   onSelectDay: (day: Date) => void;
   onEventClick: (event: CalendarEvent) => void;
 };
@@ -69,9 +69,12 @@ export function MonthView({
                     type="button"
                     className={styles.monthChip}
                     style={{
-                      backgroundColor: colorFor(event.calendar_source_id),
+                      backgroundColor: colorFor(
+                        event.calendar_source_id,
+                        event,
+                      ),
                       color: contrastTextFor(
-                        colorFor(event.calendar_source_id),
+                        colorFor(event.calendar_source_id, event),
                       ),
                     }}
                     onClick={() => onEventClick(event)}

@@ -12,7 +12,7 @@ type DayViewProps = {
   day: Date;
   allDay: CalendarEvent[];
   timed: LaidOutEvent[];
-  colorFor: (sourceId: string) => string;
+  colorFor: (sourceId: string, event?: CalendarEvent) => string;
   onEventClick: (event: CalendarEvent) => void;
 };
 
@@ -91,7 +91,7 @@ export function DayView({
               <EventCard
                 key={event.id}
                 event={event}
-                color={colorFor(event.calendar_source_id)}
+                color={colorFor(event.calendar_source_id, event)}
                 compact
                 className="max-w-[14rem]"
                 onClick={() => onEventClick(event)}
@@ -137,7 +137,7 @@ export function DayView({
               >
                 <EventCard
                   event={item.event}
-                  color={colorFor(item.event.calendar_source_id)}
+                  color={colorFor(item.event.calendar_source_id, item.event)}
                   className="h-full"
                   onClick={() => onEventClick(item.event)}
                 />

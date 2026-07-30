@@ -46,33 +46,35 @@ type CalendarEventSyncResult struct {
 
 // CalendarService syncs and lists calendar sources/events (Donna DB is the query source of truth).
 type CalendarService struct {
-	accounts  repository.ConnectedAccountRepository
-	secrets   repository.CredentialSecretRepository
-	sources   repository.CalendarSourceRepository
-	events    repository.CalendarEventRepository
-	syncRuns  repository.CalendarSyncRunRepository
-	jobs      repository.SchedulerJobRepository
-	tx        TxRunner
-	providers map[string]calendarprovider.Provider
-	tokens    map[string]calendarprovider.TokenRefresher
-	sealKey   []byte
-	log       *logger.Logger
-	now       func() time.Time
+	accounts    repository.ConnectedAccountRepository
+	secrets     repository.CredentialSecretRepository
+	sources     repository.CalendarSourceRepository
+	events      repository.CalendarEventRepository
+	donnaEvents repository.DonnaEventRepository
+	syncRuns    repository.CalendarSyncRunRepository
+	jobs        repository.SchedulerJobRepository
+	tx          TxRunner
+	providers   map[string]calendarprovider.Provider
+	tokens      map[string]calendarprovider.TokenRefresher
+	sealKey     []byte
+	log         *logger.Logger
+	now         func() time.Time
 }
 
 // CalendarServiceDeps wires CalendarService.
 type CalendarServiceDeps struct {
-	Accounts  repository.ConnectedAccountRepository
-	Secrets   repository.CredentialSecretRepository
-	Sources   repository.CalendarSourceRepository
-	Events    repository.CalendarEventRepository
-	SyncRuns  repository.CalendarSyncRunRepository
-	Jobs      repository.SchedulerJobRepository
-	Tx        TxRunner
-	Providers map[string]calendarprovider.Provider
-	Tokens    map[string]calendarprovider.TokenRefresher
-	SealKey   []byte
-	Log       *logger.Logger
+	Accounts    repository.ConnectedAccountRepository
+	Secrets     repository.CredentialSecretRepository
+	Sources     repository.CalendarSourceRepository
+	Events      repository.CalendarEventRepository
+	DonnaEvents repository.DonnaEventRepository
+	SyncRuns    repository.CalendarSyncRunRepository
+	Jobs        repository.SchedulerJobRepository
+	Tx          TxRunner
+	Providers   map[string]calendarprovider.Provider
+	Tokens      map[string]calendarprovider.TokenRefresher
+	SealKey     []byte
+	Log         *logger.Logger
 }
 
 // NewCalendarService constructs a CalendarService.
@@ -86,18 +88,19 @@ func NewCalendarService(deps CalendarServiceDeps) *CalendarService {
 		tokens = map[string]calendarprovider.TokenRefresher{}
 	}
 	return &CalendarService{
-		accounts:  deps.Accounts,
-		secrets:   deps.Secrets,
-		sources:   deps.Sources,
-		events:    deps.Events,
-		syncRuns:  deps.SyncRuns,
-		jobs:      deps.Jobs,
-		tx:        deps.Tx,
-		providers: providers,
-		tokens:    tokens,
-		sealKey:   deps.SealKey,
-		log:       deps.Log,
-		now:       time.Now,
+		accounts:    deps.Accounts,
+		secrets:     deps.Secrets,
+		sources:     deps.Sources,
+		events:      deps.Events,
+		donnaEvents: deps.DonnaEvents,
+		syncRuns:    deps.SyncRuns,
+		jobs:        deps.Jobs,
+		tx:          deps.Tx,
+		providers:   providers,
+		tokens:      tokens,
+		sealKey:     deps.SealKey,
+		log:         deps.Log,
+		now:         time.Now,
 	}
 }
 
@@ -176,8 +179,12 @@ func (s *CalendarService) ListSources(ctx context.Context, userID uuid.UUID) (Ca
 	if err != nil {
 		return CalendarSourcesView{}, err
 	}
+	now := s.now().UTC()
+	merged := make([]entity.CalendarSource, 0, len(sources)+1)
+	merged = append(merged, donnaCalendarSource(userID, now))
+	merged = append(merged, sources...)
 	view := CalendarSourcesView{
-		Sources:  sources,
+		Sources:  merged,
 		Accounts: []entity.ConnectedAccount{},
 	}
 	accounts, err := s.listSyncableAccounts(ctx, userID)

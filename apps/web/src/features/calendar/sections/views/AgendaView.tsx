@@ -13,7 +13,7 @@ import { timelineStyles as styles } from "./view.styles";
 
 type AgendaViewProps = {
   events: CalendarEvent[];
-  colorFor: (sourceId: string) => string;
+  colorFor: (sourceId: string, event?: CalendarEvent) => string;
   onEventClick: (event: CalendarEvent) => void;
   onNearEnd: () => void;
   /** Agenda starts on this civil day (inclusive), in `timeZone`. */
@@ -110,7 +110,7 @@ export function AgendaView({
               <AgendaEventRow
                 key={event.id}
                 event={event}
-                color={colorFor(event.calendar_source_id)}
+                color={colorFor(event.calendar_source_id, event)}
                 timeZone={timeZone}
                 onEventClick={onEventClick}
               />

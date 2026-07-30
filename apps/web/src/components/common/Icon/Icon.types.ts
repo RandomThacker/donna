@@ -30,7 +30,8 @@ export type IconName =
   | "pin"
   | "trash"
   | "repeat"
-  | "sun";
+  | "sun"
+  | "bell";
 
 export type IconProps = {
   name: IconName;

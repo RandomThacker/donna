@@ -52,8 +52,8 @@ export const dashboardNavItems: DashboardNavItem[] = [
 /** Mobile bottom bar — subset of primary nav. */
 export const dashboardBottomNavIds = [
   "home",
+  "calendar",
   "chat",
-  "commands",
   "tasks",
   "settings",
 ] as const;

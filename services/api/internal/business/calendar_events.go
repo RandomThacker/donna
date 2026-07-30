@@ -19,6 +19,7 @@ import (
 )
 
 // ListEvents returns live events overlapping [from, to) from Donna DB only.
+// Includes synced provider events plus Donna-owned timeline events.
 func (s *CalendarService) ListEvents(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEvent, error) {
 	if userID == uuid.Nil {
 		return nil, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
@@ -32,7 +33,24 @@ func (s *CalendarService) ListEvents(ctx context.Context, userID uuid.UUID, from
 	if !to.After(from) {
 		return nil, fmt.Errorf("%w: to must be after from", apperr.ErrValidation)
 	}
-	return s.events.ListByUserInRange(ctx, userID, from.UTC(), to.UTC())
+	providerEvents, err := s.events.ListByUserInRange(ctx, userID, from.UTC(), to.UTC())
+	if err != nil {
+		return nil, err
+	}
+	out := make([]entity.CalendarEvent, 0, len(providerEvents)+8)
+	out = append(out, providerEvents...)
+	if s.donnaEvents == nil {
+		return out, nil
+	}
+	donnaRows, err := s.donnaEvents.ListByUserInRange(ctx, userID, from.UTC(), to.UTC())
+	if err != nil {
+		return nil, err
+	}
+	sourceID := DonnaCalendarSourceID(userID)
+	for _, row := range donnaRows {
+		out = append(out, mapDonnaEventToCalendarEvent(row, sourceID))
+	}
+	return out, nil
 }
 
 // SyncEvents syncs events for every active sync_enabled calendar source across all syncable accounts.

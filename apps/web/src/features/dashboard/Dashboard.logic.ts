@@ -21,7 +21,7 @@ export const dashboardData: DashboardData = {
     salutation: "Good morning",
     name: "Aryan",
     emoji: "☀️",
-    summary: "0 meetings · 0 tasks",
+    summary: "0 meetings · 0 tasks · 0 reminders",
     nudge: "",
   },
   focus: {

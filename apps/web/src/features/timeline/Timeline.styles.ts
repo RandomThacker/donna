@@ -1,0 +1,24 @@
+export const timelineStyles = {
+  page: [
+    "relative flex h-dvh overflow-x-hidden overflow-hidden bg-donna-bg text-donna-text",
+    "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+  ].join(" "),
+  shell: [
+    "relative z-10 grid h-full w-full min-w-0",
+    "grid-cols-1 md:grid-cols-[15rem_minmax(0,1fr)]",
+  ].join(" "),
+  workspace: "flex min-h-0 min-w-0 flex-col overflow-hidden bg-donna-bg",
+  body: "relative flex min-h-0 flex-1 overflow-hidden",
+  main: "flex min-h-0 min-w-0 flex-1 flex-col",
+  side: [
+    "hidden w-[17.5rem] shrink-0 flex-col gap-5 overflow-y-auto",
+    "border-r border-donna-hairline bg-donna-surface p-4 lg:flex",
+  ].join(" "),
+  sideMobile: [
+    "absolute inset-y-0 left-0 z-30 flex w-[17.5rem] flex-col gap-5",
+    "overflow-y-auto border-r border-donna-hairline bg-donna-surface p-4",
+    "shadow-donna-card lg:hidden animate-donna-fade-up",
+  ].join(" "),
+  backdrop: "absolute inset-0 z-20 bg-black/40 lg:hidden",
+  viewPane: "min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto scrollbar-hidden",
+} as const;

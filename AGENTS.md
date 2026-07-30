@@ -16,6 +16,7 @@ Read before implementing:
 12. [docs/PHYSICAL_DATABASE_DESIGN.md](docs/PHYSICAL_DATABASE_DESIGN.md) — PostgreSQL physical design (no CREATE TABLE yet)
 13. [docs/DATABASE.md](docs/DATABASE.md) — persistence standards (no tables yet)
 14. [docs/PHASE1_PLAN.md](docs/PHASE1_PLAN.md) — milestone order
+15. [docs/TIMELINE_UI.md](docs/TIMELINE_UI.md) — Timeline planning UI (Phase 3.1)
 
 Project rules also live in `.cursor/rules/`.
 

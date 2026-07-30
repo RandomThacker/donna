@@ -448,17 +448,18 @@ func wireCalendar(
 	eventsRepo := repository.NewCalendarEventRepository(pool)
 
 	svc := business.NewCalendarService(business.CalendarServiceDeps{
-		Accounts:  auth.accounts,
-		Secrets:   auth.secrets,
-		Sources:   sourcesRepo,
-		Events:    eventsRepo,
-		SyncRuns:  repository.NewCalendarSyncRunRepository(pool),
-		Jobs:      repository.NewSchedulerJobRepository(pool),
-		Tx:        auth.tx,
-		Providers: providers,
-		Tokens:    tokens,
-		SealKey:   auth.sealKey,
-		Log:       calendarLog,
+		Accounts:    auth.accounts,
+		Secrets:     auth.secrets,
+		Sources:     sourcesRepo,
+		Events:      eventsRepo,
+		DonnaEvents: repository.NewDonnaEventRepository(pool),
+		SyncRuns:    repository.NewCalendarSyncRunRepository(pool),
+		Jobs:        repository.NewSchedulerJobRepository(pool),
+		Tx:          auth.tx,
+		Providers:   providers,
+		Tokens:      tokens,
+		SealKey:     auth.sealKey,
+		Log:         calendarLog,
 	})
 
 	out := calendarWire{

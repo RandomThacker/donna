@@ -1,12 +1,14 @@
 "use client";
 
-import { format } from "date-fns";
+import { endOfDay, format, startOfDay } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useSyncExternalStore } from "react";
 
 import { useCalendarDayEvents } from "@/features/calendar/useCalendarDayEvents";
 import { fetchTaskDay } from "@/features/tasks/Tasks.api";
 import { taskQueryKeys } from "@/features/tasks/Tasks.logic";
+import { fetchTimeline } from "@/features/timeline/Timeline.api";
+import { timelineQueryKeys } from "@/features/timeline/Timeline.logic";
 
 import type { DashboardGreeting } from "./Dashboard.types";
 
@@ -35,12 +37,13 @@ function plural(count: number, singular: string, pluralForm: string): string {
   return `${count} ${count === 1 ? singular : pluralForm}`;
 }
 
-/** Meetings = remaining calendar events today. Tasks = incomplete journal tasks today. */
+/** Meetings / tasks / reminders remaining today. */
 export function buildGreetingSummary(
   meetingCount: number,
   taskCount: number,
+  reminderCount: number,
 ): string {
-  return `${plural(meetingCount, "meeting", "meetings")} · ${plural(taskCount, "task", "tasks")}`;
+  return `${plural(meetingCount, "meeting", "meetings")} · ${plural(taskCount, "task", "tasks")} · ${plural(reminderCount, "reminder", "reminders")}`;
 }
 
 function subscribeLocalHour(onStoreChange: () => void): () => void {
@@ -67,7 +70,15 @@ function useLocalHour(): number | null {
   return hour < 0 ? null : hour;
 }
 
-/** Live greeting strip: salutation + meeting/task counts. */
+function todayRangeIso(): { from: string; to: string } {
+  const now = new Date();
+  return {
+    from: startOfDay(now).toISOString(),
+    to: endOfDay(now).toISOString(),
+  };
+}
+
+/** Live greeting strip: salutation + meeting/task/reminder counts. */
 export function useDashboardGreeting(name: string): {
   greeting: DashboardGreeting;
   isLoading: boolean;
@@ -76,10 +87,17 @@ export function useDashboardGreeting(name: string): {
   const dateKey = format(today, "yyyy-MM-dd");
   const localHour = useLocalHour();
   const { events, isLoading: eventsLoading } = useCalendarDayEvents(today);
+  const range = useMemo(() => todayRangeIso(), []);
 
   const tasksQuery = useQuery({
     queryKey: taskQueryKeys.day(dateKey),
     queryFn: ({ signal }) => fetchTaskDay(dateKey, signal),
+  });
+
+  const timelineQuery = useQuery({
+    queryKey: timelineQueryKeys.range(range.from, range.to),
+    queryFn: ({ signal }) =>
+      fetchTimeline({ from: range.from, to: range.to, signal }),
   });
 
   const greeting = useMemo(() => {
@@ -100,17 +118,39 @@ export function useDashboardGreeting(name: string): {
       tasksQuery.data?.occurrences.filter((occurrence) => !occurrence.completed) ??
       [];
 
+    const upcomingReminders = (timelineQuery.data?.items ?? []).filter(
+      (item) => {
+        if (item.type !== "REMINDER") return false;
+        if (item.status === "CANCELLED" || item.status === "COMPLETED") {
+          return false;
+        }
+        if (item.all_day) return true;
+        return new Date(item.end_at).getTime() > now.getTime();
+      },
+    );
+
     return {
       salutation,
       name,
       emoji,
-      summary: buildGreetingSummary(upcomingMeetings.length, pendingTasks.length),
+      summary: buildGreetingSummary(
+        upcomingMeetings.length,
+        pendingTasks.length,
+        upcomingReminders.length,
+      ),
       nudge: "",
     } satisfies DashboardGreeting;
-  }, [events, localHour, name, tasksQuery.data?.occurrences]);
+  }, [
+    events,
+    localHour,
+    name,
+    tasksQuery.data?.occurrences,
+    timelineQuery.data?.items,
+  ]);
 
   return {
     greeting,
-    isLoading: eventsLoading || tasksQuery.isLoading,
+    isLoading:
+      eventsLoading || tasksQuery.isLoading || timelineQuery.isLoading,
   };
 }

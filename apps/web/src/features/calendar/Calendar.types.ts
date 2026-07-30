@@ -36,6 +36,14 @@ export type CalendarEvent = {
   origin: string;
   created_at: string;
   updated_at: string;
+  /** Timeline-backed fields (Donna CRUD). */
+  read_only?: boolean;
+  timeline_source?: string;
+  timeline_type?: "EVENT" | "REMINDER";
+  occurrence_id?: string;
+  mutation_id?: string;
+  recurrence_rule?: string;
+  accent_color?: string;
 };
 
 export type CalendarEventsResponse = {

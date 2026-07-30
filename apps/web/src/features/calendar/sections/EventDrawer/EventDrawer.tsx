@@ -20,11 +20,13 @@ import { linkifyPlainText } from "./EventDrawer.linkify";
 type EventDrawerProps = {
   event: CalendarEvent | null;
   source?: CalendarSource;
-  /** Prefer account label (e.g. ICS feed name) over generic source.name. */
   calendarLabel?: string;
   color: string;
   onClose: () => void;
   timeZone?: string;
+  onEdit?: (event: CalendarEvent) => void;
+  onDelete?: (event: CalendarEvent) => void;
+  deleting?: boolean;
 };
 
 function Field({
@@ -60,6 +62,9 @@ export function EventDrawer({
   color,
   onClose,
   timeZone: timeZoneProp,
+  onEdit,
+  onDelete,
+  deleting,
 }: EventDrawerProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -90,6 +95,7 @@ export function EventDrawer({
 
   const organizer = parseOrganizer(event.organizer);
   const attendees = parseAttendees(event.attendees);
+  const editable = event.read_only === false && Boolean(event.mutation_id);
 
   return createPortal(
     <div className={styles.root} role="presentation">
@@ -132,20 +138,19 @@ export function EventDrawer({
         </header>
 
         <div className={styles.body}>
-          <Field label="Timezone">
-            {event.timezone || timeZone}
-          </Field>
+          <Field label="Timezone">{event.timezone || timeZone}</Field>
           <Field label="Calendar">
             {calendarLabel || source?.name || "Unknown calendar"}
+          </Field>
+          <Field label="Type">
+            {event.timeline_type === "REMINDER" ? "Reminder" : "Event"}
           </Field>
           <Field label="Location">{event.location}</Field>
           {event.description ? (
             <DescriptionField text={event.description} />
           ) : null}
           <Field label="Organizer">
-            {organizer
-              ? organizer.displayName || organizer.email
-              : null}
+            {organizer ? organizer.displayName || organizer.email : null}
           </Field>
           <Field label="Attendees">
             {attendees.length > 0 ? (
@@ -154,24 +159,62 @@ export function EventDrawer({
                   <li key={`${a.email ?? a.displayName ?? i}`}>
                     {a.displayName || a.email || "Guest"}
                     {a.responseStatus ? (
-                      <span className="text-donna-faint"> · {a.responseStatus}</span>
+                      <span className="text-donna-faint">
+                        {" "}
+                        · {a.responseStatus}
+                      </span>
                     ) : null}
                   </li>
                 ))}
               </ul>
             ) : null}
           </Field>
-          <Field label="Provider status">
+          <Field label="Status">
             <span className={styles.chip}>{event.status}</span>
-            {isRecurring(event) ? (
+            {isRecurring(event) || event.recurrence_rule ? (
               <span className={`${styles.chip} ml-2`}>Recurring</span>
             ) : null}
             {event.all_day ? (
               <span className={`${styles.chip} ml-2`}>All day</span>
             ) : null}
           </Field>
+          {event.recurrence_rule ? (
+            <Field label="Recurrence">{event.recurrence_rule}</Field>
+          ) : null}
         </div>
-        <footer className={styles.footer}>Read-only · Synced from your calendar</footer>
+        <footer className={styles.footer}>
+          {editable ? (
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-full border border-donna-border px-3 py-1.5 text-xs text-donna-text"
+                onClick={() => onEdit?.(event)}
+              >
+                <Icon name="compose" className="h-3.5 w-3.5" />
+                Edit
+              </button>
+              <button
+                type="button"
+                className="inline-flex items-center gap-1.5 rounded-full border border-rose-500/40 px-3 py-1.5 text-xs text-rose-300"
+                disabled={deleting}
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      `Delete “${event.title}”? This can’t be undone.`,
+                    )
+                  ) {
+                    onDelete?.(event);
+                  }
+                }}
+              >
+                <Icon name="trash" className="h-3.5 w-3.5" />
+                {deleting ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          ) : (
+            <span>Read-only · Synced from your calendar</span>
+          )}
+        </footer>
       </aside>
     </div>,
     document.body,

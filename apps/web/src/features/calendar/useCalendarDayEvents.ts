@@ -62,6 +62,9 @@ export function useCalendarDayEvents(day = new Date()) {
       if (!source.sync_enabled) {
         return false;
       }
+      if (source.provider_calendar_id === "donna_local") {
+        return true;
+      }
       if (liveAccountIds.size === 0) {
         return true;
       }

@@ -19,7 +19,7 @@ type DayBundle = {
 type WeekViewProps = {
   cursor: Date;
   days: DayBundle[];
-  colorFor: (sourceId: string) => string;
+  colorFor: (sourceId: string, event?: CalendarEvent) => string;
   onEventClick: (event: CalendarEvent) => void;
 };
 
@@ -93,7 +93,7 @@ export function WeekView({ cursor, days, colorFor, onEventClick }: WeekViewProps
               <EventCard
                 key={event.id}
                 event={event}
-                color={colorFor(event.calendar_source_id)}
+                color={colorFor(event.calendar_source_id, event)}
                 compact
                 onClick={() => onEventClick(event)}
               />
@@ -142,7 +142,7 @@ export function WeekView({ cursor, days, colorFor, onEventClick }: WeekViewProps
                 >
                   <EventCard
                     event={item.event}
-                    color={colorFor(item.event.calendar_source_id)}
+                    color={colorFor(item.event.calendar_source_id, item.event)}
                     compact
                     className="h-full"
                     onClick={() => onEventClick(item.event)}

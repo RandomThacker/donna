@@ -4,12 +4,24 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 
 import { useAuth } from "@/features/auth";
-
 import {
-  listCalendarEvents,
-  listCalendarSources,
-  syncCalendarSources,
-} from "./Calendar.api";
+  createDonnaEvent,
+  createDonnaReminder,
+  deleteDonnaEvent,
+  deleteDonnaReminder,
+  fetchTimeline,
+  updateDonnaEvent,
+  updateDonnaReminder,
+} from "@/features/timeline/Timeline.api";
+import { TIMELINE_COLORS } from "@/features/timeline/Timeline.colors";
+import type {
+  CreateDonnaEventInput,
+  CreateDonnaReminderInput,
+  UpdateDonnaEventInput,
+  UpdateDonnaReminderInput,
+} from "@/features/timeline/Timeline.types";
+
+import { listCalendarSources, syncCalendarSources } from "./Calendar.api";
 import {
   allDayEventsForDay,
   colorForSource,
@@ -17,6 +29,13 @@ import {
   eventsOverlappingDay,
   layoutTimedEvents,
 } from "./Calendar.layout";
+import {
+  DONNA_EVENT_SOURCE_ID,
+  DONNA_REMINDER_SOURCE_ID,
+  donnaEventAccountGroup,
+  donnaReminderAccountGroup,
+  timelineItemToCalendarEvent,
+} from "./Calendar.timeline";
 import type {
   CalendarAccountGroup,
   CalendarConnectedAccount,
@@ -69,9 +88,14 @@ function buildAccountGroups(
   visibleSourceIds: Set<string>,
 ): CalendarAccountGroup[] {
   const byAccount = new Map<string, CalendarSource[]>();
+
   for (const source of sources) {
+    if (source.provider_calendar_id === "donna_local") {
+      // Virtual Donna Events source — shown via donnaEventAccountGroup instead.
+      continue;
+    }
     const key = source.connected_account_id;
-    if (!key) {
+    if (!key || key === "00000000-0000-0000-0000-000000000000") {
       continue;
     }
     const list = byAccount.get(key) ?? [];
@@ -80,44 +104,45 @@ function buildAccountGroups(
   }
 
   const accountById = new Map(accounts.map((a) => [a.id, a]));
-  const orderedIds: string[] = [];
-  for (const account of accounts) {
-    orderedIds.push(account.id);
-  }
-  // Never surface sources whose connected account is gone (disconnected ICS/OAuth).
-  for (const accountId of byAccount.keys()) {
+  for (const accountId of [...byAccount.keys()]) {
     if (!accountById.has(accountId)) {
       byAccount.delete(accountId);
     }
   }
 
-  return orderedIds
-    .filter((accountId) => byAccount.has(accountId))
-    .map((accountId) => {
-    const matchedAccount = accountById.get(accountId);
-    const groupSources = byAccount.get(accountId) ?? [];
+  const groups: CalendarAccountGroup[] = [
+    donnaEventAccountGroup(visibleSourceIds.has(DONNA_EVENT_SOURCE_ID)),
+    donnaReminderAccountGroup(visibleSourceIds.has(DONNA_REMINDER_SOURCE_ID)),
+  ];
+
+  for (const account of accounts) {
+    const groupSources = byAccount.get(account.id);
+    if (!groupSources?.length) continue;
     const primary =
       groupSources.find((s) => s.is_primary_on_provider) ?? groupSources[0];
     const sourceIds = groupSources.map((s) => s.id);
     const label =
-      matchedAccount?.email?.trim() ||
-      accountLabel(groupSources, matchedAccount);
+      account.email?.trim() || accountLabel(groupSources, account);
     const email =
-      matchedAccount?.email?.trim() ||
+      account.email?.trim() ||
       (EMAIL_RE.test(label) ? label : null) ||
       groupSources.find((s) => EMAIL_RE.test(s.provider_calendar_id.trim()))
         ?.provider_calendar_id ||
       null;
-    return {
-      accountId,
+    groups.push({
+      accountId: account.id,
       label,
       email,
       color: primary ? colorFor(primary.id) : "#c9a87c",
       sourceIds,
       visibleCount: sourceIds.filter((id) => visibleSourceIds.has(id)).length,
-    };
-  });
+    });
+  }
+
+  return groups;
 }
+
+export type CreateIntent = "event" | "reminder" | null;
 
 export function useCalendarController() {
   const { user } = useAuth();
@@ -131,6 +156,9 @@ export function useCalendarController() {
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [agendaDays, setAgendaDays] = useState(60);
+  const [createIntent, setCreateIntent] = useState<CreateIntent>(null);
+  const [createDay, setCreateDay] = useState<Date | null>(null);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
 
   const range = useMemo(
     () => queryRangeForView(view, cursor, agendaDays, timeZone),
@@ -146,16 +174,60 @@ export function useCalendarController() {
     refetchOnMount: "always",
   });
 
-  const eventsQuery = useQuery({
-    queryKey: calendarQueryKeys.events(fromIso, toIso),
+  const timelineQuery = useQuery({
+    queryKey: [...calendarQueryKeys.all, "timeline", fromIso, toIso],
     queryFn: ({ signal }) =>
-      listCalendarEvents({ from: fromIso, to: toIso, signal }),
+      fetchTimeline({ from: fromIso, to: toIso, signal }),
   });
 
   const syncMutation = useMutation({
     mutationFn: () => syncCalendarSources(),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
+    },
+  });
+
+  const invalidate = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: calendarQueryKeys.all });
+  }, [queryClient]);
+
+  const createEventMutation = useMutation({
+    mutationFn: (body: CreateDonnaEventInput) => createDonnaEvent(body),
+    onSuccess: () => void invalidate(),
+  });
+  const updateEventMutation = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: UpdateDonnaEventInput }) =>
+      updateDonnaEvent(id, body),
+    onSuccess: () => void invalidate(),
+  });
+  const deleteEventMutation = useMutation({
+    mutationFn: (id: string) => deleteDonnaEvent(id),
+    onSuccess: () => {
+      setSelectedEventId(null);
+      setEditingEvent(null);
+      void invalidate();
+    },
+  });
+  const createReminderMutation = useMutation({
+    mutationFn: (body: CreateDonnaReminderInput) => createDonnaReminder(body),
+    onSuccess: () => void invalidate(),
+  });
+  const updateReminderMutation = useMutation({
+    mutationFn: ({
+      id,
+      body,
+    }: {
+      id: string;
+      body: UpdateDonnaReminderInput;
+    }) => updateDonnaReminder(id, body),
+    onSuccess: () => void invalidate(),
+  });
+  const deleteReminderMutation = useMutation({
+    mutationFn: (id: string) => deleteDonnaReminder(id),
+    onSuccess: () => {
+      setSelectedEventId(null);
+      setEditingEvent(null);
+      void invalidate();
     },
   });
 
@@ -172,38 +244,72 @@ export function useCalendarController() {
       if (!source.sync_enabled) {
         return false;
       }
-      // Drop leftovers from disconnected integrations.
+      if (source.provider_calendar_id === "donna_local") {
+        return true;
+      }
       if (liveAccountIds.size === 0) {
         return true;
       }
       return liveAccountIds.has(source.connected_account_id);
     });
-  }, [sourcesQuery.data?.sources, sourcesQuery.data?.accounts, sourcesQuery.data?.account]);
+  }, [
+    sourcesQuery.data?.sources,
+    sourcesQuery.data?.accounts,
+    sourcesQuery.data?.account,
+  ]);
 
   const sourceColorMap = useMemo(() => {
     const map = new Map<string, string>();
     enabledSources.forEach((source, index) => {
+      if (source.provider_calendar_id === "donna_local") {
+        map.set(source.id, TIMELINE_COLORS.donnaEvent);
+        return;
+      }
       map.set(source.id, colorForSource(source.id, source.color, index));
     });
+    map.set(DONNA_EVENT_SOURCE_ID, TIMELINE_COLORS.donnaEvent);
+    map.set(DONNA_REMINDER_SOURCE_ID, TIMELINE_COLORS.donnaReminder);
     return map;
   }, [enabledSources]);
 
   const visibleSourceIds = useMemo(() => {
-    return new Set(
+    const ids = new Set(
       enabledSources
         .filter((s) => !hiddenSourceIds.has(s.id))
         .map((s) => s.id),
     );
+    // Always include Donna filter keys (stable client IDs).
+    if (!hiddenSourceIds.has(DONNA_EVENT_SOURCE_ID)) {
+      ids.add(DONNA_EVENT_SOURCE_ID);
+    }
+    if (!hiddenSourceIds.has(DONNA_REMINDER_SOURCE_ID)) {
+      ids.add(DONNA_REMINDER_SOURCE_ID);
+    }
+    // Also keep API virtual donna_local UUID visible if present.
+    for (const source of enabledSources) {
+      if (
+        source.provider_calendar_id === "donna_local" &&
+        !hiddenSourceIds.has(DONNA_EVENT_SOURCE_ID)
+      ) {
+        ids.add(source.id);
+      }
+    }
+    return ids;
   }, [enabledSources, hiddenSourceIds]);
 
   const events = useMemo(() => {
-    const all = normalizeEvents(eventsQuery.data?.events ?? []);
-    const visible = all.filter((e) => visibleSourceIds.has(e.calendar_source_id));
+    const mapped = (timelineQuery.data?.items ?? []).map((item) =>
+      timelineItemToCalendarEvent(item),
+    );
+    const all = normalizeEvents(mapped);
+    const visible = all.filter((e) =>
+      visibleSourceIds.has(e.calendar_source_id),
+    );
     const sourcesById = new Map(
       enabledSources.map((source) => [source.id, source] as const),
     );
     return dedupeHolidayEvents(visible, sourcesById);
-  }, [eventsQuery.data?.events, visibleSourceIds, enabledSources]);
+  }, [timelineQuery.data?.items, visibleSourceIds, enabledSources]);
 
   const selectedEvent = useMemo(
     () => events.find((e) => e.id === selectedEventId) ?? null,
@@ -228,37 +334,25 @@ export function useCalendarController() {
     setSidebarOpen(false);
   }, []);
 
-  const toggleSource = useCallback((sourceId: string) => {
+  const openCreate = useCallback((day: Date) => {
+    setCreateDay(day);
+    setCreateIntent(null);
+    setSelectedEventId(null);
+    setEditingEvent(null);
+  }, []);
+
+  const toggleAccount = useCallback((sourceIds: string[]) => {
     setHiddenSourceIds((prev) => {
       const next = new Set(prev);
-      if (next.has(sourceId)) {
-        next.delete(sourceId);
+      const allVisible = sourceIds.every((id) => !next.has(id));
+      if (allVisible) {
+        for (const id of sourceIds) next.add(id);
       } else {
-        next.add(sourceId);
+        for (const id of sourceIds) next.delete(id);
       }
       return next;
     });
   }, []);
-
-  const toggleAccount = useCallback(
-    (sourceIds: string[]) => {
-      setHiddenSourceIds((prev) => {
-        const next = new Set(prev);
-        const allVisible = sourceIds.every((id) => !next.has(id));
-        if (allVisible) {
-          for (const id of sourceIds) {
-            next.add(id);
-          }
-        } else {
-          for (const id of sourceIds) {
-            next.delete(id);
-          }
-        }
-        return next;
-      });
-    },
-    [],
-  );
 
   const connectedAccounts = useMemo(() => {
     if (sourcesQuery.data?.accounts?.length) {
@@ -280,11 +374,35 @@ export function useCalendarController() {
       ),
     [enabledSources, connectedAccounts, sourceColorMap, visibleSourceIds],
   );
+
   const openEvent = useCallback((event: CalendarEvent) => {
     setSelectedEventId(event.id);
   }, []);
 
   const closeEvent = useCallback(() => setSelectedEventId(null), []);
+
+  const startEdit = useCallback((event: CalendarEvent) => {
+    setEditingEvent(event);
+    setSelectedEventId(null);
+    if (event.timeline_type === "REMINDER") {
+      setCreateIntent("reminder");
+    } else {
+      setCreateIntent("event");
+    }
+  }, []);
+
+  const removeEvent = useCallback(
+    async (event: CalendarEvent) => {
+      const id = event.mutation_id;
+      if (!id) return;
+      if (event.timeline_type === "REMINDER") {
+        await deleteReminderMutation.mutateAsync(id);
+      } else {
+        await deleteEventMutation.mutateAsync(id);
+      }
+    },
+    [deleteEventMutation, deleteReminderMutation],
+  );
 
   const extendAgenda = useCallback(() => {
     setAgendaDays((d) => d + 30);
@@ -306,14 +424,27 @@ export function useCalendarController() {
 
   const calendarLabelFor = useCallback(
     (sourceId: string): string => {
+      if (sourceId === DONNA_EVENT_SOURCE_ID) return "Donna Events";
+      if (sourceId === DONNA_REMINDER_SOURCE_ID) return "Donna Reminders";
       const group = accountGroups.find((g) => g.sourceIds.includes(sourceId));
-      if (group?.label?.trim()) {
-        return group.label.trim();
-      }
+      if (group?.label?.trim()) return group.label.trim();
       return sourceById(sourceId)?.name?.trim() || "Unknown calendar";
     },
     [accountGroups, sourceById],
   );
+
+  const colorFor = useCallback(
+    (sourceId: string, event?: CalendarEvent) => {
+      if (event?.accent_color) return event.accent_color;
+      return sourceColorMap.get(sourceId) ?? "#c9a87c";
+    },
+    [sourceColorMap],
+  );
+
+  const hasAnySource =
+    enabledSources.length > 0 ||
+    (timelineQuery.data?.items?.length ?? 0) > 0 ||
+    !sourcesQuery.isLoading;
 
   return {
     view,
@@ -325,30 +456,35 @@ export function useCalendarController() {
     goPrev,
     goNext,
     selectDay,
+    openCreate,
+    createIntent,
+    setCreateIntent,
+    createDay,
+    setCreateDay,
+    editingEvent,
+    setEditingEvent,
+    startEdit,
+    removeEvent,
     events,
     dayLayout,
     sources: enabledSources,
+    hasAnySource,
     accountGroups,
-    sourceColorMap,
-    visibleSourceIds,
-    toggleSource,
     toggleAccount,
     sync: sourcesQuery.data?.sync,
-    isLoading: sourcesQuery.isLoading || eventsQuery.isLoading,
-    isFetching: eventsQuery.isFetching || sourcesQuery.isFetching,
-    isError: sourcesQuery.isError || eventsQuery.isError,
+    isLoading: sourcesQuery.isLoading || timelineQuery.isLoading,
+    isFetching: timelineQuery.isFetching || sourcesQuery.isFetching,
+    isError: sourcesQuery.isError || timelineQuery.isError,
     errorMessage:
       (sourcesQuery.error as Error | null)?.message ||
-      (eventsQuery.error as Error | null)?.message ||
+      (timelineQuery.error as Error | null)?.message ||
       null,
     refetch: () => {
       void sourcesQuery.refetch();
-      void eventsQuery.refetch();
+      void timelineQuery.refetch();
     },
     syncNow: () => syncMutation.mutate(),
     isSyncing: syncMutation.isPending,
-    syncError: (syncMutation.error as Error | null)?.message ?? null,
-    lastSyncResult: syncMutation.data ?? null,
     selectedEvent,
     openEvent,
     closeEvent,
@@ -358,8 +494,13 @@ export function useCalendarController() {
     timeZone,
     sourceById,
     calendarLabelFor,
-    colorFor: (sourceId: string) =>
-      sourceColorMap.get(sourceId) ?? "#c9a87c",
+    colorFor,
+    createEventMutation,
+    updateEventMutation,
+    deleteEventMutation,
+    createReminderMutation,
+    updateReminderMutation,
+    deleteReminderMutation,
   };
 }
 

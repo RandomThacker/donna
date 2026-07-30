@@ -267,7 +267,9 @@ func dayWindow(now time.Time, tz string, dayOffset int) (time.Time, time.Time) {
 }
 
 func formatWhen(t time.Time, tz string) string {
-	return "When: " + formatClock(t, tz)
+	loc := loadLocation(tz)
+	local := t.In(loc)
+	return "When: " + local.Format("Mon, Jan 2 · 3:04 PM")
 }
 
 func formatRecurrence(t time.Time, tz string) string {
@@ -281,7 +283,7 @@ func formatClock(t time.Time, tz string) string {
 	if tz == "" && t.Location() != nil {
 		loc = t.Location()
 	}
-	return t.In(loc).Format("3:04 PM")
+	return t.In(loc).Format("Mon, Jan 2 · 3:04 PM")
 }
 
 func friendlyErr(err error) string {

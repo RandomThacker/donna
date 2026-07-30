@@ -19,10 +19,15 @@ const (
 	CalendarEventSyncLookback  = 365 * 24 * time.Hour
 	CalendarEventSyncLookahead = 730 * 24 * time.Hour
 
+	CalendarEventOriginDonna        = "donna"
 	CalendarEventOriginProviderSync = "provider_sync"
 	CalendarEventStatusConfirmed    = "confirmed"
 	CalendarEventStatusTentative    = "tentative"
 	CalendarEventStatusCancelled    = "cancelled"
+
+	// CalendarProviderCalendarIDDonna is the virtual source for Donna-owned events.
+	CalendarProviderCalendarIDDonna = "donna_local"
+	CalendarDonnaSourceName         = "Donna"
 
 	CalendarSyncTriggerManual    = "manual"
 	CalendarSyncTriggerEnsure    = "ensure"
