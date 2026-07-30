@@ -63,8 +63,8 @@ type AppendTurnResult struct {
 }
 
 // GetPrimaryHistory returns the primary web conversation messages (creates thread if missing).
-// Loading history marks the thread as read.
-func (s *ConversationService) GetPrimaryHistory(ctx context.Context, userID uuid.UUID) (ChatHistory, error) {
+// When markRead is true, loading history clears the unread badge.
+func (s *ConversationService) GetPrimaryHistory(ctx context.Context, userID uuid.UUID, markRead bool) (ChatHistory, error) {
 	if userID == uuid.Nil {
 		return ChatHistory{}, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
 	}
@@ -76,7 +76,7 @@ func (s *ConversationService) GetPrimaryHistory(ctx context.Context, userID uuid
 	if err != nil {
 		return ChatHistory{}, err
 	}
-	if conv.UnreadCount > 0 {
+	if markRead && conv.UnreadCount > 0 {
 		cleared, clearErr := s.conversations.ClearUnread(ctx, conv.ID, s.now().UTC())
 		if clearErr == nil {
 			conv = cleared

@@ -68,6 +68,28 @@ UPDATE task_occurrences SET
 WHERE id = $1 AND user_id = $5
 RETURNING` + occurrenceColumns
 
+const sqlCompleteIncompleteForTask = `
+UPDATE task_occurrences SET
+	completed = true,
+	completed_at = $3,
+	updated_at = $4
+WHERE task_id = $1
+  AND user_id = $2
+  AND completed = false`
+
+// Syncs incomplete rows when another day already completed the same task.
+const sqlSyncIncompleteFromCompletedPeers = `
+UPDATE task_occurrences AS o
+SET completed = true,
+    completed_at = COALESCE(peer.completed_at, $2),
+    updated_at = $2
+FROM task_occurrences AS peer
+WHERE o.user_id = $1
+  AND o.completed = false
+  AND peer.user_id = o.user_id
+  AND peer.task_id = o.task_id
+  AND peer.completed = true`
+
 const sqlUpdateOccurrenceSortOrder = `
 UPDATE task_occurrences SET sort_order = $3, updated_at = $4
 WHERE id = $1 AND user_id = $2 AND date = $5`
@@ -103,6 +125,8 @@ type TaskOccurrenceRepository interface {
 	ListIncompleteByUserDate(ctx context.Context, userID uuid.UUID, date time.Time) ([]entity.TaskOccurrence, error)
 	MaxSortOrder(ctx context.Context, userID uuid.UUID, date time.Time) (int, error)
 	UpdateCompletion(ctx context.Context, id, userID uuid.UUID, completed bool, completedAt *time.Time, updatedAt time.Time) (entity.TaskOccurrence, error)
+	CompleteIncompleteForTask(ctx context.Context, taskID, userID uuid.UUID, completedAt, updatedAt time.Time) (int64, error)
+	SyncIncompleteFromCompletedPeers(ctx context.Context, userID uuid.UUID, at time.Time) (int64, error)
 	UpdateSortOrder(ctx context.Context, id, userID uuid.UUID, sortOrder int, date time.Time, updatedAt time.Time) error
 	BumpSortOrders(ctx context.Context, userID uuid.UUID, date time.Time, delta int, updatedAt time.Time) error
 	UpdateDateAndSort(ctx context.Context, id, userID uuid.UUID, date time.Time, sortOrder int, updatedAt time.Time) (entity.TaskOccurrence, error)
@@ -180,6 +204,30 @@ func (r *taskOccurrenceRepository) MaxSortOrder(ctx context.Context, userID uuid
 func (r *taskOccurrenceRepository) UpdateCompletion(ctx context.Context, id, userID uuid.UUID, completed bool, completedAt *time.Time, updatedAt time.Time) (entity.TaskOccurrence, error) {
 	row := r.q.QueryRow(ctx, sqlUpdateOccurrenceCompletion, id, completed, completedAt, updatedAt, userID)
 	return scanOccurrence(row)
+}
+
+func (r *taskOccurrenceRepository) CompleteIncompleteForTask(
+	ctx context.Context,
+	taskID, userID uuid.UUID,
+	completedAt, updatedAt time.Time,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlCompleteIncompleteForTask, taskID, userID, completedAt, updatedAt)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func (r *taskOccurrenceRepository) SyncIncompleteFromCompletedPeers(
+	ctx context.Context,
+	userID uuid.UUID,
+	at time.Time,
+) (int64, error) {
+	tag, err := r.q.Exec(ctx, sqlSyncIncompleteFromCompletedPeers, userID, at)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 func (r *taskOccurrenceRepository) UpdateSortOrder(ctx context.Context, id, userID uuid.UUID, sortOrder int, date time.Time, updatedAt time.Time) error {

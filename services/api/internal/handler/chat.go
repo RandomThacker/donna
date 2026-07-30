@@ -92,7 +92,8 @@ func (h *ChatHandler) Command(c *gin.Context) {
 	response.OK(c, constant.MessageOK, out)
 }
 
-// Messages handles GET /chat/messages — primary web thread history (marks read).
+// Messages handles GET /chat/messages — primary web thread history.
+// Pass mark_read=false to load history without clearing the unread badge (list preview).
 func (h *ChatHandler) Messages(c *gin.Context) {
 	userID, ok := middleware.UserIDFromContext(c)
 	if !ok {
@@ -103,7 +104,8 @@ func (h *ChatHandler) Messages(c *gin.Context) {
 		response.OK(c, constant.MessageOK, model.ChatHistoryResponse{Messages: []model.ChatMessageResponse{}})
 		return
 	}
-	history, err := h.conversations.GetPrimaryHistory(c.Request.Context(), userID)
+	markRead := !strings.EqualFold(strings.TrimSpace(c.Query("mark_read")), "false")
+	history, err := h.conversations.GetPrimaryHistory(c.Request.Context(), userID, markRead)
 	if err != nil {
 		if h.log != nil {
 			h.log.Error(c.Request.Context(), "chat history load failed", constant.LogAttrError, err)

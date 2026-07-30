@@ -35,7 +35,7 @@ export function DashboardPhoneFullscreen({
   exiting = false,
   onCloseComplete,
 }: DashboardPhoneFullscreenProps) {
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeId, setActiveId] = useState<string | null>("donna");
   const donna = useDonnaThreadSummary();
 
   const conversations = useMemo(

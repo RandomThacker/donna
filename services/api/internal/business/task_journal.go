@@ -88,6 +88,9 @@ func (s *TaskJournalService) GetDay(ctx context.Context, userID uuid.UUID, date 
 	if err := s.purgeFutureCarryForwards(ctx, userID); err != nil {
 		return DayView{}, err
 	}
+	if _, err := s.occurrences.SyncIncompleteFromCompletedPeers(ctx, userID, s.now().UTC()); err != nil {
+		return DayView{}, err
+	}
 	if err := s.EnsureDay(ctx, userID, date); err != nil {
 		return DayView{}, err
 	}
@@ -319,6 +322,8 @@ func (s *TaskJournalService) UpdateTask(ctx context.Context, userID, taskID uuid
 }
 
 // UpdateOccurrence toggles completion for a journal row.
+// Completing also marks every other incomplete occurrence of the same task
+// (e.g. the original day that was carried forward). Uncomplete only affects this row.
 func (s *TaskJournalService) UpdateOccurrence(ctx context.Context, userID, occurrenceID uuid.UUID, completed bool) (entity.TaskOccurrenceWithTask, error) {
 	if userID == uuid.Nil || occurrenceID == uuid.Nil {
 		return entity.TaskOccurrenceWithTask{}, fmt.Errorf("%w: user and occurrence id are required", apperr.ErrValidation)
@@ -331,22 +336,21 @@ func (s *TaskJournalService) UpdateOccurrence(ctx context.Context, userID, occur
 		return entity.TaskOccurrenceWithTask{}, apperr.ErrForbidden
 	}
 	now := s.now().UTC()
-	var completedAt *time.Time
 	if completed {
 		t := now
-		completedAt = &t
-	}
-	_, err = s.occurrences.UpdateCompletion(ctx, occurrenceID, userID, completed, completedAt, now)
-	if err != nil {
-		return entity.TaskOccurrenceWithTask{}, err
-	}
-	// Keep completed rows at the bottom of the day list.
-	if completed {
+		if _, err := s.occurrences.CompleteIncompleteForTask(ctx, existing.TaskID, userID, t, now); err != nil {
+			return entity.TaskOccurrenceWithTask{}, err
+		}
+		// Keep completed rows at the bottom of the day list for the clicked occurrence.
 		maxSort, maxErr := s.occurrences.MaxSortOrder(ctx, userID, existing.Date)
 		if maxErr != nil {
 			return entity.TaskOccurrenceWithTask{}, maxErr
 		}
 		if err := s.occurrences.UpdateSortOrder(ctx, occurrenceID, userID, maxSort+1, existing.Date, now); err != nil {
+			return entity.TaskOccurrenceWithTask{}, err
+		}
+	} else {
+		if _, err := s.occurrences.UpdateCompletion(ctx, occurrenceID, userID, false, nil, now); err != nil {
 			return entity.TaskOccurrenceWithTask{}, err
 		}
 	}

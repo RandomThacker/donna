@@ -152,7 +152,7 @@ func TestConversationAppendAndHistory(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	history, err := svc.GetPrimaryHistory(context.Background(), userID)
+	history, err := svc.GetPrimaryHistory(context.Background(), userID, true)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -71,6 +71,12 @@ func (s *stubOccurrences) MaxSortOrder(context.Context, uuid.UUID, time.Time) (i
 func (s *stubOccurrences) UpdateCompletion(context.Context, uuid.UUID, uuid.UUID, bool, *time.Time, time.Time) (entity.TaskOccurrence, error) {
 	panic("unused")
 }
+func (s *stubOccurrences) CompleteIncompleteForTask(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time) (int64, error) {
+	panic("unused")
+}
+func (s *stubOccurrences) SyncIncompleteFromCompletedPeers(context.Context, uuid.UUID, time.Time) (int64, error) {
+	return 0, nil
+}
 func (s *stubOccurrences) UpdateSortOrder(context.Context, uuid.UUID, uuid.UUID, int, time.Time, time.Time) error {
 	panic("unused")
 }

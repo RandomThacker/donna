@@ -19,8 +19,11 @@ export async function sendChatCommand(
   });
 }
 
-export async function fetchChatMessages(): Promise<ChatHistoryResponse> {
-  return apiRequest<ChatHistoryResponse>("/api/v1/chat/messages");
+export async function fetchChatMessages(
+  markRead = true,
+): Promise<ChatHistoryResponse> {
+  const query = markRead ? "" : "?mark_read=false";
+  return apiRequest<ChatHistoryResponse>(`/api/v1/chat/messages${query}`);
 }
 
 export async function fetchChatSummary(): Promise<ChatSummaryResponse> {
