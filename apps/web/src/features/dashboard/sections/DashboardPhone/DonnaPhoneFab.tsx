@@ -1,6 +1,7 @@
 "use client";
 
 import { useDonnaThreadSummary } from "@/features/chat/useDonnaThreadSummary";
+import { primeChatAudio } from "@/features/chat/chatSounds";
 import { cn } from "@/lib/cn";
 
 import { getDashboardContent } from "../../Dashboard.logic";
@@ -26,7 +27,10 @@ export function DonnaPhoneFab() {
               ? "Open Donna messages, new notifications"
               : "Open Donna messages"
           }
-          onPointerDown={fab.onPointerDown}
+          onPointerDown={(event) => {
+            primeChatAudio();
+            fab.onPointerDown(event);
+          }}
           onPointerMove={fab.onPointerMove}
           onPointerUp={fab.onPointerUp}
           onPointerCancel={fab.onPointerUp}

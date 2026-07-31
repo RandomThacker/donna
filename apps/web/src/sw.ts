@@ -21,3 +21,31 @@ const serwist = new Serwist({
 });
 
 serwist.addEventListeners();
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const raw = event.notification.data as { url?: string } | undefined;
+  const target =
+    typeof raw?.url === "string" && raw.url.startsWith("/")
+      ? raw.url
+      : "/dashboard";
+
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+      for (const client of all) {
+        if ("focus" in client) {
+          await client.focus();
+          if ("navigate" in client) {
+            await (client as WindowClient).navigate(target);
+          }
+          return;
+        }
+      }
+      await self.clients.openWindow(target);
+    })(),
+  );
+});
