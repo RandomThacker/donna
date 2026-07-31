@@ -14,6 +14,13 @@ const withSerwist = withSerwistInit({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /\.mp3$/,
+      type: "asset/resource",
+    });
+    return config;
+  },
 };
 
 export default withSerwist(nextConfig);

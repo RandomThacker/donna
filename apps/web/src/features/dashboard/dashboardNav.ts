@@ -9,12 +9,13 @@ export type DashboardNavItem = {
 
 export const dashboardNavItems: DashboardNavItem[] = [
   { id: "home", label: "Home", icon: "home", href: "/dashboard" },
-  {
-    id: "chat",
-    label: "Chat",
-    icon: "spark",
-    href: "/dashboard/chat",
-  },
+  // Chat tab parked for now — phone FAB covers messaging.
+  // {
+  //   id: "chat",
+  //   label: "Chat",
+  //   icon: "spark",
+  //   href: "/dashboard/chat",
+  // },
   {
     id: "commands",
     label: "Commands",

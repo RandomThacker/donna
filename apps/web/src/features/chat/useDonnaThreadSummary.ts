@@ -1,9 +1,14 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchChatMessages, fetchChatSummary } from "./Chat.api";
 import type { ChatSummaryResponse } from "./Chat.types";
+import {
+  isLiveChatOpen,
+  playChatNotificationSound,
+} from "./chatSounds";
 
 export const chatSummaryQueryKey = ["chat", "summary"] as const;
 
@@ -60,14 +65,32 @@ export function useDonnaThreadSummary() {
   const query = useQuery({
     queryKey: chatSummaryQueryKey,
     queryFn: loadDonnaThreadSummary,
-    refetchInterval: 30_000,
-    staleTime: 10_000,
+    // Keep polling in background so unread can still raise a browser notification.
+    refetchInterval: 15_000,
+    refetchIntervalInBackground: true,
+    staleTime: 8_000,
   });
 
   const data: ChatSummaryResponse | undefined = query.data;
   const preview = data?.preview?.trim() || EMPTY_PREVIEW;
   const unread = data?.unread_count ?? 0;
   const time = formatListTime(data?.last_message_at);
+  const prevUnreadRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (query.isLoading) {
+      return;
+    }
+    const prev = prevUnreadRef.current;
+    if (prev === null) {
+      prevUnreadRef.current = unread;
+      return;
+    }
+    if (unread > prev && !isLiveChatOpen()) {
+      playChatNotificationSound(preview);
+    }
+    prevUnreadRef.current = unread;
+  }, [unread, preview, query.isLoading]);
 
   return {
     preview,

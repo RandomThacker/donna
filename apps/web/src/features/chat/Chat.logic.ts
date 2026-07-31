@@ -5,6 +5,11 @@ import { useQueryClient } from "@tanstack/react-query";
 
 import { fetchChatMessages, sendChatCommand } from "./Chat.api";
 import type { ChatHistoryMessage, ChatMessage } from "./Chat.types";
+import {
+  playChatReceiveSound,
+  playChatSendSound,
+  setLiveChatOpen,
+} from "./chatSounds";
 import { chatSummaryQueryKey } from "./useDonnaThreadSummary";
 
 function newId(): string {
@@ -112,6 +117,13 @@ export function useChatSession(
         }
       }
 
+      if (
+        historyReadyRef.current &&
+        arrivals.some((message) => message.role === "donna")
+      ) {
+        playChatReceiveSound();
+      }
+
       if (arrivals.length === 0 && remote.length === 0) {
         return;
       }
@@ -140,6 +152,15 @@ export function useChatSession(
     },
     [],
   );
+
+  useEffect(() => {
+    if (!enabled) {
+      setLiveChatOpen(false);
+      return;
+    }
+    setLiveChatOpen(true);
+    return () => setLiveChatOpen(false);
+  }, [enabled]);
 
   useEffect(() => {
     if (!enabled) {
@@ -245,6 +266,7 @@ export function useChatSession(
       const withoutWelcome = prev.filter((m) => m.id !== "welcome");
       return [...withoutWelcome, userMsg];
     });
+    playChatSendSound();
     setDraft("");
     setSending(true);
     const typingStartedAt = Date.now();
@@ -275,6 +297,7 @@ export function useChatSession(
           createdAt: Date.now(),
         },
       ]);
+      playChatReceiveSound();
     } catch {
       const remaining = Math.max(0, TYPING_MIN_MS - (Date.now() - typingStartedAt));
       if (remaining > 0) {
@@ -293,6 +316,7 @@ export function useChatSession(
           createdAt: Date.now(),
         },
       ]);
+      playChatReceiveSound();
     } finally {
       setSending(false);
       refreshSummary();
