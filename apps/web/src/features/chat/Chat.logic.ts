@@ -42,6 +42,20 @@ function wait(ms: number): Promise<void> {
   });
 }
 
+/** Keep first occurrence of each id — React keys must stay unique. */
+function dedupeById(messages: ChatMessage[]): ChatMessage[] {
+  const seen = new Set<string>();
+  const out: ChatMessage[] = [];
+  for (const message of messages) {
+    if (seen.has(message.id)) {
+      continue;
+    }
+    seen.add(message.id);
+    out.push(message);
+  }
+  return out;
+}
+
 /** Oldest Donna message among the trailing `unread` assistant messages. */
 function firstUnreadDonnaId(
   messages: ChatMessage[],
@@ -137,17 +151,21 @@ export function useChatSession(
         const welcomeOnly =
           prev.length === 1 && prev[0]?.id === "welcome" && remote.length > 0;
         if (welcomeOnly) {
-          return remote;
+          return dedupeById(remote);
         }
 
-        const order = remote.map((m) => m.id);
+        // Remote ids win order. Drop local-only rows that the server already
+        // echoed under a different id (optimistic clientId still in prev while
+        // public_id is in remote) by preferring unique ids only.
+        const remoteIds = new Set(remote.map((m) => m.id));
+        const order = [...remoteIds];
         const extras = prev.filter(
-          (m) => m.id !== "welcome" && !order.includes(m.id),
+          (m) => m.id !== "welcome" && !remoteIds.has(m.id),
         );
-        return [
+        return dedupeById([
           ...order.map((id) => byId.get(id)!).filter(Boolean),
           ...extras,
-        ];
+        ]);
       });
     },
     [],
@@ -176,7 +194,7 @@ export function useChatSession(
           setMessages([WELCOME]);
           rememberIds([WELCOME]);
         } else {
-          const mapped = history.messages.map(mapHistoryMessage);
+          const mapped = dedupeById(history.messages.map(mapHistoryMessage));
           setMessages(mapped);
           rememberIds(mapped);
           const unread = Math.max(
@@ -284,19 +302,35 @@ export function useChatSession(
         knownIdsRef.current.delete(clientId);
       }
       knownIdsRef.current.add(replyId);
-      setMessages((prev) => [
-        ...prev.map((m) =>
-          m.id === clientId && result.user_message_public_id
-            ? { ...m, id: result.user_message_public_id }
-            : m,
-        ),
-        {
-          id: replyId,
-          role: "donna",
-          text: result.reply,
-          createdAt: Date.now(),
-        },
-      ]);
+      setMessages((prev) => {
+        const serverUserId = result.user_message_public_id;
+        // Poll may have already inserted the server user/reply ids while we
+        // still held the optimistic clientId — drop or remap without dupes.
+        const next = prev.flatMap((m) => {
+          if (m.id !== clientId) {
+            return [m];
+          }
+          if (!serverUserId) {
+            return [m];
+          }
+          if (prev.some((other) => other.id === serverUserId)) {
+            return [];
+          }
+          return [{ ...m, id: serverUserId }];
+        });
+        const withReply = next.some((m) => m.id === replyId)
+          ? next
+          : [
+              ...next,
+              {
+                id: replyId,
+                role: "donna" as const,
+                text: result.reply,
+                createdAt: Date.now(),
+              },
+            ];
+        return dedupeById(withReply);
+      });
       playChatReceiveSound();
     } catch {
       const remaining = Math.max(0, TYPING_MIN_MS - (Date.now() - typingStartedAt));
