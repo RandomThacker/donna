@@ -95,7 +95,6 @@ function showBrowserNotification(body: string): void {
       body: body.trim() || "New message",
       icon: "/icons/donna-icon.svg",
       tag: "donna-chat-message",
-      renotify: true,
       silent: false,
     });
     note.onclick = () => {

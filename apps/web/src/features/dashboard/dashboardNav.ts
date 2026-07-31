@@ -62,7 +62,6 @@ export const dashboardBottomNavIds = [
   "calendar",
   "tasks",
   "notes",
-  "settings",
 ] as const;
 
 /** Active nav item for the current path — only one selection at a time. */

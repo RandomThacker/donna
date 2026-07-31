@@ -15,6 +15,7 @@ import { DashboardPhone } from "./sections/DashboardPhone";
 import { DashboardQuickTasks } from "./sections/DashboardQuickTasks";
 import { DashboardSidebar } from "./sections/DashboardSidebar";
 import { DashboardTimeline } from "./sections/DashboardTimeline";
+import { DashboardTopBar } from "./sections/DashboardTopBar";
 
 function initialsFrom(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -49,7 +50,12 @@ export function Dashboard() {
           profileEmail={user?.email}
           profileAvatarUrl={user?.avatar_url}
         />
-        <main className={styles.workspace}>
+        <main className={styles.workspace} data-dashboard-scroll>
+          <DashboardTopBar
+            profileName={profileName}
+            profileInitials={profileInitials}
+            profileAvatarUrl={user?.avatar_url}
+          />
           <div className={styles.workspaceInner}>
             <div className={styles.bento}>
               <DashboardGreeting greeting={greeting} />

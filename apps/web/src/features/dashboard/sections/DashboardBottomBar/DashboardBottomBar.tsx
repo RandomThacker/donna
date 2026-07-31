@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import { Icon } from "@/components/common";
 import type { IconName } from "@/components/common";
@@ -13,6 +13,7 @@ import { bottomBarStyles as styles } from "./DashboardBottomBar.styles";
 
 export function DashboardBottomBar() {
   const pathname = usePathname();
+  const router = useRouter();
   const items = bottomNavItemsForPath(pathname);
   const { badgeCount } = useNotificationsCenter();
 
@@ -25,7 +26,27 @@ export function DashboardBottomBar() {
             href={item.href}
             aria-current={item.active ? "page" : undefined}
             className={cn(styles.item, item.active && styles.itemActive)}
+            onClick={(event) => {
+              // Same-route taps (e.g. Home while already home) still need a
+              // reliable response — scroll the workspace back to top.
+              if (!item.active) return;
+              event.preventDefault();
+              if (item.id === "home") {
+                router.push(item.href);
+              }
+              const scroller = document.querySelector(
+                "main.overflow-y-auto, [data-dashboard-scroll]",
+              );
+              if (scroller instanceof HTMLElement) {
+                scroller.scrollTo({ top: 0, behavior: "smooth" });
+              } else {
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }
+            }}
           >
+            {item.active ? (
+              <span className={styles.indicator} aria-hidden />
+            ) : null}
             <span
               className={cn(
                 styles.iconWrap,
@@ -39,7 +60,11 @@ export function DashboardBottomBar() {
                 </span>
               ) : null}
             </span>
-            <span className={styles.label}>{item.label}</span>
+            <span
+              className={cn(styles.label, item.active && styles.labelActive)}
+            >
+              {item.label}
+            </span>
           </Link>
         ))}
       </nav>

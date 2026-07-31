@@ -1,7 +1,7 @@
 export const notificationsPageStyles = {
   page: [
     "relative flex h-dvh overflow-x-hidden overflow-hidden bg-donna-bg text-donna-text",
-    "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+    "pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0",
   ].join(" "),
   shell: [
     "relative z-10 grid h-full w-full min-w-0",
@@ -37,7 +37,7 @@ export const notificationsPageStyles = {
   ].join(" "),
   mobileDetails: [
     "fixed inset-0 z-40 flex flex-col bg-donna-surface lg:hidden",
-    "pb-[calc(4rem+env(safe-area-inset-bottom))]",
+    "pb-[calc(4.25rem+env(safe-area-inset-bottom))]",
   ].join(" "),
   mobileDetailsHeader: [
     "flex shrink-0 items-center gap-2 border-b border-donna-hairline px-3 py-3",

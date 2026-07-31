@@ -1,7 +1,7 @@
 export const memoriesStyles = {
   page: [
     "relative flex h-dvh overflow-x-hidden overflow-hidden bg-donna-bg text-donna-text",
-    "pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0",
+    "pb-[calc(4.25rem+env(safe-area-inset-bottom))] md:pb-0",
   ].join(" "),
   shell: [
     "relative z-10 grid h-full w-full min-w-0",

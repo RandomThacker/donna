@@ -10,13 +10,17 @@ import {
 const FAB_SIZE = 48;
 const EDGE_GAP = 16;
 const DRAG_THRESHOLD = 8;
-const BOTTOM_NAV_OFFSET = 76;
+const BOTTOM_NAV_OFFSET = 82;
 
 type FabPoint = { x: number; y: number };
 
 function clampFabPoint(point: FabPoint): FabPoint {
   const maxX = Math.max(EDGE_GAP, window.innerWidth - FAB_SIZE - EDGE_GAP);
-  const maxY = Math.max(EDGE_GAP, window.innerHeight - FAB_SIZE - EDGE_GAP);
+  // Keep the FAB above the bottom nav so it never steals tab taps.
+  const maxY = Math.max(
+    EDGE_GAP,
+    window.innerHeight - FAB_SIZE - EDGE_GAP - BOTTOM_NAV_OFFSET,
+  );
   return {
     x: Math.min(maxX, Math.max(EDGE_GAP, point.x)),
     y: Math.min(maxY, Math.max(EDGE_GAP, point.y)),
