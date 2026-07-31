@@ -144,9 +144,11 @@ func (s *NotificationService) enqueueItem(
 	if err != nil {
 		return false, err
 	}
-	channelStatus, err := json.Marshal(map[string]string{
-		constant.DeliveryChannelChat: constant.ChannelDeliveryPending,
-	})
+	channelStatusMap := make(map[string]string, len(constant.DefaultDeliveryChannels))
+	for _, ch := range constant.DefaultDeliveryChannels {
+		channelStatusMap[ch] = constant.ChannelDeliveryPending
+	}
+	channelStatus, err := json.Marshal(channelStatusMap)
 	if err != nil {
 		return false, err
 	}

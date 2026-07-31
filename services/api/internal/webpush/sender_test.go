@@ -25,7 +25,7 @@ func TestPayloadFromNotification(t *testing.T) {
 			"type":"EVENT",
 			"startAt":"2026-07-30T12:15:00Z",
 			"occurrenceId":"dev_abc_20260730T120000Z",
-			"deepLink":"/donna/timeline?occurrence=dev_abc_20260730T120000Z"
+			"deepLink":"/dashboard/calendar?event=dev_abc_20260730T120000Z"
 		}`),
 	}
 	p := PayloadFromNotification(n)

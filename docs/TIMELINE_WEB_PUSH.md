@@ -1,29 +1,30 @@
-# Timeline In-App Notification Delivery
+# Timeline Notification Delivery (Chat + Web Push)
 
-Promotes due **PENDING** notifications to **SENT** for in-app surfaces.
-
-Web Push is **disabled**. Delivery targets:
-
-1. **Notification Center** — row becomes visible as unread (`SENT`)
-2. **Chat** — dispatcher posts a Donna message into the primary web conversation, then sets `channel_delivery_status.CHAT = SENT`
+Promotes due **PENDING** notifications to **SENT** for in-app surfaces and browser push.
 
 ## Flow
 
 1. `NotificationDispatcher` ticks every minute
 2. Load `status = PENDING` AND `scheduled_for <= now`
-3. For `CHAT` (default): insert an assistant message (`client_message_id = notif:<public_id>`)
-4. Mark overall `status = SENT`, set `sent_at`
-5. Legacy rows that still list `WEB_PUSH` skip that channel without failing
+3. **CHAT** (default): insert an assistant message (`client_message_id = notif:<public_id>`)
+4. **WEB_PUSH** (when VAPID configured + device subscribed): fan-out via Web Push
+5. Mark overall `status = SENT`, set `sent_at`
 6. Recent already-SENT chat notifications are backfilled into chat if the message is missing
 
 ## Default channels
 
 ```text
-["CHAT"]
+["CHAT", "WEB_PUSH"]
 ```
 
-## Out of scope
+## Web Push requirements
 
-Browser Web Push, Telegram, WhatsApp, Email, retries.
+| Piece | Notes |
+|-------|--------|
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Required on the API |
+| `GET /api/v1/push/vapid-public-key` | Auth required |
+| `POST /api/v1/push/subscribe` | Stores browser endpoint |
+| Service worker `push` handler | `apps/web/src/sw.ts` (production Serwist build) |
+| Installed PWA + notification permission | Required on iOS; recommended on Android |
 
-Push subscription tables/handlers may remain in the codebase but are not wired.
+Local `next dev` disables the service worker by default — use a production web build / installed PWA to receive OS pushes.

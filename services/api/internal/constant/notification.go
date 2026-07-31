@@ -19,7 +19,7 @@ const (
 
 // Intended delivery channels.
 const (
-	DeliveryChannelWebPush  = "WEB_PUSH" // disabled — skipped by dispatcher
+	DeliveryChannelWebPush  = "WEB_PUSH"
 	DeliveryChannelChat     = "CHAT"
 	DeliveryChannelTelegram = "TELEGRAM"
 	DeliveryChannelWhatsApp = "WHATSAPP"
@@ -43,13 +43,14 @@ const (
 )
 
 // Default intended channels until user preferences exist.
-// Web Push is disabled — Notification Center + Chat only.
 var DefaultDeliveryChannels = []string{
 	DeliveryChannelChat,
+	DeliveryChannelWebPush,
 }
 
 // NotificationDeepLinkPath is the in-app path opened from a Web Push click.
-const NotificationDeepLinkPath = "/donna/timeline?occurrence="
+// Occurrence id is appended by callers / PayloadFromNotification.
+const NotificationDeepLinkPath = "/dashboard/calendar?event="
 
 // NotificationDispatcherBatchLimit caps due notifications processed per tick.
 const NotificationDispatcherBatchLimit = 100

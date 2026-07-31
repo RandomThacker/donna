@@ -10,28 +10,36 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
+	"github.com/RandomThacker/donna/services/api/internal/webpush"
 )
 
 // NotificationDispatcher promotes due PENDING notifications to SENT for
-// in-app surfaces (Notification Center + Chat). Web Push is disabled.
+// Notification Center, Chat, and (when configured) Web Push.
 type NotificationDispatcher struct {
 	notifications repository.NotificationRepository
 	chat          *ConversationService
+	pushSubs      *PushSubscriptionService
+	pushSender    webpush.Sender
 	log           *logger.Logger
 	interval      time.Duration
 	now           func() time.Time
 	batchLimit    int
 }
 
-// NewNotificationDispatcher constructs a minute-tick in-app publisher.
+// NewNotificationDispatcher constructs a minute-tick publisher.
+// pushSubs / pushSender may be nil when Web Push is not configured.
 func NewNotificationDispatcher(
 	notifications repository.NotificationRepository,
 	chat *ConversationService,
+	pushSubs *PushSubscriptionService,
+	pushSender webpush.Sender,
 	log *logger.Logger,
 ) *NotificationDispatcher {
 	return &NotificationDispatcher{
 		notifications: notifications,
 		chat:          chat,
+		pushSubs:      pushSubs,
+		pushSender:    pushSender,
 		log:           log,
 		interval:      constant.NotificationDispatcherInterval,
 		now:           time.Now,
@@ -107,11 +115,21 @@ func (d *NotificationDispatcher) publishOne(ctx context.Context, n entity.Notifi
 	channelStatus := parseChannelStatus(n.ChannelDeliveryStatus)
 	marked := false
 	for _, ch := range n.DeliveryChannels {
-		if ch == constant.DeliveryChannelWebPush {
-			continue
+		switch ch {
+		case constant.DeliveryChannelWebPush:
+			if d.webPushConfigured() {
+				if d.deliverWebPush(ctx, n) {
+					channelStatus[ch] = constant.ChannelDeliverySent
+				} else {
+					channelStatus[ch] = constant.ChannelDeliveryFailed
+				}
+				marked = true
+			}
+			// Not configured: leave WEB_PUSH as-is (usually PENDING).
+		default:
+			channelStatus[ch] = constant.ChannelDeliverySent
+			marked = true
 		}
-		channelStatus[ch] = constant.ChannelDeliverySent
-		marked = true
 	}
 	if !marked {
 		channelStatus[constant.DeliveryChannelChat] = constant.ChannelDeliverySent
@@ -130,6 +148,50 @@ func (d *NotificationDispatcher) publishOne(ctx context.Context, n entity.Notifi
 		now,
 	)
 	return err
+}
+
+func (d *NotificationDispatcher) webPushConfigured() bool {
+	return d.pushSender != nil && d.pushSender.Configured() && d.pushSubs != nil
+}
+
+// deliverWebPush fans out to all live device subscriptions.
+// Returns true when delivery is considered successful (any device ok, or no devices).
+func (d *NotificationDispatcher) deliverWebPush(ctx context.Context, n entity.Notification) bool {
+	subs, err := d.pushSubs.List(ctx, n.UserID)
+	if err != nil {
+		if d.log != nil {
+			d.log.Warn(ctx, "web push list subscriptions failed",
+				"notification_id", n.ID.String(),
+				constant.LogAttrError, err,
+			)
+		}
+		return false
+	}
+	if len(subs) == 0 {
+		return true
+	}
+
+	payload := webpush.PayloadFromNotification(n)
+	var delivered int
+	for _, sub := range subs {
+		result, err := d.pushSender.Send(ctx, sub, payload)
+		if err != nil {
+			if d.log != nil {
+				d.log.Warn(ctx, "web push send failed",
+					"notification_id", n.ID.String(),
+					"endpoint", sub.Endpoint,
+					"status_code", result.StatusCode,
+					constant.LogAttrError, err,
+				)
+			}
+			if result.Gone {
+				_ = d.pushSubs.Unsubscribe(ctx, n.UserID, sub.Endpoint)
+			}
+			continue
+		}
+		delivered++
+	}
+	return delivered > 0
 }
 
 func (d *NotificationDispatcher) backfillChatNotices(ctx context.Context, now time.Time) int {

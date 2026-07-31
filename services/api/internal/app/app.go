@@ -31,6 +31,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/seal"
 	"github.com/RandomThacker/donna/services/api/internal/server"
 	"github.com/RandomThacker/donna/services/api/internal/session"
+	"github.com/RandomThacker/donna/services/api/internal/webpush"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -162,6 +163,21 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	)
 	notificationScheduler := business.NewNotificationScheduler(notificationSvc, userRepo, notificationLog)
 
+	pushSubRepo := repository.NewPushSubscriptionRepository(pool)
+	pushSubSvc := business.NewPushSubscriptionService(pushSubRepo)
+	pushSender := webpush.NewSender(
+		cfg.App.VAPIDPublicKey,
+		cfg.App.VAPIDPrivateKey,
+		cfg.App.VAPIDSubject,
+	)
+	var pushHandler *handler.PushHandler
+	if pushSender.Configured() {
+		pushHandler = handler.NewPushHandler(pushSubSvc, cfg.App.VAPIDPublicKey, notificationLog)
+		appLog.Info(ctx, "web push enabled")
+	} else {
+		appLog.Warn(ctx, "web push disabled — missing VAPID keys")
+	}
+
 	chatLog := logFactory.Module(constant.ModuleChat)
 	chatExecutor := chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
 	tx := repository.NewTxManager(pool)
@@ -173,6 +189,8 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	notificationDispatcher := business.NewNotificationDispatcher(
 		notificationRepo,
 		conversationSvc,
+		pushSubSvc,
+		pushSender,
 		notificationLog,
 	)
 
@@ -192,7 +210,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		DonnaEventHandler:     donnaEventHandler,
 		DonnaReminderHandler:  donnaReminderHandler,
 		NotificationHandler:   notificationHandler,
-		PushHandler:           nil, // Web Push disabled — Notification Center + Chat only
+		PushHandler:           pushHandler,
 		ChatHandler:           chatHandler,
 		TokenIssuer:           authParts.issuer,
 	})
