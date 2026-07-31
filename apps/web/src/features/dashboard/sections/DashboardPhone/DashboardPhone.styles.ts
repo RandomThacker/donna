@@ -181,11 +181,29 @@ export const iMessageStyles = {
     "pointer-events-none absolute bottom-0 -right-[4px] h-[14px] w-[10px]",
     "text-[var(--im-bubble-out)]",
   ].join(" "),
-  composer: [
-    "relative z-20 flex shrink-0 items-end gap-2",
+  composerDock: [
+    "relative z-20 flex shrink-0 flex-col",
     "border-t border-[var(--im-separator)]/40 bg-[var(--im-nav)]",
-    "px-2.5 pt-2.5 backdrop-blur-xl",
+    "backdrop-blur-xl",
     "pb-[max(1.5rem,env(safe-area-inset-bottom))]",
+  ].join(" "),
+  suggestionRow: [
+    "flex gap-2 overflow-x-auto overscroll-x-contain px-2.5 pt-2.5 pb-1",
+    "scrollbar-none [-ms-overflow-style:none] [scrollbar-width:none]",
+    "[&::-webkit-scrollbar]:hidden",
+  ].join(" "),
+  suggestionPill: [
+    "shrink-0 rounded-full border border-dashed border-[var(--im-muted)]/55",
+    "bg-transparent px-3 py-1",
+    "text-[11px] font-medium leading-none tracking-wide",
+    "text-[var(--im-muted)] whitespace-nowrap",
+    "transition-colors active:bg-[var(--im-surface-2)]",
+    "hover:border-[var(--im-blue)]/50 hover:text-[var(--im-blue)]",
+    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--im-blue)]/40",
+  ].join(" "),
+  composer: [
+    "relative flex items-end gap-2",
+    "px-2.5 pt-1.5",
   ].join(" "),
   plus: [
     "mb-0.5 grid h-[28px] w-[28px] shrink-0 place-items-center rounded-full",

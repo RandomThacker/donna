@@ -5,6 +5,10 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "@/components/common";
 import { useChatSession } from "@/features/chat/Chat.logic";
 import type { ChatMessage } from "@/features/chat/Chat.types";
+import {
+  chatIntentSuggestions,
+  pickSuggestionPhrase,
+} from "@/features/chat/chatIntentSuggestions";
 import { cn } from "@/lib/cn";
 
 import type { IMessageBubble } from "../../Dashboard.types";
@@ -61,6 +65,7 @@ export function IMessageChat({
     unreadOnOpen: live ? conversation.unread : 0,
   });
   const bodyRef = useRef<HTMLDivElement | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
   const historySeededRef = useRef(false);
   const seenIdsRef = useRef<Set<string>>(new Set());
   const freshThisRenderRef = useRef<string[]>([]);
@@ -297,42 +302,68 @@ export function IMessageChat({
         </div>
       </div>
 
-      <form
-        className={styles.composer}
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (live) void session.send();
-        }}
-      >
-        <button type="button" className={styles.plus} aria-label="Apps">
-          <Icon name="plus" className="h-4 w-4" />
-        </button>
-        <div className={styles.inputShell}>
-          <input
-            type="text"
-            className={styles.input}
-            placeholder="iMessage"
-            aria-label="iMessage"
-            readOnly={!live}
-            disabled={live && session.sending}
-            value={live ? session.draft : ""}
-            onChange={
-              live
-                ? (event) => session.setDraft(event.target.value)
-                : undefined
-            }
-          />
-          {canSend ? (
-            <button type="submit" className={styles.send} aria-label="Send">
-              <Icon name="arrow" className="h-3.5 w-3.5 -rotate-90" />
-            </button>
-          ) : (
-            <button type="button" className={styles.mic} aria-label="Dictation">
-              <Icon name="mic" className="h-[18px] w-[18px]" />
-            </button>
-          )}
-        </div>
-      </form>
+      <div className={styles.composerDock}>
+        {live ? (
+          <div
+            className={styles.suggestionRow}
+            role="list"
+            aria-label="Suggested commands"
+          >
+            {chatIntentSuggestions.map((suggestion) => (
+              <button
+                key={suggestion.id}
+                type="button"
+                role="listitem"
+                className={styles.suggestionPill}
+                disabled={session.sending}
+                onClick={() => {
+                  session.setDraft(pickSuggestionPhrase(suggestion));
+                  inputRef.current?.focus();
+                }}
+              >
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <form
+          className={styles.composer}
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (live) void session.send();
+          }}
+        >
+          <button type="button" className={styles.plus} aria-label="Apps">
+            <Icon name="plus" className="h-4 w-4" />
+          </button>
+          <div className={styles.inputShell}>
+            <input
+              ref={inputRef}
+              type="text"
+              className={styles.input}
+              placeholder="iMessage"
+              aria-label="iMessage"
+              readOnly={!live}
+              disabled={live && session.sending}
+              value={live ? session.draft : ""}
+              onChange={
+                live
+                  ? (event) => session.setDraft(event.target.value)
+                  : undefined
+              }
+            />
+            {canSend ? (
+              <button type="submit" className={styles.send} aria-label="Send">
+                <Icon name="arrow" className="h-3.5 w-3.5 -rotate-90" />
+              </button>
+            ) : (
+              <button type="button" className={styles.mic} aria-label="Dictation">
+                <Icon name="mic" className="h-[18px] w-[18px]" />
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

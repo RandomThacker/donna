@@ -1,103 +1,153 @@
 /**
  * Chat send / receive / notify sounds.
  *
- * Mobile PWAs are strict: audio must be primed by a user gesture, and
- * background tabs usually cannot play HTMLAudio. For background alerts we
- * use the service worker Notification API so the OS plays a sound.
+ * Uses Web Audio (one AudioContext + decoded buffers) so:
+ * - Unlock on a user gesture covers later async receive plays (mobile).
+ * - Send no longer races with a silent "prime" on the same HTMLAudio element
+ *   (that race killed send on desktop and receive on mobile).
+ *
+ * Background tabs: page audio is often suspended; we also raise a SW
+ * notification so the OS can alert.
  */
 
 import notifyBundled from "@/lib/sound/iphone_sms_tone.mp3";
 import receiveBundled from "@/lib/sound/iphone_receive_sms.mp3";
 import sentBundled from "@/lib/sound/iphone_sent_sms.mp3";
 
-/** Stable public URLs (best for SW notifications + iOS). */
-const SOUND = {
+type SoundKey = "sent" | "receive" | "notify";
+
+/** Stable public URLs (best for SW notifications + caching). */
+const SOUND: Record<SoundKey, string> = {
   sent: "/sounds/iphone_sent_sms.mp3",
   receive: "/sounds/iphone_receive_sms.mp3",
   notify: "/sounds/iphone_sms_tone.mp3",
-} as const;
+};
 
 /** Bundled fallbacks if public files are missing in some deploys. */
-const SOUND_FALLBACK = {
+const SOUND_FALLBACK: Record<SoundKey, string> = {
   sent: sentBundled,
   receive: receiveBundled,
   notify: notifyBundled,
-} as const;
+};
 
 let unlockBound = false;
 let audioUnlocked = false;
 let liveChatOpen = false;
 let lastReceiveAt = 0;
-const players = new Map<string, HTMLAudioElement>();
+let ctx: AudioContext | null = null;
+const buffers = new Map<SoundKey, AudioBuffer>();
+const loading = new Map<SoundKey, Promise<AudioBuffer | null>>();
 
-function getPlayer(src: string): HTMLAudioElement | null {
+function getAudioContext(): AudioContext | null {
   if (typeof window === "undefined") return null;
-  let audio = players.get(src);
-  if (!audio) {
-    audio = new Audio(src);
-    audio.preload = "auto";
-    // Required for iOS / iPadOS — without this, play() is ignored.
-    audio.setAttribute("playsinline", "true");
-    audio.setAttribute("webkit-playsinline", "true");
-    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
-    audio.volume = 1;
-    players.set(src, audio);
-  }
-  return audio;
+  if (ctx) return ctx;
+  const AC =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!AC) return null;
+  ctx = new AC();
+  return ctx;
 }
 
-async function tryPlay(src: string): Promise<boolean> {
-  const audio = getPlayer(src);
-  if (!audio) return false;
+async function loadBuffer(key: SoundKey): Promise<AudioBuffer | null> {
+  const cached = buffers.get(key);
+  if (cached) return cached;
+
+  const inflight = loading.get(key);
+  if (inflight) return inflight;
+
+  const task = (async () => {
+    const audioCtx = getAudioContext();
+    if (!audioCtx) return null;
+
+    for (const url of [SOUND[key], SOUND_FALLBACK[key]]) {
+      try {
+        const res = await fetch(url);
+        if (!res.ok) continue;
+        const raw = await res.arrayBuffer();
+        const buffer = await audioCtx.decodeAudioData(raw.slice(0));
+        buffers.set(key, buffer);
+        return buffer;
+      } catch {
+        // Try next URL.
+      }
+    }
+    return null;
+  })().finally(() => {
+    loading.delete(key);
+  });
+
+  loading.set(key, task);
+  return task;
+}
+
+async function resumeContext(): Promise<boolean> {
+  const audioCtx = getAudioContext();
+  if (!audioCtx) return false;
   try {
-    audio.pause();
-    audio.currentTime = 0;
-    await audio.play();
-    audioUnlocked = true;
-    return true;
+    if (audioCtx.state === "suspended") {
+      await audioCtx.resume();
+    }
+    audioUnlocked = audioCtx.state === "running";
+    return audioUnlocked;
   } catch {
-    // Try bundled URL once if public path failed to load.
     return false;
   }
 }
 
-function playSrc(src: string, fallback?: string): void {
+async function playKey(key: SoundKey): Promise<boolean> {
+  const audioCtx = getAudioContext();
+  if (!audioCtx) return false;
+
+  await resumeContext();
+  const buffer = await loadBuffer(key);
+  if (!buffer) return false;
+
+  // Context can suspend again while decoding on some mobile browsers.
+  await resumeContext();
+  if (audioCtx.state !== "running") return false;
+
+  try {
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    const gain = audioCtx.createGain();
+    gain.gain.value = 1;
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start(0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function playSound(key: SoundKey): void {
   bindUnlock();
-  void (async () => {
-    if (await tryPlay(src)) return;
-    if (fallback && fallback !== src) {
-      await tryPlay(fallback);
-    }
-  })();
+  void playKey(key);
 }
 
 /**
- * Call from a user-gesture handler (send tap, nav tap) so later async
+ * Call from a user-gesture handler (send tap, fab tap) so later async
  * receive/notify plays are allowed on mobile.
  */
 export function primeChatAudio(): void {
   bindUnlock();
-  void unlockAudio();
-}
-
-async function unlockAudio(): Promise<void> {
-  for (const key of Object.keys(SOUND) as Array<keyof typeof SOUND>) {
-    const audio = getPlayer(SOUND[key]);
-    if (!audio) continue;
-    try {
-      // Silent prime — volume 0 then restore. Still counts as a gesture unlock.
-      const prev = audio.volume;
-      audio.volume = 0.001;
-      await audio.play();
-      audio.pause();
-      audio.currentTime = 0;
-      audio.volume = prev || 1;
-      audioUnlocked = true;
-    } catch {
-      // Keep trying on the next gesture.
-    }
+  // Resume must start inside the gesture stack — don't await first.
+  const audioCtx = getAudioContext();
+  if (audioCtx?.state === "suspended") {
+    void audioCtx.resume().then(() => {
+      audioUnlocked = audioCtx.state === "running";
+    });
+  } else if (audioCtx?.state === "running") {
+    audioUnlocked = true;
   }
-  void ensureBrowserNotificationPermission();
+  void (async () => {
+    if (!(await resumeContext())) return;
+    await Promise.all(
+      (Object.keys(SOUND) as SoundKey[]).map((key) => loadBuffer(key)),
+    );
+  })();
 }
 
 function bindUnlock(): void {
@@ -105,27 +155,34 @@ function bindUnlock(): void {
   unlockBound = true;
 
   const onGesture = () => {
-    void unlockAudio().then(() => {
+    const audioCtx = getAudioContext();
+    if (audioCtx?.state === "suspended") {
+      void audioCtx.resume().then(() => {
+        audioUnlocked = audioCtx.state === "running";
+      });
+    } else if (audioCtx?.state === "running") {
+      audioUnlocked = true;
+    }
+    void (async () => {
+      await resumeContext();
+      await Promise.all(
+        (Object.keys(SOUND) as SoundKey[]).map((key) => loadBuffer(key)),
+      );
       if (audioUnlocked) {
         window.removeEventListener("touchstart", onGesture);
         window.removeEventListener("pointerdown", onGesture);
         window.removeEventListener("click", onGesture);
       }
-    });
+    })();
   };
 
-  // Don't use { once: true } until unlock succeeds — first attempt often fails
-  // on iOS if the gesture didn't reach audio in time.
   window.addEventListener("touchstart", onGesture, { passive: true });
   window.addEventListener("pointerdown", onGesture, { passive: true });
   window.addEventListener("click", onGesture);
 
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible") {
-      // Re-warm players when returning to the PWA.
-      if (audioUnlocked) {
-        void unlockAudio();
-      }
+    if (document.visibilityState === "visible" && audioUnlocked) {
+      void resumeContext();
     }
   });
 }
@@ -166,8 +223,6 @@ async function showBrowserNotification(body: string): Promise<void> {
     data: { url: "/dashboard" },
   };
 
-  // Service-worker notifications are what actually beep on mobile PWAs
-  // when the app is backgrounded (page audio is suspended).
   try {
     if ("serviceWorker" in navigator) {
       const reg = await navigator.serviceWorker.ready;
@@ -189,23 +244,35 @@ async function showBrowserNotification(body: string): Promise<void> {
   }
 }
 
-/** Sent-message tone. */
+/** Sent-message tone. Must stay inside the send gesture call stack start. */
 export function playChatSendSound(): void {
-  // Send is always inside a gesture — unlock + play together.
-  primeChatAudio();
-  playSrc(SOUND.sent, SOUND_FALLBACK.sent);
+  bindUnlock();
+  // Kick resume synchronously in the gesture; then decode/play.
+  const audioCtx = getAudioContext();
+  if (audioCtx?.state === "suspended") {
+    void audioCtx.resume().then(() => {
+      audioUnlocked = audioCtx.state === "running";
+    });
+  } else if (audioCtx?.state === "running") {
+    audioUnlocked = true;
+  }
+  void ensureBrowserNotificationPermission();
+  void (async () => {
+    await playKey("sent");
+    void Promise.all([loadBuffer("receive"), loadBuffer("notify")]);
+  })();
 }
 
 /** Received-message tone (while thread is open). */
 export function playChatReceiveSound(): void {
   lastReceiveAt = Date.now();
-  playSrc(SOUND.receive, SOUND_FALLBACK.receive);
+  playSound("receive");
 }
 
 /**
  * Unread / background alert.
- * Plays in-app tone when possible; always raises a SW notification when
- * useful so mobile PWAs get an OS sound.
+ * Plays in-app tone when possible; raises a SW notification when useful
+ * so mobile PWAs get an OS sound.
  */
 export function playChatNotificationSound(preview = ""): void {
   if (Date.now() - lastReceiveAt < 1200) {
@@ -213,11 +280,10 @@ export function playChatNotificationSound(preview = ""): void {
   }
 
   const shouldNotify =
-    typeof document !== "undefined" &&
-    (document.hidden || !liveChatOpen);
+    typeof document !== "undefined" && (document.hidden || !liveChatOpen);
 
   if (!document.hidden) {
-    playSrc(SOUND.notify, SOUND_FALLBACK.notify);
+    playSound("notify");
   }
 
   if (shouldNotify) {

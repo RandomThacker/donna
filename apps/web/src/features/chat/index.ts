@@ -2,6 +2,10 @@ export { Chat } from "./Chat";
 export { ChatThread } from "./ChatThread";
 export { useChatSession } from "./Chat.logic";
 export {
+  chatIntentSuggestions,
+  pickSuggestionPhrase,
+} from "./chatIntentSuggestions";
+export {
   fetchChatMessages,
   fetchChatSummary,
   sendChatCommand,
@@ -16,3 +20,4 @@ export type {
   ChatHistoryResponse,
   ChatSummaryResponse,
 } from "./Chat.types";
+export type { ChatIntentSuggestion } from "./chatIntentSuggestions";
