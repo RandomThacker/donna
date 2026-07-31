@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { cn } from "@/lib/cn";
 
 import { usePhoneThreadScreen } from "./usePhoneThreadScreen";
+import { setDonnaPhoneOpen } from "./donnaPhoneOpen";
 import { phoneFullscreenStyles as styles } from "./DashboardPhone.styles";
 import type { DashboardPhoneFullscreenProps } from "./DashboardPhone.types";
 import { IMessageChat } from "./IMessageChat";
@@ -17,11 +18,16 @@ export function DashboardPhoneFullscreen({
   onCloseComplete,
 }: DashboardPhoneFullscreenProps) {
   const screen = usePhoneThreadScreen(phone.conversations);
+  // Drop enter animation class after it finishes — a leftover `transform`
+  // on this sheet breaks overflow scrolling on mobile browsers.
+  const [enterDone, setEnterDone] = useState(false);
 
   useEffect(() => {
+    setDonnaPhoneOpen(true);
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
+      setDonnaPhoneOpen(false);
       document.body.style.overflow = previous;
     };
   }, []);
@@ -40,7 +46,7 @@ export function DashboardPhoneFullscreen({
     <div
       className={cn(
         styles.root,
-        exiting ? styles.rootExit : styles.rootEnter,
+        exiting ? styles.rootExit : !enterDone && styles.rootEnter,
       )}
       role="dialog"
       aria-modal="true"
@@ -48,7 +54,9 @@ export function DashboardPhoneFullscreen({
       onAnimationEnd={() => {
         if (exiting) {
           onCloseComplete?.();
+          return;
         }
+        setEnterDone(true);
       }}
     >
       <div className={styles.body}>

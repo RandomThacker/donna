@@ -42,13 +42,14 @@ export const phoneStyles = {
 
 export const phoneFullscreenStyles = {
   root: [
-    "fixed inset-0 z-[60] flex flex-col overflow-hidden md:hidden",
+    // Above the bottom bar (z-60) so chat owns the full screen.
+    "fixed inset-0 z-[70] flex flex-col overflow-hidden md:hidden",
     "origin-bottom-right bg-[var(--im-bg)]",
     "pt-[env(safe-area-inset-top)]",
   ].join(" "),
   rootEnter: "animate-donna-phone-in",
   rootExit: "animate-donna-phone-out",
-  body: "flex min-h-0 flex-1 flex-col",
+  body: "flex min-h-0 flex-1 flex-col overflow-hidden",
 } as const;
 
 export const phoneFabStyles = {
@@ -130,9 +131,10 @@ export const iMessageStyles = {
     "text-[var(--im-blue)]",
   ].join(" "),
   chatBody: [
-    "flex min-h-0 flex-1 flex-col overflow-y-auto px-3.5 pb-3 pt-3",
+    "flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-3.5 pb-3 pt-3",
+    "[-webkit-overflow-scrolling:touch]",
   ].join(" "),
-  chatBodyInner: "flex min-h-full flex-col justify-end",
+  chatBodyInner: "mt-auto flex w-full flex-col",
   stamp: "mb-3 text-center text-[10px] font-medium text-[var(--im-muted)]",
   newMessageRule: "my-3 flex w-full items-center gap-3",
   newMessageLine: "h-px min-w-0 flex-1 bg-[var(--im-blue)]",

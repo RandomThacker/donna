@@ -21,15 +21,15 @@ export const bottomBarStyles = {
     "rounded-b-full bg-donna-accent",
   ].join(" "),
   iconWrap: [
-    "pointer-events-none relative grid h-9 w-9 place-items-center rounded-2xl",
+    "relative grid h-9 w-9 place-items-center rounded-2xl",
     "transition-[background-color,color] duration-150",
   ].join(" "),
   iconWrapActive: "bg-donna-accent-soft text-donna-accent",
-  icon: "h-[1.2rem] w-[1.2rem]",
+  icon: "pointer-events-none h-[1.2rem] w-[1.2rem]",
   badge: [
     "absolute -right-0.5 -top-0.5 grid h-4 min-w-4 place-items-center rounded-full",
     "bg-donna-accent px-1 text-[0.55rem] font-semibold leading-none text-donna-on-accent",
   ].join(" "),
-  label: "pointer-events-none max-w-full truncate font-medium leading-none",
+  label: "max-w-full truncate font-medium leading-none",
   labelActive: "font-semibold",
 } as const;
