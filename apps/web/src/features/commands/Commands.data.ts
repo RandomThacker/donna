@@ -17,6 +17,19 @@ export type CommandGuide = {
 /** Canonical MVP phrases that RuleBasedParser accepts — keep in sync with docs/COMMAND_CHAT.md */
 export const commandGuides: CommandGuide[] = [
   {
+    id: "greeting",
+    intent: "GREETING",
+    title: "Say hello",
+    blurb: "Gets you a time-of-day hello and a sarcastic nudge toward real commands.",
+    icon: "spark",
+    examples: [
+      { phrase: "Hi" },
+      { phrase: "Hello" },
+      { phrase: "Good morning" },
+      { phrase: "Hey Donna" },
+    ],
+  },
+  {
     id: "create-task",
     intent: "CREATE_TASK",
     title: "Create a task",

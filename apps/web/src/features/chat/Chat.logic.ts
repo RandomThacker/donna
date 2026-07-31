@@ -18,6 +18,10 @@ const WELCOME: ChatMessage = {
   createdAt: Date.now(),
 };
 
+const POLL_MS = 12_000;
+const TYPING_MIN_MS = 1_000;
+const TYPING_EXIT_MS = 280;
+
 function mapHistoryMessage(m: ChatHistoryMessage): ChatMessage {
   return {
     id: m.public_id || m.id,
@@ -27,11 +31,42 @@ function mapHistoryMessage(m: ChatHistoryMessage): ChatMessage {
   };
 }
 
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+/** Oldest Donna message among the trailing `unread` assistant messages. */
+function firstUnreadDonnaId(
+  messages: ChatMessage[],
+  unread: number,
+): string | null {
+  if (unread <= 0) {
+    return null;
+  }
+  let remaining = unread;
+  let firstId: string | null = null;
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    const message = messages[i];
+    if (!message || message.role !== "donna") {
+      continue;
+    }
+    firstId = message.id;
+    remaining -= 1;
+    if (remaining <= 0) {
+      break;
+    }
+  }
+  return firstId;
+}
+
 export function useChatSession(
   initialDraft = "",
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; unreadOnOpen?: number } = {},
 ) {
   const enabled = options.enabled !== false;
+  const unreadOnOpenRef = useRef(Math.max(0, options.unreadOnOpen ?? 0));
   const queryClient = useQueryClient();
   const [messages, setMessages] = useState<ChatMessage[]>(
     enabled ? [] : [WELCOME],
@@ -39,12 +74,72 @@ export function useChatSession(
   const [draft, setDraft] = useState(initialDraft);
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(enabled);
+  /** First Donna message id in an unread / newly arrived batch. */
+  const [newMessageBeforeId, setNewMessageBeforeId] = useState<string | null>(
+    null,
+  );
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const appliedPrefill = useRef(false);
+  const knownIdsRef = useRef<Set<string>>(new Set());
+  const historyReadyRef = useRef(false);
+  const dividerSetRef = useRef(false);
 
   const refreshSummary = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: chatSummaryQueryKey });
   }, [queryClient]);
+
+  const rememberIds = useCallback((items: ChatMessage[]) => {
+    for (const item of items) {
+      knownIdsRef.current.add(item.id);
+    }
+  }, []);
+
+  const mergeRemoteMessages = useCallback(
+    (remote: ChatMessage[]) => {
+      const arrivals = remote.filter((message) => !knownIdsRef.current.has(message.id));
+      for (const message of remote) {
+        knownIdsRef.current.add(message.id);
+      }
+
+      if (
+        historyReadyRef.current &&
+        !dividerSetRef.current
+      ) {
+        const firstDonna = arrivals.find((m) => m.role === "donna");
+        if (firstDonna) {
+          dividerSetRef.current = true;
+          setNewMessageBeforeId(firstDonna.id);
+        }
+      }
+
+      if (arrivals.length === 0 && remote.length === 0) {
+        return;
+      }
+
+      setMessages((prev) => {
+        const byId = new Map(prev.map((m) => [m.id, m]));
+        for (const message of remote) {
+          byId.set(message.id, message);
+        }
+
+        const welcomeOnly =
+          prev.length === 1 && prev[0]?.id === "welcome" && remote.length > 0;
+        if (welcomeOnly) {
+          return remote;
+        }
+
+        const order = remote.map((m) => m.id);
+        const extras = prev.filter(
+          (m) => m.id !== "welcome" && !order.includes(m.id),
+        );
+        return [
+          ...order.map((id) => byId.get(id)!).filter(Boolean),
+          ...extras,
+        ];
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!enabled) {
@@ -58,13 +153,28 @@ export function useChatSession(
         if (cancelled) return;
         if (history.messages.length === 0) {
           setMessages([WELCOME]);
+          rememberIds([WELCOME]);
         } else {
-          setMessages(history.messages.map(mapHistoryMessage));
+          const mapped = history.messages.map(mapHistoryMessage);
+          setMessages(mapped);
+          rememberIds(mapped);
+          const unread = Math.max(
+            history.unread_count ?? 0,
+            unreadOnOpenRef.current,
+          );
+          const dividerId = firstUnreadDonnaId(mapped, unread);
+          if (dividerId) {
+            dividerSetRef.current = true;
+            setNewMessageBeforeId(dividerId);
+          }
         }
+        historyReadyRef.current = true;
         refreshSummary();
       } catch {
         if (!cancelled) {
           setMessages([WELCOME]);
+          rememberIds([WELCOME]);
+          historyReadyRef.current = true;
         }
       } finally {
         if (!cancelled) {
@@ -75,7 +185,35 @@ export function useChatSession(
     return () => {
       cancelled = true;
     };
-  }, [enabled, refreshSummary]);
+  }, [enabled, refreshSummary, rememberIds]);
+
+  useEffect(() => {
+    if (!enabled || loadingHistory) {
+      return;
+    }
+    let cancelled = false;
+
+    const poll = async () => {
+      try {
+        const history = await fetchChatMessages(false);
+        if (cancelled) return;
+        if (history.messages.length === 0) return;
+        mergeRemoteMessages(history.messages.map(mapHistoryMessage));
+        refreshSummary();
+      } catch {
+        // Keep the open thread usable offline / on blips.
+      }
+    };
+
+    const id = window.setInterval(() => {
+      void poll();
+    }, POLL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [enabled, loadingHistory, mergeRemoteMessages, refreshSummary]);
 
   useEffect(() => {
     if (appliedPrefill.current) return;
@@ -102,14 +240,28 @@ export function useChatSession(
       text,
       createdAt: Date.now(),
     };
+    knownIdsRef.current.add(clientId);
     setMessages((prev) => {
       const withoutWelcome = prev.filter((m) => m.id !== "welcome");
       return [...withoutWelcome, userMsg];
     });
     setDraft("");
     setSending(true);
+    const typingStartedAt = Date.now();
     try {
       const result = await sendChatCommand(text, clientId);
+      const remaining = Math.max(0, TYPING_MIN_MS - (Date.now() - typingStartedAt));
+      if (remaining > 0) {
+        await wait(remaining);
+      }
+      setSending(false);
+      await wait(TYPING_EXIT_MS);
+      const replyId = result.reply_message_public_id || newId();
+      if (result.user_message_public_id) {
+        knownIdsRef.current.add(result.user_message_public_id);
+        knownIdsRef.current.delete(clientId);
+      }
+      knownIdsRef.current.add(replyId);
       setMessages((prev) => [
         ...prev.map((m) =>
           m.id === clientId && result.user_message_public_id
@@ -117,17 +269,25 @@ export function useChatSession(
             : m,
         ),
         {
-          id: result.reply_message_public_id || newId(),
+          id: replyId,
           role: "donna",
           text: result.reply,
           createdAt: Date.now(),
         },
       ]);
     } catch {
+      const remaining = Math.max(0, TYPING_MIN_MS - (Date.now() - typingStartedAt));
+      if (remaining > 0) {
+        await wait(remaining);
+      }
+      setSending(false);
+      await wait(TYPING_EXIT_MS);
+      const errId = newId();
+      knownIdsRef.current.add(errId);
       setMessages((prev) => [
         ...prev,
         {
-          id: newId(),
+          id: errId,
           role: "donna",
           text: "Something went wrong on my end. Try again in a moment.",
           createdAt: Date.now(),
@@ -145,6 +305,7 @@ export function useChatSession(
     setDraft,
     sending,
     loadingHistory,
+    newMessageBeforeId,
     send,
     bottomRef,
   };

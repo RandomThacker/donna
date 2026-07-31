@@ -132,12 +132,21 @@ export const iMessageStyles = {
   chatBody: [
     "flex min-h-0 flex-1 flex-col overflow-y-auto px-3.5 pb-3 pt-3",
   ].join(" "),
+  chatBodyInner: "flex min-h-full flex-col justify-end",
   stamp: "mb-3 text-center text-[10px] font-medium text-[var(--im-muted)]",
+  newMessageRule: "my-3 flex w-full items-center gap-3",
+  newMessageLine: "h-px min-w-0 flex-1 bg-[var(--im-blue)]",
+  newMessageLabel: [
+    "shrink-0 text-[10px] font-medium tracking-wide text-[var(--im-blue)]",
+  ].join(" "),
   cluster: "flex flex-col",
   bubbleWrap: "relative max-w-[78%] px-0",
   bubbleWrapIn: "self-start",
   bubbleWrapOut: "self-end",
-  bubble: "relative px-[11px] py-[7px] text-[13px] leading-[1.3]",
+  bubble: [
+    "relative flex flex-col gap-1 px-[11px] py-[7px]",
+    "text-[13px] leading-[1.3]",
+  ].join(" "),
   bubbleIn: [
     "rounded-[16px] bg-[var(--im-bubble-in)] text-[var(--im-bubble-in-text)]",
   ].join(" "),
@@ -148,6 +157,20 @@ export const iMessageStyles = {
   bubbleOutLast: "rounded-br-[4px]",
   bubbleInMiddle: "rounded-bl-[16px]",
   bubbleOutMiddle: "rounded-br-[16px]",
+  bubbleText: "whitespace-pre-wrap",
+  bubbleTime: "self-end text-[9px] leading-none opacity-70",
+  bubbleTimeIn: "text-[var(--im-muted)]",
+  bubbleTimeOut: "text-white/75",
+  bubbleEnterIn: "animate-donna-im-in",
+  bubbleEnterOut: "animate-donna-im-out",
+  typingWrap: "relative mt-3 max-w-[78%] self-start",
+  typingEnter: "animate-donna-im-typing-in",
+  typingExit: "animate-donna-im-typing-out",
+  typingBubble: [
+    "flex items-center gap-1 rounded-[16px] rounded-bl-[4px]",
+    "bg-[var(--im-bubble-in)] px-3.5 py-2.5",
+  ].join(" "),
+  typingDot: "h-1.5 w-1.5 rounded-full bg-[var(--im-muted)] animate-donna-im-dot",
   tailIn: [
     "pointer-events-none absolute bottom-0 -left-[4px] h-[14px] w-[10px]",
     "text-[var(--im-bubble-in)]",

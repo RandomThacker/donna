@@ -76,12 +76,15 @@ func (s *ConversationService) GetPrimaryHistory(ctx context.Context, userID uuid
 	if err != nil {
 		return ChatHistory{}, err
 	}
-	if markRead && conv.UnreadCount > 0 {
+	// Preserve pre-clear unread so clients can place a "New Message" divider on open.
+	unreadBefore := conv.UnreadCount
+	if markRead && unreadBefore > 0 {
 		cleared, clearErr := s.conversations.ClearUnread(ctx, conv.ID, s.now().UTC())
 		if clearErr == nil {
 			conv = cleared
 		}
 	}
+	conv.UnreadCount = unreadBefore
 	return ChatHistory{Conversation: conv, Messages: msgs}, nil
 }
 

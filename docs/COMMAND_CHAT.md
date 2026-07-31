@@ -40,6 +40,7 @@ chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
 
 | Say | Intent |
 | --- | --- |
+| Hi / Hello / Good morning | `GREETING` |
 | Add task Finish API | `CREATE_TASK` |
 | Complete task Finish API | `COMPLETE_TASK` |
 | Remind me tomorrow at 6 PM | `CREATE_REMINDER` |

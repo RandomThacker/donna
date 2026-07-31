@@ -33,6 +33,14 @@ var (
 	reQueryTomorrow = regexp.MustCompile(`(?i)^\s*(?:what(?:'s| is| do i have)?\s+(?:on\s+)?tomorrow|tomorrow(?:'s)?\s+(?:schedule|agenda|plan)|show\s+tomorrow)\s*[?.!]?\s*$`)
 	reQueryDueToday = regexp.MustCompile(`(?i)^\s*(?:what(?:'s| is)\s+due(?:\s+today)?|due\s+today|what\s+tasks?\s+(?:do i have\s+)?(?:today|due)|show\s+(?:my\s+)?(?:tasks|todos?)(?:\s+today)?)\s*[?.!]?\s*$`)
 
+	reGreeting = regexp.MustCompile(`(?i)^\s*(?:` +
+		`hi+|hello|hey+|heya|hiya|howdy|yo|sup|hola|greetings|` +
+		`good\s+(?:morning|afternoon|evening|day)|` +
+		`what'?s\s+up|whats\s+up` +
+		`)` +
+		`(?:\s+(?:there|donna|folks|everyone|all))?` +
+		`\s*[!.]*\s*$`)
+
 	reEveryWeekday = regexp.MustCompile(`(?i)\bevery\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b`)
 	reAtTime       = regexp.MustCompile(`(?i)\bat\s+(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b`)
 	reToClause     = regexp.MustCompile(`(?i)\bto\s+(.+)$`)
@@ -51,6 +59,8 @@ func (p *RuleBasedParser) Parse(ctx context.Context, input string) (*Intent, err
 	lower := strings.ToLower(raw)
 
 	switch {
+	case reGreeting.MatchString(raw):
+		return &Intent{Kind: IntentGreeting, Raw: raw, Timezone: loc.String(), Confidence: 0.99}, nil
 	case reQueryDueToday.MatchString(raw):
 		return &Intent{Kind: IntentQueryDueToday, Raw: raw, Timezone: loc.String(), Confidence: 0.95}, nil
 	case reQueryToday.MatchString(raw):

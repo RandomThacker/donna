@@ -19,6 +19,7 @@ const (
 	IntentQueryToday     IntentKind = "QUERY_TODAY"
 	IntentQueryTomorrow  IntentKind = "QUERY_TOMORROW"
 	IntentQueryDueToday  IntentKind = "QUERY_DUE_TODAY"
+	IntentGreeting       IntentKind = "GREETING"
 	IntentUnknown        IntentKind = "UNKNOWN"
 )
 
@@ -105,8 +106,9 @@ type CommandResult struct {
 
 // ExecuteInput is required by the executor (not part of Intent).
 type ExecuteInput struct {
-	UserID   uuid.UUID
-	Timezone string
-	Now      time.Time
-	Message  string
+	UserID      uuid.UUID
+	Timezone    string
+	Now         time.Time
+	Message     string
+	DisplayName string
 }

@@ -77,6 +77,24 @@ func TestRuleBasedParserMVPQueries(t *testing.T) {
 	}
 }
 
+func TestRuleBasedParserGreeting(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	for _, input := range []string{
+		"hi",
+		"Hello!",
+		"hey donna",
+		"good morning",
+		"What's up",
+		"yo",
+	} {
+		got := parseWith(t, input, "UTC", now)
+		if got.Kind != chat.IntentGreeting {
+			t.Fatalf("%q => %s want GREETING", input, got.Kind)
+		}
+	}
+}
+
 func TestRuleBasedParserRejectsNonMVP(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC()
@@ -120,6 +138,27 @@ func TestRuleBasedParserCreateEvent(t *testing.T) {
 type stubParser struct{ intent *chat.Intent }
 
 func (s stubParser) Parse(context.Context, string) (*chat.Intent, error) { return s.intent, nil }
+
+func TestExecutorGreeting(t *testing.T) {
+	t.Parallel()
+	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentGreeting, Timezone: "UTC"}}, nil)
+	morning := time.Date(2026, 7, 30, 9, 0, 0, 0, time.UTC)
+	out := ex.Execute(context.Background(), chat.ExecuteInput{
+		DisplayName: "Aryan Thacker",
+		Timezone:    "UTC",
+		Now:         morning,
+		Message:     "hi",
+	})
+	if out.Intent != chat.IntentGreeting {
+		t.Fatalf("intent = %s", out.Intent)
+	}
+	if !strings.Contains(out.Reply, "Hi Aryan, Good Morning") {
+		t.Fatalf("reply = %q", out.Reply)
+	}
+	if !strings.Contains(out.Reply, "Add task Finish API") {
+		t.Fatalf("missing samples in %q", out.Reply)
+	}
+}
 
 func TestExecutorUnknown(t *testing.T) {
 	t.Parallel()

@@ -51,6 +51,12 @@ func (e *Executor) Execute(ctx context.Context, in ExecuteInput) CommandResult {
 	if intent.Kind == IntentUnknown {
 		return CommandResult{Reply: UnknownHelp, Intent: IntentUnknown}
 	}
+	if intent.Kind == IntentGreeting {
+		return CommandResult{
+			Reply:  greetingReply(in.DisplayName, now, intent.Timezone),
+			Intent: IntentGreeting,
+		}
+	}
 	if e.reg == nil {
 		return CommandResult{Reply: "Donna isn't ready for commands yet.", Intent: intent.Kind}
 	}
@@ -83,9 +89,59 @@ func (e *Executor) dispatch(ctx context.Context, userID uuid.UUID, now time.Time
 		return e.queryTimeline(ctx, userID, from, to)
 	case IntentQueryDueToday:
 		return e.queryDueToday(ctx, userID, now, intent.Timezone)
+	case IntentGreeting:
+		return greetingReply("", now, intent.Timezone), nil
 	default:
 		return UnknownHelp, nil
 	}
+}
+
+func greetingReply(displayName string, now time.Time, tz string) string {
+	name := firstName(displayName)
+	if name == "" {
+		name = "there"
+	}
+	loc := loadLocation(tz)
+	local := now.In(loc)
+	hour := local.Hour()
+
+	period := "Good Evening"
+	jab := "Still online? Cute. The night shift of denial looks good on you."
+	switch {
+	case hour >= 5 && hour < 12:
+		period = "Good Morning"
+		jab = "Rise and grind — or rise and open chat. Same energy, honestly."
+	case hour >= 12 && hour < 17:
+		period = "Good Afternoon"
+		jab = "Peak \"I'll do it later\" hours. Lucky for you, I don't judge. Much."
+	case hour >= 17 && hour < 22:
+		period = "Good Evening"
+		jab = "Wrapping up the day, or just starting the real work? Asking for a friend."
+	}
+
+	return fmt.Sprintf(`Hi %s, %s.
+
+%s
+
+If you're here to actually make me do something (wild), try:
+• Add task Finish API
+• What's due today?
+• Remind me tomorrow at 6 PM to stretch
+• What do I have today?
+• Schedule meeting Standup tomorrow at 10 AM
+• Complete task Finish API`, name, period, jab)
+}
+
+func firstName(displayName string) string {
+	displayName = strings.TrimSpace(displayName)
+	if displayName == "" {
+		return ""
+	}
+	parts := strings.Fields(displayName)
+	if len(parts) == 0 {
+		return ""
+	}
+	return parts[0]
 }
 
 func (e *Executor) createTask(ctx context.Context, userID uuid.UUID, now time.Time, intent Intent) (string, error) {

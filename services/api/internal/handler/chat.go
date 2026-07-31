@@ -52,17 +52,24 @@ func (h *ChatHandler) Command(c *gin.Context) {
 	}
 
 	tz := constant.DefaultUserTimezone
+	displayName := ""
 	if h.users != nil {
-		if user, err := h.users.GetByID(c.Request.Context(), userID); err == nil && strings.TrimSpace(user.Timezone) != "" {
-			tz = user.Timezone
+		if user, err := h.users.GetByID(c.Request.Context(), userID); err == nil {
+			if strings.TrimSpace(user.Timezone) != "" {
+				tz = user.Timezone
+			}
+			if user.DisplayName != nil {
+				displayName = strings.TrimSpace(*user.DisplayName)
+			}
 		}
 	}
 
 	result := h.executor.Execute(c.Request.Context(), chat.ExecuteInput{
-		UserID:   userID,
-		Timezone: tz,
-		Now:      time.Now(),
-		Message:  msg,
+		UserID:      userID,
+		Timezone:    tz,
+		Now:         time.Now(),
+		Message:     msg,
+		DisplayName: displayName,
 	})
 
 	out := model.ChatCommandResponse{

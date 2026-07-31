@@ -1,33 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect } from "react";
 
-import { useDonnaThreadSummary } from "@/features/chat/useDonnaThreadSummary";
 import { cn } from "@/lib/cn";
 
-import type { IMessageConversation } from "../../Dashboard.types";
+import { usePhoneThreadScreen } from "./usePhoneThreadScreen";
 import { phoneFullscreenStyles as styles } from "./DashboardPhone.styles";
 import type { DashboardPhoneFullscreenProps } from "./DashboardPhone.types";
 import { IMessageChat } from "./IMessageChat";
 import { IMessageList } from "./IMessageList";
-
-function withDonnaSummary(
-  conversations: IMessageConversation[],
-  preview: string,
-  time: string,
-  unread: number,
-): IMessageConversation[] {
-  return conversations.map((conversation) =>
-    conversation.id === "donna"
-      ? {
-          ...conversation,
-          preview,
-          time: time || conversation.time,
-          unread,
-        }
-      : conversation,
-  );
-}
 
 export function DashboardPhoneFullscreen({
   phone,
@@ -35,18 +16,7 @@ export function DashboardPhoneFullscreen({
   exiting = false,
   onCloseComplete,
 }: DashboardPhoneFullscreenProps) {
-  const [activeId, setActiveId] = useState<string | null>(null);
-  const donna = useDonnaThreadSummary();
-
-  const conversations = useMemo(
-    () => withDonnaSummary(phone.conversations, donna.preview, donna.time, donna.unread),
-    [phone.conversations, donna.preview, donna.time, donna.unread],
-  );
-
-  const activeConversation = useMemo(
-    () => conversations.find((item) => item.id === activeId) ?? null,
-    [activeId, conversations],
-  );
+  const screen = usePhoneThreadScreen(phone.conversations);
 
   useEffect(() => {
     const previous = document.body.style.overflow;
@@ -82,20 +52,20 @@ export function DashboardPhoneFullscreen({
       }}
     >
       <div className={styles.body}>
-        {activeConversation ? (
+        {screen.activeConversation ? (
           <IMessageChat
-            conversation={activeConversation}
-            live={activeConversation.id === "donna"}
+            conversation={screen.activeConversation}
+            live={screen.activeConversation.id === "donna"}
             onBack={() => {
-              setActiveId(null);
-              donna.refresh();
+              screen.setActiveId(null);
+              screen.donna.refresh();
             }}
             onClose={onClose}
           />
         ) : (
           <IMessageList
-            conversations={conversations}
-            onOpen={setActiveId}
+            conversations={screen.threads}
+            onOpen={screen.setActiveId}
             onClose={onClose}
           />
         )}

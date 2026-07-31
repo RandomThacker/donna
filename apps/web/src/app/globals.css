@@ -284,6 +284,83 @@
   animation: donna-typing 1.2s ease-in-out infinite;
 }
 
+@keyframes donna-im-bubble-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-8px, 12px, 0) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes donna-im-bubble-out {
+  from {
+    opacity: 0;
+    transform: translate3d(8px, 12px, 0) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes donna-im-typing-in {
+  from {
+    opacity: 0;
+    transform: translate3d(-6px, 8px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes donna-im-typing-out {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translate3d(-4px, 6px, 0) scale(0.94);
+  }
+}
+
+@keyframes donna-im-typing-dot {
+  0%,
+  60%,
+  100% {
+    opacity: 0.35;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@utility animate-donna-im-in {
+  animation: donna-im-bubble-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-donna-im-out {
+  animation: donna-im-bubble-out 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-donna-im-typing-in {
+  animation: donna-im-typing-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-donna-im-typing-out {
+  animation: donna-im-typing-out 0.28s ease-in both;
+}
+
+@utility animate-donna-im-dot {
+  animation: donna-im-typing-dot 1.05s ease-in-out infinite;
+}
+
 @keyframes donna-fab-glow {
   0%,
   100% {
