@@ -9,6 +9,6 @@ export const bentoBoxStyles = {
     "mb-3 shrink-0 text-[0.7rem] font-medium uppercase tracking-[0.18em]",
     "text-donna-faint sm:mb-4",
   ].join(" "),
-  fixedPanel: "flex h-80 min-h-0 flex-col",
+  fixedPanel: "flex h-96 min-h-0 flex-col",
   scrollBody: "min-h-0 flex-1 overflow-y-auto scrollbar-hidden",
 } as const;
