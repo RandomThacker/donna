@@ -155,8 +155,8 @@ func TestExecutorGreeting(t *testing.T) {
 	if !strings.Contains(out.Reply, "Hi Aryan, Good Morning") {
 		t.Fatalf("reply = %q", out.Reply)
 	}
-	if !strings.Contains(out.Reply, "Add task Finish API") {
-		t.Fatalf("missing samples in %q", out.Reply)
+	if !strings.Contains(out.Reply, "Try this:") {
+		t.Fatalf("missing sample prompt in %q", out.Reply)
 	}
 }
 

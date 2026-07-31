@@ -20,7 +20,7 @@ export const commandGuides: CommandGuide[] = [
     id: "greeting",
     intent: "GREETING",
     title: "Say hello",
-    blurb: "Gets you a time-of-day hello and a sarcastic nudge toward real commands.",
+    blurb: "Gets a warm time-of-day hello, a sweet or playful line, and one sample command.",
     icon: "spark",
     examples: [
       { phrase: "Hi" },

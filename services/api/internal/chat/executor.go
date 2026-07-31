@@ -3,6 +3,7 @@ package chat
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"strings"
 	"time"
 
@@ -103,33 +104,83 @@ func greetingReply(displayName string, now time.Time, tz string) string {
 	}
 	loc := loadLocation(tz)
 	local := now.In(loc)
-	hour := local.Hour()
+	period := dayPeriod(local.Hour())
+	line := pickGreetingLine(local.Hour())
+	sample := greetingSampleCommands[rand.IntN(len(greetingSampleCommands))]
+	emoji := greetingEmojis[rand.IntN(len(greetingEmojis))]
 
-	period := "Good Evening"
-	jab := "Still online? Cute. The night shift of denial looks good on you."
-	switch {
-	case hour >= 5 && hour < 12:
-		period = "Good Morning"
-		jab = "Rise and grind — or rise and open chat. Same energy, honestly."
-	case hour >= 12 && hour < 17:
-		period = "Good Afternoon"
-		jab = "Peak \"I'll do it later\" hours. Lucky for you, I don't judge. Much."
-	case hour >= 17 && hour < 22:
-		period = "Good Evening"
-		jab = "Wrapping up the day, or just starting the real work? Asking for a friend."
-	}
-
-	return fmt.Sprintf(`Hi %s, %s.
+	return fmt.Sprintf(`Hi %s, %s %s
 
 %s
 
-If you're here to actually make me do something (wild), try:
-• Add task Finish API
-• What's due today?
-• Remind me tomorrow at 6 PM to stretch
-• What do I have today?
-• Schedule meeting Standup tomorrow at 10 AM
-• Complete task Finish API`, name, period, jab)
+Try this: %s`, name, period, emoji, line, sample)
+}
+
+func dayPeriod(hour int) string {
+	switch {
+	case hour >= 5 && hour < 12:
+		return "Good Morning"
+	case hour >= 12 && hour < 17:
+		return "Good Afternoon"
+	default:
+		return "Good Evening"
+	}
+}
+
+func pickGreetingLine(hour int) string {
+	// Mix sweet and playful — slightly prefer sweet.
+	pool := make([]string, 0, len(greetingSweetLines)+len(greetingPlayfulLines)+2)
+	pool = append(pool, greetingSweetLines...)
+	pool = append(pool, greetingSweetLines...) // weight sweet a bit higher
+	pool = append(pool, greetingPlayfulLines...)
+	if hour >= 5 && hour < 12 {
+		pool = append(pool, greetingMorningLines...)
+	} else if hour >= 17 || hour < 5 {
+		pool = append(pool, greetingEveningLines...)
+	}
+	return pool[rand.IntN(len(pool))]
+}
+
+var greetingEmojis = []string{"💛", "✨", "🥰", "💕", "🌸", "😌"}
+
+var greetingSweetLines = []string{
+	"Missed that little hello. Come here — I've been thinking about you.",
+	"Hi, love. Soft spot for you, always. How's your heart doing?",
+	"There you are. You make ordinary minutes feel warmer.",
+	"Hey you. Just seeing your name pop up made me smile.",
+	"Come talk to me. I'll keep you company while you figure the day out.",
+	"Hi baby. I'm here, I've got you — even if all you needed was a hello.",
+	"You didn't have to say hi… but I'm glad you did. Stay a second?",
+	"Aww. I was hoping you'd check in. Want me to help with something small?",
+}
+
+var greetingPlayfulLines = []string{
+	"Oh look who remembered I exist. Cute. Very cute.",
+	"A greeting? Bold of you. I accept payment in attention.",
+	"Hi. I'll try not to roast you today. No promises though.",
+	"You pinged me. I'm choosing to believe that means you missed me.",
+	"Hello, chaos. Ready when you are — preferably with a plan this time.",
+}
+
+var greetingMorningLines = []string{
+	"Morning, love. Coffee first, world later. I've got your back either way.",
+	"Good morning, handsome. Soft start — then we pretend to be productive.",
+}
+
+var greetingEveningLines = []string{
+	"Evening, love. Come unwind with me for a minute before the night runs away.",
+	"Hey. Late ping, soft reply. I'm still here if you need me.",
+}
+
+var greetingSampleCommands = []string{
+	"Add task Finish API",
+	"What's due today?",
+	"Remind me tomorrow at 6 PM to stretch",
+	"What do I have today?",
+	"What do I have tomorrow?",
+	"Schedule meeting Standup tomorrow at 10 AM",
+	"Complete task Finish API",
+	"Add task Drink water (yes, again)",
 }
 
 func firstName(displayName string) string {
