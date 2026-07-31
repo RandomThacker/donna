@@ -58,14 +58,15 @@ self.addEventListener("push", (event) => {
         url = `/dashboard/calendar?event=${encodeURIComponent(payload.occurrenceId)}`;
       }
 
-      await self.registration.showNotification(title, {
+      const options: NotificationOptions & { renotify?: boolean } = {
         body,
         icon: "/icons/icon-192.png",
         badge: "/icons/icon-192.png",
         tag: payload.notificationId || "donna-notification",
         renotify: true,
         data: { url },
-      });
+      };
+      await self.registration.showNotification(title, options);
     })(),
   );
 });
