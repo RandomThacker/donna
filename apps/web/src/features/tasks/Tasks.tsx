@@ -383,8 +383,6 @@ export function Tasks() {
               </aside>
 
               <div className={styles.tasksCol}>
-                <div className={styles.mobileTags}>{tagsPanel}</div>
-
                 <section className={styles.tasksCard} aria-label="Tasks">
                   {isFiltered ? (
                     <div className={styles.filterRow}>
@@ -542,6 +540,8 @@ export function Tasks() {
                   ) : null}
                 </div>
               </aside>
+
+              <div className={styles.mobileTags}>{tagsPanel}</div>
             </div>
           </div>
         </main>

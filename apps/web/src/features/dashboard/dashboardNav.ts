@@ -60,8 +60,8 @@ export const dashboardNavItems: DashboardNavItem[] = [
 export const dashboardBottomNavIds = [
   "home",
   "calendar",
-  "notifications",
   "tasks",
+  "notes",
   "settings",
 ] as const;
 

@@ -12,22 +12,25 @@ export const journalStyles = {
     "h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto scrollbar-hidden",
     "bg-donna-bg lg:overflow-y-hidden",
   ].join(" "),
+  // Mobile: natural document flow + workspace scroll.
+  // Desktop (lg+): fill viewport and keep the 3-column locked layout.
   workspaceInner: [
-    "mx-auto flex h-full w-full max-w-6xl flex-col gap-4 overflow-hidden p-5 sm:p-6 lg:p-8",
+    "mx-auto flex w-full max-w-6xl flex-col gap-4 overflow-x-hidden p-5 sm:p-6 lg:p-8",
+    "lg:h-full lg:min-h-0 lg:overflow-hidden",
   ].join(" "),
   main: [
-    "flex min-h-0 flex-1 flex-col gap-4",
-    "lg:flex-row lg:items-start lg:overflow-hidden",
+    "flex min-h-0 min-w-0 flex-col gap-4",
+    "lg:min-h-0 lg:flex-1 lg:flex-row lg:items-start lg:overflow-hidden",
   ].join(" "),
   // left col: mini calendar + tags (desktop only)
   sidebar: "hidden w-52 shrink-0 flex-col gap-4 overflow-y-auto scrollbar-hidden lg:flex",
-  // center col: tasks
+  // center col: tasks — grow/fill only on desktop so mobile stats stay in flow
   tasksCol: [
-    "flex min-h-0 flex-1 flex-col gap-4",
-    "lg:h-full lg:overflow-hidden",
+    "flex min-h-0 flex-col gap-4",
+    "lg:h-full lg:min-h-0 lg:flex-1 lg:overflow-hidden",
   ].join(" "),
   // right col: statistics
-  statsCol: "shrink-0 lg:w-52",
+  statsCol: "w-full shrink-0 lg:w-52",
   mobileTags: "block lg:hidden",
   header: "flex shrink-0 min-w-0 flex-nowrap items-center justify-between gap-2",
   nav: "flex shrink-0 items-center gap-1.5 sm:gap-2",
@@ -43,7 +46,7 @@ export const journalStyles = {
     "text-xs font-medium text-donna-accent sm:h-9 sm:px-3.5 sm:text-sm",
   ].join(" "),
   tasksCard: [
-    "flex min-h-0 flex-1 flex-col rounded-2xl border border-donna-hairline",
+    "flex flex-col rounded-2xl border border-donna-hairline",
     "bg-donna-surface p-4 sm:p-5",
   ].join(" "),
   filterRow: "mb-3 flex flex-wrap items-center gap-1.5",
