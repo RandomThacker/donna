@@ -156,7 +156,7 @@ type CalendarEventRepository interface {
 		from, to time.Time,
 		providers []string,
 	) ([]entity.CalendarEventWithProvider, error)
-	// ListCalendarOccurrences is the Sprint 1B alias for the shared calendar Occurrence query.
+	// ListCalendarOccurrences is the Sprint 1B alias for the shared Calendar Occurrence query.
 	ListCalendarOccurrences(
 		ctx context.Context,
 		userID uuid.UUID,
