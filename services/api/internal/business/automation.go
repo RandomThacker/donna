@@ -33,6 +33,7 @@ type CreateAutomationInput struct {
 	Enabled          *bool
 	TriggerType      string
 	TriggerTime      string
+	TriggerDays      []string
 	Timezone         string
 	Commands         []entity.AutomationCommand
 	DeliveryChannels []string
@@ -46,6 +47,8 @@ type UpdateAutomationInput struct {
 	Enabled          *bool
 	TriggerType      *string
 	TriggerTime      *string
+	TriggerDays      []string
+	TriggerDaysSet   bool
 	Timezone         *string
 	Commands         []entity.AutomationCommand
 	DeliveryChannels []string
@@ -128,12 +131,16 @@ func (s *AutomationService) Create(ctx context.Context, userID uuid.UUID, in Cre
 	if triggerType == "" {
 		triggerType = constant.AutomationTriggerDaily
 	}
-	if triggerType != constant.AutomationTriggerDaily {
-		return entity.Automation{}, fmt.Errorf("%w: only daily triggers are supported", apperr.ErrValidation)
+	if _, ok := constant.AllowedAutomationTriggerTypes[triggerType]; !ok {
+		return entity.Automation{}, fmt.Errorf("%w: unsupported trigger type", apperr.ErrValidation)
 	}
 	normalizedTime, err := normalizeLocalTime(triggerTime)
 	if err != nil {
 		return entity.Automation{}, fmt.Errorf("%w: trigger time must be HH:MM", apperr.ErrValidation)
+	}
+	days, err := normalizeTriggerDays(triggerType, in.TriggerDays)
+	if err != nil {
+		return entity.Automation{}, err
 	}
 	if tz == "" {
 		tz = "UTC"
@@ -156,7 +163,7 @@ func (s *AutomationService) Create(ctx context.Context, userID uuid.UUID, in Cre
 		return entity.Automation{}, err
 	}
 	now := s.now().UTC()
-	next := NextDailyRunAt(now, tz, normalizedTime)
+	next := NextAutomationRunAt(now, tz, triggerType, normalizedTime, days)
 	return s.autos.Create(ctx, entity.Automation{
 		ID:               id,
 		PublicID:         idgen.PublicID(constant.PublicIDPrefixAutomation, id),
@@ -166,6 +173,7 @@ func (s *AutomationService) Create(ctx context.Context, userID uuid.UUID, in Cre
 		Enabled:          enabled,
 		TriggerType:      triggerType,
 		TriggerTime:      normalizedTime,
+		TriggerDays:      days,
 		Timezone:         tz,
 		Commands:         commands,
 		DeliveryChannels: delivery,
@@ -204,13 +212,15 @@ func (s *AutomationService) Update(ctx context.Context, userID, autoID uuid.UUID
 	}
 	if in.TriggerType != nil {
 		tt := strings.TrimSpace(*in.TriggerType)
-		if tt != constant.AutomationTriggerDaily {
-			return entity.Automation{}, fmt.Errorf("%w: only daily triggers are supported", apperr.ErrValidation)
+		if _, ok := constant.AllowedAutomationTriggerTypes[tt]; !ok {
+			return entity.Automation{}, fmt.Errorf("%w: unsupported trigger type", apperr.ErrValidation)
 		}
 		fields.TriggerType = &tt
 	}
 	tz := existing.Timezone
 	triggerTime := existing.TriggerTime
+	triggerType := existing.TriggerType
+	triggerDays := append([]string{}, existing.TriggerDays...)
 	if in.Timezone != nil {
 		tz = strings.TrimSpace(*in.Timezone)
 		if tz == "" {
@@ -228,6 +238,27 @@ func (s *AutomationService) Update(ctx context.Context, userID, autoID uuid.UUID
 		}
 		triggerTime = normalized
 		fields.TriggerTime = &normalized
+	}
+	if fields.TriggerType != nil {
+		triggerType = *fields.TriggerType
+	}
+	if in.TriggerDaysSet {
+		days, err := normalizeTriggerDays(triggerType, in.TriggerDays)
+		if err != nil {
+			return entity.Automation{}, err
+		}
+		triggerDays = days
+		fields.TriggerDays = days
+		fields.TriggerDaysSet = true
+	} else if fields.TriggerType != nil {
+		// Changing type without days: re-validate existing days against new type.
+		days, err := normalizeTriggerDays(triggerType, triggerDays)
+		if err != nil {
+			return entity.Automation{}, err
+		}
+		triggerDays = days
+		fields.TriggerDays = days
+		fields.TriggerDaysSet = true
 	}
 	if in.Commands != nil {
 		commands, err := NormalizeAutomationCommands(in.Commands)
@@ -247,7 +278,7 @@ func (s *AutomationService) Update(ctx context.Context, userID, autoID uuid.UUID
 		fields.DeliveryChannels = delivery
 	}
 
-	next := NextDailyRunAt(s.now().UTC(), tz, triggerTime)
+	next := NextAutomationRunAt(s.now().UTC(), tz, triggerType, triggerTime, triggerDays)
 	fields.NextRunAt = &next
 	return s.autos.Update(ctx, autoID, userID, fields, s.now().UTC())
 }
@@ -298,7 +329,7 @@ func AutomationDue(auto entity.Automation, now time.Time) bool {
 	if !auto.Enabled {
 		return false
 	}
-	if auto.TriggerType != constant.AutomationTriggerDaily {
+	if _, ok := constant.AllowedAutomationTriggerTypes[auto.TriggerType]; !ok {
 		return false
 	}
 	loc, err := time.LoadLocation(strings.TrimSpace(auto.Timezone))
@@ -308,6 +339,11 @@ func AutomationDue(auto entity.Automation, now time.Time) bool {
 	local := now.In(loc)
 	if local.Format("15:04") != normalizeLocalTimeOrEmpty(auto.TriggerTime) {
 		return false
+	}
+	if auto.TriggerType == constant.AutomationTriggerWeekly {
+		if !weekdayAllowed(local.Weekday(), auto.TriggerDays) {
+			return false
+		}
 	}
 	if auto.LastRunAt != nil {
 		lastLocal := auto.LastRunAt.In(loc)
@@ -325,6 +361,11 @@ func ClientMessageIDForAutomationRun(publicID string, localDay time.Time) string
 
 // NextDailyRunAt returns the next daily trigger instant in UTC.
 func NextDailyRunAt(now time.Time, timezone, triggerTime string) time.Time {
+	return NextAutomationRunAt(now, timezone, constant.AutomationTriggerDaily, triggerTime, nil)
+}
+
+// NextAutomationRunAt returns the next trigger instant in UTC for daily/weekly schedules.
+func NextAutomationRunAt(now time.Time, timezone, triggerType, triggerTime string, days []string) time.Time {
 	loc, err := time.LoadLocation(strings.TrimSpace(timezone))
 	if err != nil || loc == nil {
 		loc = time.UTC
@@ -339,7 +380,85 @@ func NextDailyRunAt(now time.Time, timezone, triggerTime string) time.Time {
 	if !candidate.After(local) {
 		candidate = candidate.Add(24 * time.Hour)
 	}
+	if triggerType != constant.AutomationTriggerWeekly {
+		return candidate.UTC()
+	}
+	for i := 0; i < 8; i++ {
+		if weekdayAllowed(candidate.Weekday(), days) {
+			return candidate.UTC()
+		}
+		candidate = candidate.Add(24 * time.Hour)
+	}
 	return candidate.UTC()
+}
+
+func normalizeTriggerDays(triggerType string, raw []string) ([]string, error) {
+	if triggerType == constant.AutomationTriggerDaily || triggerType == "" {
+		return []string{}, nil
+	}
+	allowed := map[string]struct{}{}
+	for _, d := range constant.AutomationWeekdays {
+		allowed[d] = struct{}{}
+	}
+	out := make([]string, 0, len(raw))
+	seen := map[string]struct{}{}
+	for _, d := range raw {
+		code := strings.ToUpper(strings.TrimSpace(d))
+		if code == "" {
+			continue
+		}
+		if _, ok := allowed[code]; !ok {
+			return nil, fmt.Errorf("%w: invalid weekday %q", apperr.ErrValidation, d)
+		}
+		if _, dup := seen[code]; dup {
+			continue
+		}
+		seen[code] = struct{}{}
+		out = append(out, code)
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("%w: select at least one weekday", apperr.ErrValidation)
+	}
+	// Stable RRULE order.
+	ordered := make([]string, 0, len(out))
+	for _, d := range constant.AutomationWeekdays {
+		if _, ok := seen[d]; ok {
+			ordered = append(ordered, d)
+		}
+	}
+	return ordered, nil
+}
+
+func weekdayAllowed(day time.Weekday, days []string) bool {
+	if len(days) == 0 {
+		return false
+	}
+	code := weekdayCode(day)
+	for _, d := range days {
+		if strings.EqualFold(d, code) {
+			return true
+		}
+	}
+	return false
+}
+
+func weekdayCode(day time.Weekday) string {
+	switch day {
+	case time.Monday:
+		return "MO"
+	case time.Tuesday:
+		return "TU"
+	case time.Wednesday:
+		return "WE"
+	case time.Thursday:
+		return "TH"
+	case time.Friday:
+		return "FR"
+	case time.Saturday:
+		return "SA"
+	default:
+		return "SU"
+	}
 }
 
 func normalizeDeliveryChannels(raw []string) ([]string, error) {

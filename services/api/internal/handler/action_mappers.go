@@ -55,6 +55,7 @@ func automationFromAction(a actions.AutomationResult) model.AutomationResponse {
 		Trigger: model.AutomationTriggerResponse{
 			Type: a.TriggerType,
 			Time: a.TriggerTime,
+			Days: a.TriggerDays,
 		},
 		Timezone: a.Timezone,
 		Commands: model.AutomationCommandsFromEntities(a.Commands),

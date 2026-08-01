@@ -14,8 +14,9 @@ type Automation struct {
 	Name             string
 	Description      *string
 	Enabled          bool
-	TriggerType      string   // daily (future: weekly, monthly, cron)
+	TriggerType      string   // daily | weekly
 	TriggerTime      string   // HH:MM civil clock in Timezone
+	TriggerDays      []string // RRULE weekday codes for weekly (MO..SU); empty for daily
 	Timezone         string
 	Commands         []AutomationCommand
 	DeliveryChannels []string

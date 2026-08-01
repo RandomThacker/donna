@@ -39,8 +39,8 @@ notifications:
   - "{canonical} {emoji}"
   - "Heads up, {nickname}:\n{canonical}"
 automation_intros:
-  - "For you:"
-  - "Soft briefing:"
+  - "{greeting}"
+  - "{greeting}\n\nFor you:"
 closings:
   - ""
   - "I'm here if you need me."

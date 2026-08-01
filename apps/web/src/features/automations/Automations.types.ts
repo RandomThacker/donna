@@ -1,6 +1,7 @@
 export type AutomationTrigger = {
   type: string;
   time: string;
+  days?: string[];
 };
 
 export type AutomationDelivery = {

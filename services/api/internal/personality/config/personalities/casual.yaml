@@ -40,8 +40,8 @@ notifications:
   - "Hey {nickname} — {canonical}"
   - "{canonical}"
 automation_intros:
-  - "Quick check-in:"
-  - "Here's what I've got:"
+  - "{greeting}"
+  - "{greeting}\n\nQuick check-in:"
 closings:
   - ""
   - "You've got this."

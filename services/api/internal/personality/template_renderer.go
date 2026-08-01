@@ -78,11 +78,39 @@ func (r *TemplateRenderer) renderKind(def Definition, kind Kind, vars map[string
 	case KindNotification:
 		return fill(pick(def.Notifications, "{canonical}"), vars)
 	case KindAutomation:
-		intro := strings.TrimSpace(fill(pick(def.AutomationIntros, ""), vars))
+		// Prefer greeting-led wrappers so Flirty/Casual nicknames always show.
+		tpl := pick(def.AutomationIntros, "{greeting}")
+		if !strings.Contains(tpl, "{canonical}") && !strings.Contains(tpl, "{greeting}") {
+			// Plain intro lines like "For you:" — prepend greeting.
+			intro := strings.TrimSpace(fill(tpl, vars))
+			closing := strings.TrimSpace(fill(pick(def.Closings, ""), vars))
+			parts := make([]string, 0, 4)
+			if g := strings.TrimSpace(vars["greeting"]); g != "" {
+				parts = append(parts, g)
+			}
+			if intro != "" {
+				parts = append(parts, intro)
+			}
+			if canonical != "" {
+				parts = append(parts, canonical)
+			}
+			if closing != "" {
+				parts = append(parts, closing)
+			}
+			return strings.Join(parts, "\n\n")
+		}
+		body := strings.TrimSpace(fill(tpl, vars))
+		if strings.Contains(tpl, "{canonical}") {
+			closing := strings.TrimSpace(fill(pick(def.Closings, ""), vars))
+			if closing == "" {
+				return body
+			}
+			return strings.TrimSpace(body + "\n\n" + closing)
+		}
 		closing := strings.TrimSpace(fill(pick(def.Closings, ""), vars))
 		parts := make([]string, 0, 3)
-		if intro != "" {
-			parts = append(parts, intro)
+		if body != "" {
+			parts = append(parts, body)
 		}
 		if canonical != "" {
 			parts = append(parts, canonical)

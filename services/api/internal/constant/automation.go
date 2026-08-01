@@ -11,11 +11,20 @@ const PublicIDPrefixAutomationExecution = "aex_"
 // PublicIDPrefixAutomationCommandExecution is the ace_ prefix for per-command results.
 const PublicIDPrefixAutomationCommandExecution = "ace_"
 
-// Automation trigger types (Phase 1: daily only).
+// Automation trigger types.
 const (
-	AutomationTriggerDaily = "daily"
-	// Future: AutomationTriggerWeekly, AutomationTriggerMonthly, AutomationTriggerCron
+	AutomationTriggerDaily  = "daily"
+	AutomationTriggerWeekly = "weekly"
 )
+
+// Automation weekday codes (RRULE BYDAY).
+var AutomationWeekdays = []string{"MO", "TU", "WE", "TH", "FR", "SA", "SU"}
+
+// AllowedAutomationTriggerTypes is the Phase 1.7 whitelist.
+var AllowedAutomationTriggerTypes = map[string]struct{}{
+	AutomationTriggerDaily:  {},
+	AutomationTriggerWeekly: {},
+}
 
 // Automation delivery channels (Phase 1: chat only).
 const (

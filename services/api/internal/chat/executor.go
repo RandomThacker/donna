@@ -81,7 +81,9 @@ func (e *Executor) finalize(
 	tz string,
 ) CommandResult {
 	if in.SkipPersonality || e == nil || e.personality == nil {
-		if result.Intent == IntentGreeting && strings.TrimSpace(result.Reply) == "" {
+		// Automations personalize the combined reply — do not invent a
+		// display-name fallback greeting here (it becomes "Good evening, there.").
+		if !in.SkipPersonality && result.Intent == IntentGreeting && strings.TrimSpace(result.Reply) == "" {
 			result.Reply = fallbackGreeting(in.DisplayName, now, tz)
 		}
 		if result.Error != "" && strings.TrimSpace(result.Reply) != "" && !strings.HasPrefix(result.Reply, "I couldn't") {

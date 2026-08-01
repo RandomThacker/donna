@@ -24,10 +24,49 @@ export function formatLocalTimeForInput(localTime: string): string {
   return "09:00";
 }
 
+export const AUTOMATION_WEEKDAYS = [
+  { code: "MO", label: "Mon" },
+  { code: "TU", label: "Tue" },
+  { code: "WE", label: "Wed" },
+  { code: "TH", label: "Thu" },
+  { code: "FR", label: "Fri" },
+  { code: "SA", label: "Sat" },
+  { code: "SU", label: "Sun" },
+] as const;
+
+export type AutomationWeekdayCode =
+  (typeof AUTOMATION_WEEKDAYS)[number]["code"];
+
+export function weekdayFromToday(): AutomationWeekdayCode {
+  const map: AutomationWeekdayCode[] = [
+    "SU",
+    "MO",
+    "TU",
+    "WE",
+    "TH",
+    "FR",
+    "SA",
+  ];
+  return map[new Date().getDay()] ?? "MO";
+}
+
+export function formatWeekdayCodes(days: string[] | undefined): string {
+  if (!days || days.length === 0) return "";
+  const order = AUTOMATION_WEEKDAYS.map((d) => d.code);
+  const labels = [...days]
+    .sort((a, b) => order.indexOf(a as AutomationWeekdayCode) - order.indexOf(b as AutomationWeekdayCode))
+    .map((code) => AUTOMATION_WEEKDAYS.find((d) => d.code === code)?.label ?? code);
+  return labels.join(", ");
+}
+
 export function formatSchedule(auto: Automation): string {
   const time = formatLocalTimeForInput(auto.trigger?.time ?? "09:00");
-  const type = auto.trigger?.type === "daily" ? "Daily" : auto.trigger?.type ?? "Daily";
-  return `${type} at ${time}`;
+  const type = (auto.trigger?.type ?? "daily").toLowerCase();
+  if (type === "weekly") {
+    const days = formatWeekdayCodes(auto.trigger?.days);
+    return days ? `${days} at ${time}` : `Weekly at ${time}`;
+  }
+  return `Every day at ${time}`;
 }
 
 export function formatDelivery(auto: Automation): string {
@@ -115,31 +154,45 @@ export function formatSuccessRate(rate: number | null | undefined): string {
   return `${Math.round(rate * 100)}%`;
 }
 
+export type AutomationScheduleInput = {
+  type: "daily" | "weekly";
+  time?: string;
+  days?: string[];
+};
+
 export function buildCreatePayloadFromTemplate(
   template: AutomationTemplate,
   timezone: string,
-  timeOverride?: string,
+  schedule?: AutomationScheduleInput,
 ): {
   name: string;
   description: string;
   template_id: string;
   timezone: string;
-  trigger: { type: string; time: string };
+  trigger: { type: string; time: string; days?: string[] };
   commands: AutomationCommand[];
   delivery: { channels: string[] };
   enabled: boolean;
 } {
+  const type = schedule?.type ?? "daily";
+  const trigger: { type: string; time: string; days?: string[] } = {
+    type,
+    time: formatLocalTimeForInput(
+      schedule?.time ?? template.default_schedule.time ?? "09:00",
+    ),
+  };
+  if (type === "weekly") {
+    trigger.days =
+      schedule?.days && schedule.days.length > 0
+        ? schedule.days
+        : [weekdayFromToday()];
+  }
   return {
     name: template.name,
     description: template.description,
     template_id: template.id,
     timezone,
-    trigger: {
-      type: template.default_schedule.type || "daily",
-      time: formatLocalTimeForInput(
-        timeOverride ?? template.default_schedule.time ?? "09:00",
-      ),
-    },
+    trigger,
     commands: template.commands.map((cmd) => ({
       command: cmd.command,
       variables: cmd.variables,

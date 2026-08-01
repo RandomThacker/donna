@@ -486,6 +486,12 @@ func (m *memAutomationRepo) Update(
 	if fields.TriggerTime != nil {
 		auto.TriggerTime = *fields.TriggerTime
 	}
+	if fields.TriggerDaysSet {
+		auto.TriggerDays = fields.TriggerDays
+		if auto.TriggerDays == nil {
+			auto.TriggerDays = []string{}
+		}
+	}
 	if fields.Timezone != nil {
 		auto.Timezone = *fields.Timezone
 	}
@@ -656,4 +662,44 @@ func (m *memExecutionRecorder) CompleteExecution(
 	exec.UpdatedAt = now
 	m.executions[in.ExecutionID] = exec
 	return exec, nil
+}
+
+func TestAutomationDueWeeklyWeekday(t *testing.T) {
+	t.Parallel()
+	loc, err := time.LoadLocation("Asia/Kolkata")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Saturday 2026-08-01 09:00 IST
+	now := time.Date(2026, 8, 1, 9, 0, 0, 0, loc)
+	auto := entity.Automation{
+		Enabled:     true,
+		TriggerType: constant.AutomationTriggerWeekly,
+		Timezone:    "Asia/Kolkata",
+		TriggerTime: "09:00",
+		TriggerDays: []string{"MO", "WE", "FR"},
+		Commands:    []entity.AutomationCommand{{Command: constant.AutomationCommandGreeting}},
+	}
+	if AutomationDue(auto, now) {
+		t.Fatal("Saturday should not match MO/WE/FR")
+	}
+	auto.TriggerDays = []string{"SA"}
+	if !AutomationDue(auto, now) {
+		t.Fatal("expected due on Saturday")
+	}
+}
+
+func TestNextAutomationRunAtWeeklySkipsNonMatchingDays(t *testing.T) {
+	t.Parallel()
+	loc, err := time.LoadLocation("UTC")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Friday evening after the trigger — next should be Monday 09:00
+	now := time.Date(2026, 7, 31, 10, 0, 0, 0, loc)
+	next := NextAutomationRunAt(now, "UTC", constant.AutomationTriggerWeekly, "09:00", []string{"MO", "WE"})
+	got := next.In(loc)
+	if got.Weekday() != time.Monday || got.Format("15:04") != "09:00" {
+		t.Fatalf("got %v, want Monday 09:00", got)
+	}
 }

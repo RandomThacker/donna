@@ -12,6 +12,7 @@ import {
   updateAutomation,
 } from "./Automations.api";
 import {
+  AUTOMATION_WEEKDAYS,
   buildCreatePayloadFromTemplate,
   commandLabel,
   commandsPreview,
@@ -23,6 +24,8 @@ import {
   formatSchedule,
   formatStatusLabel,
   formatSuccessRate,
+  weekdayFromToday,
+  type AutomationWeekdayCode,
 } from "./Automations.logic";
 import { automationsStyles as styles } from "./Automations.styles";
 import type {
@@ -48,6 +51,10 @@ export function AutomationsPanel() {
   } | null>(null);
   const [templateId, setTemplateId] = useState("morning_brief");
   const [localTime, setLocalTime] = useState("09:00");
+  const [scheduleType, setScheduleType] = useState<"daily" | "weekly">("daily");
+  const [selectedDays, setSelectedDays] = useState<AutomationWeekdayCode[]>([
+    weekdayFromToday(),
+  ]);
   const [customCommands, setCustomCommands] = useState("");
   const timezone = defaultBrowserTimezone();
 
@@ -99,14 +106,18 @@ export function AutomationsPanel() {
 
   async function handleAdd() {
     if (!selectedTemplate) return;
+    if (scheduleType === "weekly" && selectedDays.length === 0) {
+      setError("Pick at least one day for a weekly schedule.");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const payload = buildCreatePayloadFromTemplate(
-        selectedTemplate,
-        timezone,
-        localTime,
-      );
+      const payload = buildCreatePayloadFromTemplate(selectedTemplate, timezone, {
+        type: scheduleType,
+        time: localTime,
+        days: scheduleType === "weekly" ? selectedDays : undefined,
+      });
       if (selectedTemplate.id === "custom") {
         const commands = customCommands
           .split("\n")
@@ -134,6 +145,20 @@ export function AutomationsPanel() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function toggleDay(code: AutomationWeekdayCode) {
+    setSelectedDays((prev) => {
+      const set = new Set(prev);
+      if (set.has(code)) {
+        set.delete(code);
+      } else {
+        set.add(code);
+      }
+      return AUTOMATION_WEEKDAYS.map((d) => d.code).filter((c) =>
+        set.has(c),
+      ) as AutomationWeekdayCode[];
+    });
   }
 
   async function handleToggle(auto: Automation) {
@@ -298,6 +323,26 @@ export function AutomationsPanel() {
             </select>
           </div>
           <div className={styles.field}>
+            <label className={styles.label} htmlFor="automation-schedule">
+              Schedule
+            </label>
+            <select
+              id="automation-schedule"
+              className={styles.select}
+              value={scheduleType}
+              onChange={(event) => {
+                const next = event.target.value === "weekly" ? "weekly" : "daily";
+                setScheduleType(next);
+                if (next === "weekly" && selectedDays.length === 0) {
+                  setSelectedDays([weekdayFromToday()]);
+                }
+              }}
+            >
+              <option value="daily">Every day</option>
+              <option value="weekly">Selected days</option>
+            </select>
+          </div>
+          <div className={styles.field}>
             <label className={styles.label} htmlFor="automation-time">
               Time
             </label>
@@ -318,6 +363,30 @@ export function AutomationsPanel() {
             {saving ? "Adding…" : "Add"}
           </button>
         </div>
+        {scheduleType === "weekly" ? (
+          <div className={styles.field}>
+            <p className={styles.label}>Repeat on</p>
+            <div className={styles.dayRow}>
+              {AUTOMATION_WEEKDAYS.map((day) => {
+                const active = selectedDays.includes(day.code);
+                return (
+                  <button
+                    key={day.code}
+                    type="button"
+                    aria-pressed={active}
+                    className={active ? styles.dayChipActive : styles.dayChip}
+                    onClick={() => toggleDay(day.code)}
+                  >
+                    {day.label}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedDays.length === 0 ? (
+              <p className={styles.scheduleHint}>Pick at least one day</p>
+            ) : null}
+          </div>
+        ) : null}
         {selectedTemplate?.id === "custom" ? (
           <div className={styles.field}>
             <label className={styles.label} htmlFor="automation-commands">

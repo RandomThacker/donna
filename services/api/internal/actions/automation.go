@@ -23,6 +23,7 @@ type AutomationResult struct {
 	Enabled          bool
 	TriggerType      string
 	TriggerTime      string
+	TriggerDays      []string
 	Timezone         string
 	Commands         []entity.AutomationCommand
 	DeliveryChannels []string
@@ -50,6 +51,7 @@ func automationFromEntity(e entity.Automation) AutomationResult {
 		Enabled:          e.Enabled,
 		TriggerType:      e.TriggerType,
 		TriggerTime:      e.TriggerTime,
+		TriggerDays:      e.TriggerDays,
 		Timezone:         e.Timezone,
 		Commands:         e.Commands,
 		DeliveryChannels: e.DeliveryChannels,
@@ -69,6 +71,7 @@ type CreateAutomationRequest struct {
 	Enabled          *bool
 	TriggerType      string
 	TriggerTime      string
+	TriggerDays      []string
 	Timezone         string
 	Commands         []entity.AutomationCommand
 	DeliveryChannels []string
@@ -99,6 +102,7 @@ func (a *CreateAutomationAction) Execute(ctx context.Context, req CreateAutomati
 		Enabled:          req.Enabled,
 		TriggerType:      req.TriggerType,
 		TriggerTime:      req.TriggerTime,
+		TriggerDays:      req.TriggerDays,
 		Timezone:         req.Timezone,
 		Commands:         req.Commands,
 		DeliveryChannels: req.DeliveryChannels,
@@ -119,6 +123,8 @@ type UpdateAutomationRequest struct {
 	Enabled          *bool
 	TriggerType      *string
 	TriggerTime      *string
+	TriggerDays      []string
+	TriggerDaysSet   bool
 	Timezone         *string
 	Commands         []entity.AutomationCommand
 	DeliveryChannels []string
@@ -148,6 +154,8 @@ func (a *UpdateAutomationAction) Execute(ctx context.Context, req UpdateAutomati
 		Enabled:          req.Enabled,
 		TriggerType:      req.TriggerType,
 		TriggerTime:      req.TriggerTime,
+		TriggerDays:      req.TriggerDays,
+		TriggerDaysSet:   req.TriggerDaysSet,
 		Timezone:         req.Timezone,
 		Commands:         req.Commands,
 		DeliveryChannels: req.DeliveryChannels,

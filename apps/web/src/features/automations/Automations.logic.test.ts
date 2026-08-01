@@ -21,11 +21,10 @@ describe("automations", () => {
       ],
       default_schedule: { type: "daily", time: "09:00" },
     };
-    const payload = buildCreatePayloadFromTemplate(
-      template,
-      defaultBrowserTimezone(),
-      "09:30",
-    );
+    const payload = buildCreatePayloadFromTemplate(template, defaultBrowserTimezone(), {
+      type: "daily",
+      time: "09:30",
+    });
     expect(payload.template_id).toBe("morning_brief");
     expect(payload.trigger).toEqual({ type: "daily", time: "09:30" });
     expect(payload.commands).toHaveLength(2);
@@ -35,6 +34,26 @@ describe("automations", () => {
     });
     expect(payload.delivery.channels).toEqual(["chat"]);
     expect(payload.enabled).toBe(true);
+  });
+
+  it("builds weekly create payload with selected days", () => {
+    const template: AutomationTemplate = {
+      id: "custom",
+      name: "Custom",
+      description: "Custom",
+      commands: [{ command: "greeting" }],
+      default_schedule: { type: "daily", time: "18:00" },
+    };
+    const payload = buildCreatePayloadFromTemplate(template, "UTC", {
+      type: "weekly",
+      time: "18:00",
+      days: ["MO", "FR"],
+    });
+    expect(payload.trigger).toEqual({
+      type: "weekly",
+      time: "18:00",
+      days: ["MO", "FR"],
+    });
   });
 
   it("formats schedule and readable command labels", () => {
@@ -51,7 +70,13 @@ describe("automations", () => {
       updated_at: "",
     };
     expect(formatLocalTimeForInput(auto.trigger.time)).toBe("10:00");
-    expect(formatSchedule(auto)).toBe("Daily at 10:00");
+    expect(formatSchedule(auto)).toBe("Every day at 10:00");
+    expect(
+      formatSchedule({
+        ...auto,
+        trigger: { type: "weekly", time: "09:00", days: ["MO", "WE"] },
+      }),
+    ).toBe("Mon, Wed at 09:00");
     expect(commandLabel(auto.commands[0]!)).toBe("Tasks Due");
   });
 });

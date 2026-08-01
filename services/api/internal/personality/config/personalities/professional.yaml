@@ -31,8 +31,8 @@ reminders:
 notifications:
   - "{canonical}"
 automation_intros:
-  - ""
-  - "Here's your update."
+  - "{greeting}"
+  - "{greeting}\n\nHere's your update."
 closings:
   - ""
 encouragements:

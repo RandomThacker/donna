@@ -204,7 +204,9 @@ export function PersonalityPanel() {
         >
           {saving ? "Saving…" : "Save personality"}
         </button>
-        <p className={styles.hint}>Preview updates as you type.</p>
+        <p className={styles.hint}>
+          Preview updates as you type — hit Save so chat and automations use it.
+        </p>
       </div>
 
       <div className={styles.previewGrid}>

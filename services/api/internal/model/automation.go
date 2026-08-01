@@ -13,8 +13,9 @@ import (
 
 // AutomationTriggerRequest is the trigger shape on create/update.
 type AutomationTriggerRequest struct {
-	Type string `json:"type"`
-	Time string `json:"time"`
+	Type string   `json:"type"`
+	Time string   `json:"time"`
+	Days []string `json:"days,omitempty"`
 }
 
 // AutomationDeliveryRequest is the delivery shape on create/update.
@@ -102,8 +103,9 @@ type UpdateAutomationRequest struct {
 
 // AutomationTriggerResponse is the trigger shape in API responses.
 type AutomationTriggerResponse struct {
-	Type string `json:"type"`
-	Time string `json:"time"`
+	Type string   `json:"type"`
+	Time string   `json:"time"`
+	Days []string `json:"days,omitempty"`
 }
 
 // AutomationDeliveryResponse is the delivery shape in API responses.
@@ -234,6 +236,7 @@ func AutomationFromEntity(a entity.Automation) AutomationResponse {
 		Trigger: AutomationTriggerResponse{
 			Type: a.TriggerType,
 			Time: a.TriggerTime,
+			Days: a.TriggerDays,
 		},
 		Timezone: a.Timezone,
 		Commands: AutomationCommandsFromEntities(a.Commands),

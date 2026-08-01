@@ -180,9 +180,11 @@ func (h *AutomationHandler) Create(c *gin.Context) {
 		return
 	}
 	triggerType, triggerTime := "", ""
+	var triggerDays []string
 	if req.Trigger != nil {
 		triggerType = req.Trigger.Type
 		triggerTime = req.Trigger.Time
+		triggerDays = req.Trigger.Days
 	}
 	var delivery []string
 	if req.Delivery != nil {
@@ -195,6 +197,7 @@ func (h *AutomationHandler) Create(c *gin.Context) {
 		Enabled:          req.Enabled,
 		TriggerType:      triggerType,
 		TriggerTime:      triggerTime,
+		TriggerDays:      triggerDays,
 		Timezone:         req.Timezone,
 		Commands:         model.AutomationCommandsToEntities(req.Commands),
 		DeliveryChannels: delivery,
@@ -225,6 +228,8 @@ func (h *AutomationHandler) Update(c *gin.Context) {
 		return
 	}
 	var triggerType, triggerTime *string
+	var triggerDays []string
+	triggerDaysSet := false
 	if req.Trigger != nil {
 		tt := req.Trigger.Type
 		tm := req.Trigger.Time
@@ -233,6 +238,13 @@ func (h *AutomationHandler) Update(c *gin.Context) {
 		}
 		if tm != "" {
 			triggerTime = &tm
+		}
+		if req.Trigger.Days != nil || tt == "weekly" || tt == "daily" {
+			triggerDays = req.Trigger.Days
+			if triggerDays == nil {
+				triggerDays = []string{}
+			}
+			triggerDaysSet = true
 		}
 	}
 	var delivery []string
@@ -251,6 +263,8 @@ func (h *AutomationHandler) Update(c *gin.Context) {
 		Enabled:          req.Enabled,
 		TriggerType:      triggerType,
 		TriggerTime:      triggerTime,
+		TriggerDays:      triggerDays,
+		TriggerDaysSet:   triggerDaysSet,
 		Timezone:         req.Timezone,
 		Commands:         commands,
 		DeliveryChannels: delivery,

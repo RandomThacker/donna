@@ -129,6 +129,7 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 	parts := make([]string, 0, len(auto.Commands))
 	cmdResults := make([]AutomationCommandRunResult, 0, len(auto.Commands))
 	success, failed, skipped := 0, 0, 0
+	greetingOnly := false
 	order := 0
 
 	for _, structured := range auto.Commands {
@@ -138,6 +139,7 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 		status := constant.AutomationCommandSuccess
 		errText := ""
 		reply := ""
+		isGreeting := strings.EqualFold(strings.TrimSpace(structured.Command), constant.AutomationCommandGreeting)
 
 		if resolveErr != nil {
 			status = constant.AutomationCommandFailed
@@ -158,12 +160,17 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 			if errText != "" {
 				status = constant.AutomationCommandFailed
 				failed++
+			} else if reply == "" && isGreeting {
+				// Greeting body comes from the personality renderer on the combined reply.
+				success++
+				greetingOnly = greetingOnly || len(parts) == 0
 			} else if reply == "" {
 				status = constant.AutomationCommandSkipped
 				skipped++
 			} else {
 				success++
 				parts = append(parts, reply)
+				greetingOnly = false
 			}
 		}
 		cmdEnd := r.now().UTC()
@@ -204,13 +211,16 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 	}
 
 	combined := strings.TrimSpace(strings.Join(parts, "\n\n"))
-	if combined == "" {
-		combined = "I'm here — nothing to report just yet."
-	}
 	if r.personality != nil {
 		kind := personality.KindAutomation
-		if strings.Contains(strings.ToLower(auto.Name), "morning") {
+		switch {
+		case greetingOnly && combined == "":
+			kind = personality.KindGreeting
+		case strings.Contains(strings.ToLower(auto.Name), "morning"):
 			kind = personality.KindMorningBrief
+		}
+		if combined == "" && kind != personality.KindGreeting {
+			combined = "I'm here — nothing to report just yet."
 		}
 		if rendered, err := r.personality.Render(ctx, personality.RenderInput{
 			UserID:    auto.UserID,
@@ -221,6 +231,8 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 		}); err == nil && strings.TrimSpace(rendered.Text) != "" {
 			combined = strings.TrimSpace(rendered.Text)
 		}
+	} else if combined == "" {
+		combined = "I'm here — nothing to report just yet."
 	}
 
 	deliveryStatus := constant.AutomationDeliverySkipped
@@ -297,7 +309,7 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 	}
 
 	if opts.UpdateSchedule && r.autos != nil {
-		next := NextDailyRunAt(now.Add(time.Minute), auto.Timezone, auto.TriggerTime)
+		next := NextAutomationRunAt(now.Add(time.Minute), auto.Timezone, auto.TriggerType, auto.TriggerTime, auto.TriggerDays)
 		if _, err := r.autos.MarkRun(ctx, auto.ID, now, &next); err != nil {
 			return out, err
 		}

@@ -44,7 +44,7 @@ Intent Catalog (`internal/automationcatalog/templates.yaml`) is **configuration*
 | --- | --- |
 | `name`, `description` | Display |
 | `enabled` | Soft pause |
-| `trigger` | Phase 1: `{ type: "daily", time: "HH:MM" }` |
+| `trigger` | `{ type: "daily"\|"weekly", time: "HH:MM", days?: ["MO"…"SU"] }` — `days` required for weekly |
 | `commands` | Ordered structured steps: `{ command, variables }` |
 | `delivery` | Phase 1: `{ channels: ["chat"] }` |
 | `last_run_at` / `next_run_at` | Schedule markers (updated by scheduled runs only) |
@@ -101,14 +101,18 @@ Development builds include a `debug` object on execution detail (raw command out
 - `000032` — automations table (+ migrate legacy intent_rules)
 - `000033` — automation_executions + automation_command_executions
 - `000034` — structured commands (`command` + `variables`)
+- `000036` — weekly trigger days (`trigger_days`, `daily|weekly`)
+
+## Personality
+
+Combined automation replies go through the Personality Engine (`KindAutomation` / `KindGreeting` / `KindMorningBrief`). Per-command chat execution skips personality so the wrap owns tone, name, and nickname.
 
 ## Explicit non-goals (this phase)
 
 - Retries / replay / conditions
 - Telegram / Push / WhatsApp / Email delivery
 - AI-authored automations
-- New trigger types beyond daily
-- Scheduling changes
+- Cron expressions / time windows beyond daily & weekly weekdays
 
 ## Future compatibility
 

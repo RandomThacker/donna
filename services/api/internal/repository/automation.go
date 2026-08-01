@@ -16,7 +16,7 @@ import (
 
 const automationColumns = `
 	id, public_id, user_id, name, description, enabled,
-	trigger_type, to_char(trigger_time, 'HH24:MI'), timezone,
+	trigger_type, to_char(trigger_time, 'HH24:MI'), trigger_days, timezone,
 	commands, delivery_channels, template_id,
 	last_run_at, next_run_at, created_at, updated_at, deleted_at`
 
@@ -24,10 +24,10 @@ const (
 	sqlInsertAutomation = `
 INSERT INTO automations (
 	id, public_id, user_id, name, description, enabled,
-	trigger_type, trigger_time, timezone, commands, delivery_channels,
+	trigger_type, trigger_time, trigger_days, timezone, commands, delivery_channels,
 	template_id, last_run_at, next_run_at, created_at, updated_at
 ) VALUES (
-	$1,$2,$3,$4,$5,$6,$7,$8::time,$9,$10,$11,$12,$13,$14,$15,$16
+	$1,$2,$3,$4,$5,$6,$7,$8::time,$9,$10,$11,$12,$13,$14,$15,$16,$17
 )
 RETURNING` + automationColumns
 
@@ -55,13 +55,14 @@ UPDATE automations SET
 	enabled = COALESCE($4, enabled),
 	trigger_type = COALESCE($5, trigger_type),
 	trigger_time = COALESCE($6::time, trigger_time),
-	timezone = COALESCE($7, timezone),
-	commands = COALESCE($8, commands),
-	delivery_channels = COALESCE($9, delivery_channels),
-	template_id = COALESCE($10, template_id),
-	next_run_at = COALESCE($11, next_run_at),
-	updated_at = $12
-WHERE id = $1 AND user_id = $13 AND deleted_at IS NULL
+	trigger_days = COALESCE($7, trigger_days),
+	timezone = COALESCE($8, timezone),
+	commands = COALESCE($9, commands),
+	delivery_channels = COALESCE($10, delivery_channels),
+	template_id = COALESCE($11, template_id),
+	next_run_at = COALESCE($12, next_run_at),
+	updated_at = $13
+WHERE id = $1 AND user_id = $14 AND deleted_at IS NULL
 RETURNING` + automationColumns
 
 	sqlMarkAutomationRun = `
@@ -96,11 +97,14 @@ type AutomationUpdateFields struct {
 	Enabled          *bool
 	TriggerType      *string
 	TriggerTime      *string
+	TriggerDays      []string // nil = leave unchanged; non-nil replaces (empty OK for daily)
 	Timezone         *string
 	Commands         []entity.AutomationCommand
 	DeliveryChannels []string
 	TemplateID       *string
 	NextRunAt        *time.Time
+	// TriggerDaysSet marks that TriggerDays should be written (including empty).
+	TriggerDaysSet bool
 }
 
 type automationRepository struct {
@@ -125,9 +129,13 @@ func (r *automationRepository) Create(ctx context.Context, auto entity.Automatio
 	if err != nil {
 		return entity.Automation{}, fmt.Errorf("marshal delivery: %w", err)
 	}
+	days := auto.TriggerDays
+	if days == nil {
+		days = []string{}
+	}
 	return scanAutomation(r.q.QueryRow(ctx, sqlInsertAutomation,
 		auto.ID, auto.PublicID, auto.UserID, auto.Name, auto.Description, auto.Enabled,
-		auto.TriggerType, auto.TriggerTime, auto.Timezone, commandsJSON, deliveryJSON,
+		auto.TriggerType, auto.TriggerTime, days, auto.Timezone, commandsJSON, deliveryJSON,
 		auto.TemplateID, auto.LastRunAt, auto.NextRunAt, auto.CreatedAt, auto.UpdatedAt,
 	))
 }
@@ -176,9 +184,17 @@ func (r *automationRepository) Update(
 		}
 		deliveryJSON = b
 	}
+	var days any
+	if fields.TriggerDaysSet {
+		d := fields.TriggerDays
+		if d == nil {
+			d = []string{}
+		}
+		days = d
+	}
 	return scanAutomation(r.q.QueryRow(ctx, sqlUpdateAutomation,
 		id, fields.Name, fields.Description, fields.Enabled, fields.TriggerType,
-		fields.TriggerTime, fields.Timezone, commandsJSON, deliveryJSON,
+		fields.TriggerTime, days, fields.Timezone, commandsJSON, deliveryJSON,
 		fields.TemplateID, fields.NextRunAt, updatedAt, userID,
 	))
 }
@@ -212,13 +228,13 @@ func collectAutomations(rows pgx.Rows) ([]entity.Automation, error) {
 
 func scanAutomation(row pgx.Row) (entity.Automation, error) {
 	var (
-		auto         entity.Automation
-		commandsRaw  []byte
-		deliveryRaw  []byte
+		auto        entity.Automation
+		commandsRaw []byte
+		deliveryRaw []byte
 	)
 	err := row.Scan(
 		&auto.ID, &auto.PublicID, &auto.UserID, &auto.Name, &auto.Description, &auto.Enabled,
-		&auto.TriggerType, &auto.TriggerTime, &auto.Timezone,
+		&auto.TriggerType, &auto.TriggerTime, &auto.TriggerDays, &auto.Timezone,
 		&commandsRaw, &deliveryRaw, &auto.TemplateID,
 		&auto.LastRunAt, &auto.NextRunAt, &auto.CreatedAt, &auto.UpdatedAt, &auto.DeletedAt,
 	)
@@ -241,6 +257,9 @@ func scanAutomation(row pgx.Row) (entity.Automation, error) {
 	}
 	if auto.DeliveryChannels == nil {
 		auto.DeliveryChannels = []string{}
+	}
+	if auto.TriggerDays == nil {
+		auto.TriggerDays = []string{}
 	}
 	return auto, nil
 }
