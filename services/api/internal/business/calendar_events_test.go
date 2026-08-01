@@ -79,6 +79,41 @@ func (m *mockEventRepo) ListByUserInRangeWithProvider(
 	return out, nil
 }
 
+func (m *mockEventRepo) ListForSchedulerByUserInRange(
+	ctx context.Context,
+	userID uuid.UUID,
+	from, to time.Time,
+	providers []string,
+) ([]entity.CalendarEventWithProvider, error) {
+	rows, err := m.ListByUserInRangeWithProvider(ctx, userID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	if len(providers) == 0 {
+		return rows, nil
+	}
+	allow := map[string]struct{}{}
+	for _, p := range providers {
+		allow[p] = struct{}{}
+	}
+	out := make([]entity.CalendarEventWithProvider, 0, len(rows))
+	for _, row := range rows {
+		if _, ok := allow[row.Provider]; ok {
+			out = append(out, row)
+		}
+	}
+	return out, nil
+}
+
+func (m *mockEventRepo) ListCalendarOccurrences(
+	ctx context.Context,
+	userID uuid.UUID,
+	from, to time.Time,
+	providers []string,
+) ([]entity.CalendarEventWithProvider, error) {
+	return m.ListForSchedulerByUserInRange(ctx, userID, from, to, providers)
+}
+
 func (m *mockEventRepo) UpdateFromSync(_ context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error) {
 	pid := ""
 	if event.ProviderEventID != nil {

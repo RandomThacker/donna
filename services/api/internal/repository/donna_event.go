@@ -87,6 +87,8 @@ type DonnaEventRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (entity.DonnaEvent, error)
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]entity.DonnaEvent, error)
 	ListByUserInRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.DonnaEvent, error)
+	// ListForSchedulerByUserInRange returns a narrow projection for Occurrence scheduling.
+	ListForSchedulerByUserInRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.DonnaEvent, error)
 	Update(ctx context.Context, id, userID uuid.UUID, fields DonnaEventUpdateFields, updatedAt time.Time) (entity.DonnaEvent, error)
 	SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error
 	WithTx(tx pgx.Tx) DonnaEventRepository
@@ -155,6 +157,19 @@ func (r *donnaEventRepository) ListByUserInRange(
 	return collectDonnaEvents(rows)
 }
 
+func (r *donnaEventRepository) ListForSchedulerByUserInRange(
+	ctx context.Context,
+	userID uuid.UUID,
+	from, to time.Time,
+) ([]entity.DonnaEvent, error) {
+	rows, err := r.q.Query(ctx, sqlListDonnaEventsForScheduler, userID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return collectDonnaEventsForScheduler(rows)
+}
+
 func (r *donnaEventRepository) Update(
 	ctx context.Context,
 	id, userID uuid.UUID,
@@ -191,6 +206,18 @@ func collectDonnaEvents(rows pgx.Rows) ([]entity.DonnaEvent, error) {
 	return out, rows.Err()
 }
 
+func collectDonnaEventsForScheduler(rows pgx.Rows) ([]entity.DonnaEvent, error) {
+	out := make([]entity.DonnaEvent, 0)
+	for rows.Next() {
+		event, err := scanDonnaEventForScheduler(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, event)
+	}
+	return out, rows.Err()
+}
+
 func scanDonnaEvent(row pgx.Row) (entity.DonnaEvent, error) {
 	var e entity.DonnaEvent
 	err := row.Scan(
@@ -204,6 +231,22 @@ func scanDonnaEvent(row pgx.Row) (entity.DonnaEvent, error) {
 			return entity.DonnaEvent{}, apperr.ErrNotFound
 		}
 		return entity.DonnaEvent{}, fmt.Errorf("scan donna event: %w", err)
+	}
+	return e, nil
+}
+
+func scanDonnaEventForScheduler(row pgx.Row) (entity.DonnaEvent, error) {
+	var e entity.DonnaEvent
+	err := row.Scan(
+		&e.ID, &e.PublicID, &e.UserID, &e.Title, &e.Description,
+		&e.StartAt, &e.EndAt, &e.Timezone, &e.Location,
+		&e.ReminderOffsetMinutes, &e.RecurrenceRule, &e.Status,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.DonnaEvent{}, apperr.ErrNotFound
+		}
+		return entity.DonnaEvent{}, fmt.Errorf("scan donna event for scheduler: %w", err)
 	}
 	return e, nil
 }

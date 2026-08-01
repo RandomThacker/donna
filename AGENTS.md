@@ -19,6 +19,8 @@ Read before implementing:
 15. [docs/TIMELINE_UI.md](docs/TIMELINE_UI.md) — Timeline planning UI (Phase 3.1)
 16. [docs/OCCURRENCE_DOMAIN.md](docs/OCCURRENCE_DOMAIN.md) — scheduling Occurrence model vs Timeline
 17. [docs/OCCURRENCE_SERVICE.md](docs/OCCURRENCE_SERVICE.md) — OccurrenceService pipeline (scheduling feed)
+18. [docs/PERFORMANCE_SPRINT_1A.md](docs/PERFORMANCE_SPRINT_1A.md) — narrow Occurrence SQL projections
+19. [docs/PERFORMANCE_SPRINT_1B.md](docs/PERFORMANCE_SPRINT_1B.md) — shared calendar Occurrence query (query count)
 
 Project rules also live in `.cursor/rules/`.
 

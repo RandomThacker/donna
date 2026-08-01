@@ -81,6 +81,8 @@ type DonnaReminderRepository interface {
 	GetByID(ctx context.Context, id uuid.UUID) (entity.DonnaReminder, error)
 	ListByUser(ctx context.Context, userID uuid.UUID) ([]entity.DonnaReminder, error)
 	ListByUserInRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.DonnaReminder, error)
+	// ListForSchedulerByUserInRange returns a narrow projection for Occurrence scheduling.
+	ListForSchedulerByUserInRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.DonnaReminder, error)
 	Update(ctx context.Context, id, userID uuid.UUID, fields DonnaReminderUpdateFields, updatedAt time.Time) (entity.DonnaReminder, error)
 	SoftDelete(ctx context.Context, id, userID uuid.UUID, deletedAt time.Time) error
 	WithTx(tx pgx.Tx) DonnaReminderRepository
@@ -144,6 +146,19 @@ func (r *donnaReminderRepository) ListByUserInRange(
 	return collectDonnaReminders(rows)
 }
 
+func (r *donnaReminderRepository) ListForSchedulerByUserInRange(
+	ctx context.Context,
+	userID uuid.UUID,
+	from, to time.Time,
+) ([]entity.DonnaReminder, error) {
+	rows, err := r.q.Query(ctx, sqlListDonnaRemindersForScheduler, userID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return collectDonnaRemindersForScheduler(rows)
+}
+
 func (r *donnaReminderRepository) Update(
 	ctx context.Context,
 	id, userID uuid.UUID,
@@ -179,6 +194,18 @@ func collectDonnaReminders(rows pgx.Rows) ([]entity.DonnaReminder, error) {
 	return out, rows.Err()
 }
 
+func collectDonnaRemindersForScheduler(rows pgx.Rows) ([]entity.DonnaReminder, error) {
+	out := make([]entity.DonnaReminder, 0)
+	for rows.Next() {
+		reminder, err := scanDonnaReminderForScheduler(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, reminder)
+	}
+	return out, rows.Err()
+}
+
 func scanDonnaReminder(row pgx.Row) (entity.DonnaReminder, error) {
 	var rem entity.DonnaReminder
 	err := row.Scan(
@@ -191,6 +218,21 @@ func scanDonnaReminder(row pgx.Row) (entity.DonnaReminder, error) {
 			return entity.DonnaReminder{}, apperr.ErrNotFound
 		}
 		return entity.DonnaReminder{}, fmt.Errorf("scan donna reminder: %w", err)
+	}
+	return rem, nil
+}
+
+func scanDonnaReminderForScheduler(row pgx.Row) (entity.DonnaReminder, error) {
+	var rem entity.DonnaReminder
+	err := row.Scan(
+		&rem.ID, &rem.PublicID, &rem.UserID, &rem.Title, &rem.Description,
+		&rem.TriggerAt, &rem.Timezone, &rem.RecurrenceRule, &rem.Status,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.DonnaReminder{}, apperr.ErrNotFound
+		}
+		return entity.DonnaReminder{}, fmt.Errorf("scan donna reminder for scheduler: %w", err)
 	}
 	return rem, nil
 }

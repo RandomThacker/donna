@@ -31,7 +31,7 @@ func TestGoogleOccurrenceProviderOneTime(t *testing.T) {
 		Provider: constant.AuthProviderGoogle,
 	}}}
 
-	got, err := NewGoogleOccurrenceProvider(repo).ListOccurrences(context.Background(), userID, from, to)
+	got, err := NewGoogleOccurrenceProvider(repo, nil).ListOccurrences(context.Background(), userID, from, to)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestGoogleOccurrenceProviderEmptyAndFiltersMicrosoft(t *testing.T) {
 		Provider: constant.AuthProviderMicrosoft,
 	}}}
 
-	got, err := NewGoogleOccurrenceProvider(repo).ListOccurrences(context.Background(), userID, from, to)
+	got, err := NewGoogleOccurrenceProvider(repo, nil).ListOccurrences(context.Background(), userID, from, to)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestGoogleOccurrenceProviderEmptyAndFiltersMicrosoft(t *testing.T) {
 		t.Fatalf("google provider should ignore microsoft rows, got %d", len(got))
 	}
 
-	empty, err := NewGoogleOccurrenceProvider(&memCalendarEvents{}).ListOccurrences(context.Background(), userID, from, to)
+	empty, err := NewGoogleOccurrenceProvider(&memCalendarEvents{}, nil).ListOccurrences(context.Background(), userID, from, to)
 	if err != nil || len(empty) != 0 {
 		t.Fatalf("empty = %v %v", empty, err)
 	}
@@ -135,7 +135,7 @@ func TestDonnaEventOccurrenceProviderOneTimeAndRange(t *testing.T) {
 		Status: constant.DonnaEventStatusConfirmed,
 	}}}
 
-	got, err := NewDonnaEventOccurrenceProvider(repo).ListOccurrences(context.Background(), userID, from, to)
+	got, err := NewDonnaEventOccurrenceProvider(repo, nil).ListOccurrences(context.Background(), userID, from, to)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -147,7 +147,7 @@ func TestDonnaEventOccurrenceProviderOneTimeAndRange(t *testing.T) {
 	}
 
 	// Outside range → empty after expansion filter.
-	out, err := NewDonnaEventOccurrenceProvider(repo).ListOccurrences(
+	out, err := NewDonnaEventOccurrenceProvider(repo, nil).ListOccurrences(
 		context.Background(), userID,
 		time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC),
 		time.Date(2026, 9, 2, 0, 0, 0, 0, time.UTC),
@@ -177,7 +177,7 @@ func TestDonnaEventOccurrenceProviderRecurring(t *testing.T) {
 		Status:         constant.DonnaEventStatusConfirmed,
 	}}}
 
-	got, err := NewDonnaEventOccurrenceProvider(repo).ListOccurrences(context.Background(), userID, from, to)
+	got, err := NewDonnaEventOccurrenceProvider(repo, nil).ListOccurrences(context.Background(), userID, from, to)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestDonnaEventOccurrenceProviderInvalidRecurrence(t *testing.T) {
 		Status:         constant.DonnaEventStatusConfirmed,
 	}}}
 
-	_, err := NewDonnaEventOccurrenceProvider(repo).ListOccurrences(context.Background(), userID, from, to)
+	_, err := NewDonnaEventOccurrenceProvider(repo, nil).ListOccurrences(context.Background(), userID, from, to)
 	if !errors.Is(err, apperr.ErrValidation) {
 		t.Fatalf("err = %v, want ErrValidation", err)
 	}
@@ -229,7 +229,7 @@ func TestDonnaReminderOccurrenceProvider(t *testing.T) {
 			TriggerAt: trigger, Timezone: "UTC",
 			Status: constant.DonnaReminderStatusScheduled,
 		}}}
-		got, err := NewDonnaReminderOccurrenceProvider(repo).ListOccurrences(context.Background(), userID, from, to)
+		got, err := NewDonnaReminderOccurrenceProvider(repo, nil).ListOccurrences(context.Background(), userID, from, to)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -252,7 +252,7 @@ func TestDonnaReminderOccurrenceProvider(t *testing.T) {
 			Status:         constant.DonnaReminderStatusScheduled,
 		}}}
 		windowTo := time.Date(2026, 8, 4, 0, 0, 0, 0, time.UTC)
-		got, err := NewDonnaReminderOccurrenceProvider(repo).ListOccurrences(context.Background(), userID, from, windowTo)
+		got, err := NewDonnaReminderOccurrenceProvider(repo, nil).ListOccurrences(context.Background(), userID, from, windowTo)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -263,7 +263,7 @@ func TestDonnaReminderOccurrenceProvider(t *testing.T) {
 
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
-		got, err := NewDonnaReminderOccurrenceProvider(&memDonnaReminders{}).ListOccurrences(context.Background(), userID, from, to)
+		got, err := NewDonnaReminderOccurrenceProvider(&memDonnaReminders{}, nil).ListOccurrences(context.Background(), userID, from, to)
 		if err != nil || len(got) != 0 {
 			t.Fatalf("got %v %v", got, err)
 		}
@@ -276,13 +276,13 @@ func TestNilReadersReturnEmpty(t *testing.T) {
 	from := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
 	to := from.Add(24 * time.Hour)
 
-	if got, err := NewGoogleOccurrenceProvider(nil).ListOccurrences(context.Background(), userID, from, to); err != nil || got != nil {
+	if got, err := NewGoogleOccurrenceProvider(nil, nil).ListOccurrences(context.Background(), userID, from, to); err != nil || got != nil {
 		t.Fatalf("google nil: %v %v", got, err)
 	}
-	if got, err := NewDonnaEventOccurrenceProvider(nil).ListOccurrences(context.Background(), userID, from, to); err != nil || got != nil {
+	if got, err := NewDonnaEventOccurrenceProvider(nil, nil).ListOccurrences(context.Background(), userID, from, to); err != nil || got != nil {
 		t.Fatalf("donna event nil: %v %v", got, err)
 	}
-	if got, err := NewDonnaReminderOccurrenceProvider(nil).ListOccurrences(context.Background(), userID, from, to); err != nil || got != nil {
+	if got, err := NewDonnaReminderOccurrenceProvider(nil, nil).ListOccurrences(context.Background(), userID, from, to); err != nil || got != nil {
 		t.Fatalf("donna reminder nil: %v %v", got, err)
 	}
 }

@@ -10,6 +10,8 @@ import (
 )
 
 // MicrosoftICSOccurrenceProvider maps Microsoft Graph + ICS events into Occurrences.
+// Product OccurrenceService wiring uses SharedCalendarOccurrenceProvider (Sprint 1B).
+// This type remains for tests and for a future MS-enabled ActiveCalendarOccurrenceProviders list.
 type MicrosoftICSOccurrenceProvider struct {
 	events CalendarEventReader
 }

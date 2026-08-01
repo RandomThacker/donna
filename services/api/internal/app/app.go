@@ -109,12 +109,17 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 			business.NewDonnaReminderTimelineProvider(donnaReminderRepo),
 		},
 	})
+	notificationLog := logFactory.Module(constant.ModuleNotification)
 	occurrenceSvc := occurrence.NewService(occurrence.ServiceDeps{
 		Providers: []occurrence.Provider{
-			occurrenceprovider.NewGoogleOccurrenceProvider(calendarEventsRepo),
-			occurrenceprovider.NewMicrosoftICSOccurrenceProvider(calendarEventsRepo),
-			occurrenceprovider.NewDonnaEventOccurrenceProvider(donnaEventRepo),
-			occurrenceprovider.NewDonnaReminderOccurrenceProvider(donnaReminderRepo),
+			// Sprint 1B: one calendar_events query for all active calendar providers.
+			occurrenceprovider.NewSharedCalendarOccurrenceProvider(
+				calendarEventsRepo,
+				occurrenceprovider.ActiveCalendarOccurrenceProviders,
+				notificationLog,
+			),
+			occurrenceprovider.NewDonnaEventOccurrenceProvider(donnaEventRepo, notificationLog),
+			occurrenceprovider.NewDonnaReminderOccurrenceProvider(donnaReminderRepo, notificationLog),
 		},
 	})
 	notificationRepo := repository.NewNotificationRepository(pool)
@@ -164,7 +169,6 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		timelineLog,
 	)
 
-	notificationLog := logFactory.Module(constant.ModuleNotification)
 	notificationHandler := handler.NewNotificationHandler(
 		actionRegistry.GetNotifications,
 		actionRegistry.MarkNotificationRead,

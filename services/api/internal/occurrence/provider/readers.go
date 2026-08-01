@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// CalendarEventReader is the calendar-event read surface Occurrence providers need.
+// CalendarEventReader is the wide calendar-event read surface (Timeline / Microsoft ICS).
 type CalendarEventReader interface {
 	ListByUserInRangeWithProvider(
 		ctx context.Context,
@@ -17,7 +17,25 @@ type CalendarEventReader interface {
 	) ([]entity.CalendarEventWithProvider, error)
 }
 
-// DonnaEventReader is the Donna-event read surface Occurrence providers need.
+// CalendarEventSchedulerReader is the narrow calendar read surface for Occurrence scheduling.
+type CalendarEventSchedulerReader interface {
+	ListForSchedulerByUserInRange(
+		ctx context.Context,
+		userID uuid.UUID,
+		from, to time.Time,
+		providers []string,
+	) ([]entity.CalendarEventWithProvider, error)
+	// ListCalendarOccurrences is the Sprint 1B shared calendar Occurrence read
+	// (same projection as ListForSchedulerByUserInRange).
+	ListCalendarOccurrences(
+		ctx context.Context,
+		userID uuid.UUID,
+		from, to time.Time,
+		providers []string,
+	) ([]entity.CalendarEventWithProvider, error)
+}
+
+// DonnaEventReader is the wide Donna-event read surface (Timeline).
 type DonnaEventReader interface {
 	ListByUserInRange(
 		ctx context.Context,
@@ -26,9 +44,27 @@ type DonnaEventReader interface {
 	) ([]entity.DonnaEvent, error)
 }
 
-// DonnaReminderReader is the Donna-reminder read surface Occurrence providers need.
+// DonnaEventSchedulerReader is the narrow Donna-event read surface for Occurrence scheduling.
+type DonnaEventSchedulerReader interface {
+	ListForSchedulerByUserInRange(
+		ctx context.Context,
+		userID uuid.UUID,
+		from, to time.Time,
+	) ([]entity.DonnaEvent, error)
+}
+
+// DonnaReminderReader is the wide Donna-reminder read surface (Timeline).
 type DonnaReminderReader interface {
 	ListByUserInRange(
+		ctx context.Context,
+		userID uuid.UUID,
+		from, to time.Time,
+	) ([]entity.DonnaReminder, error)
+}
+
+// DonnaReminderSchedulerReader is the narrow Donna-reminder read surface for Occurrence scheduling.
+type DonnaReminderSchedulerReader interface {
+	ListForSchedulerByUserInRange(
 		ctx context.Context,
 		userID uuid.UUID,
 		from, to time.Time,

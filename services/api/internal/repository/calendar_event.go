@@ -148,6 +148,21 @@ type CalendarEventRepository interface {
 	GetBySourceAndProviderEvent(ctx context.Context, sourceID uuid.UUID, providerEventID string) (entity.CalendarEvent, error)
 	ListByUserInRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEvent, error)
 	ListByUserInRangeWithProvider(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEventWithProvider, error)
+	// ListForSchedulerByUserInRange returns a narrow projection for Occurrence scheduling.
+	// providers filters connected_accounts.provider (e.g. ["google"]).
+	ListForSchedulerByUserInRange(
+		ctx context.Context,
+		userID uuid.UUID,
+		from, to time.Time,
+		providers []string,
+	) ([]entity.CalendarEventWithProvider, error)
+	// ListCalendarOccurrences is the Sprint 1B alias for the shared calendar Occurrence query.
+	ListCalendarOccurrences(
+		ctx context.Context,
+		userID uuid.UUID,
+		from, to time.Time,
+		providers []string,
+	) ([]entity.CalendarEventWithProvider, error)
 	UpdateFromSync(ctx context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error)
 	SoftDeleteByProviderEventID(ctx context.Context, sourceID uuid.UUID, providerEventID string, deletedAt time.Time) (entity.CalendarEvent, error)
 	SoftDeleteMissing(ctx context.Context, sourceID uuid.UUID, keepProviderIDs []string, deletedAt time.Time) (int64, error)
@@ -258,6 +273,34 @@ func (r *calendarEventRepository) ListByUserInRangeWithProvider(
 	}
 	defer rows.Close()
 	return collectCalendarEventsWithProvider(rows)
+}
+
+func (r *calendarEventRepository) ListForSchedulerByUserInRange(
+	ctx context.Context,
+	userID uuid.UUID,
+	from, to time.Time,
+	providers []string,
+) ([]entity.CalendarEventWithProvider, error) {
+	if providers == nil {
+		providers = []string{}
+	}
+	rows, err := r.q.Query(ctx, sqlSelectCalendarEventsForScheduler, userID, from, to, providers)
+	if err != nil {
+		return nil, fmt.Errorf("list calendar events for scheduler: %w", err)
+	}
+	defer rows.Close()
+	return collectCalendarEventsForScheduler(rows)
+}
+
+// ListCalendarOccurrences runs one narrow calendar_events query for the given
+// provider filters (Sprint 1B shared Occurrence path).
+func (r *calendarEventRepository) ListCalendarOccurrences(
+	ctx context.Context,
+	userID uuid.UUID,
+	from, to time.Time,
+	providers []string,
+) ([]entity.CalendarEventWithProvider, error) {
+	return r.ListForSchedulerByUserInRange(ctx, userID, from, to, providers)
 }
 
 func (r *calendarEventRepository) UpdateFromSync(ctx context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error) {
@@ -390,6 +433,18 @@ func collectCalendarEventsWithProvider(rows pgx.Rows) ([]entity.CalendarEventWit
 	return out, rows.Err()
 }
 
+func collectCalendarEventsForScheduler(rows pgx.Rows) ([]entity.CalendarEventWithProvider, error) {
+	out := make([]entity.CalendarEventWithProvider, 0)
+	for rows.Next() {
+		item, err := scanCalendarEventForScheduler(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
+}
+
 func scanCalendarEvent(row scannable) (entity.CalendarEvent, error) {
 	var e entity.CalendarEvent
 	err := row.Scan(
@@ -464,5 +519,33 @@ func scanCalendarEventWithProvider(row scannable) (entity.CalendarEventWithProvi
 		Event:       e,
 		Provider:    provider,
 		SourceColor: sourceColor,
+	}, nil
+}
+
+func scanCalendarEventForScheduler(row scannable) (entity.CalendarEventWithProvider, error) {
+	var e entity.CalendarEvent
+	var provider string
+	err := row.Scan(
+		&e.ID,
+		&e.PublicID,
+		&e.UserID,
+		&e.CalendarSourceID,
+		&e.Title,
+		&e.Description,
+		&e.Location,
+		&e.StartsAt,
+		&e.EndsAt,
+		&e.Status,
+		&e.Timezone,
+		&e.ProviderEventID,
+		&e.Origin,
+		&provider,
+	)
+	if err != nil {
+		return entity.CalendarEventWithProvider{}, err
+	}
+	return entity.CalendarEventWithProvider{
+		Event:    e,
+		Provider: provider,
 	}, nil
 }
