@@ -3,6 +3,7 @@ package business
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"strings"
 	"time"
 
@@ -255,14 +256,26 @@ func wantsChatChannel(n entity.Notification) bool {
 func notificationChatText(n entity.Notification) string {
 	title := strings.TrimSpace(n.Title)
 	body := strings.TrimSpace(n.Body)
+	var text string
 	switch {
 	case title != "" && body != "" && !strings.EqualFold(title, body):
-		return title + "\n" + body
+		text = title + "\n" + body
 	case title != "":
-		return title
+		text = title
 	default:
-		return body
+		text = body
 	}
+	if n.OccurrenceID != nil {
+		occ := strings.TrimSpace(*n.OccurrenceID)
+		if occ != "" {
+			href := constant.NotificationCalendarEventPath + url.QueryEscape(occ)
+			if text != "" {
+				text += "\n\n"
+			}
+			text += "[View Event](" + href + ")"
+		}
+	}
+	return text
 }
 
 func notificationChatClientMessageID(n entity.Notification) string {

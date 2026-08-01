@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { Icon } from "@/components/common";
 import { useChatSession } from "@/features/chat/Chat.logic";
@@ -13,6 +14,7 @@ import { cn } from "@/lib/cn";
 
 import type { IMessageBubble } from "../../Dashboard.types";
 import { BubbleTail } from "./BubbleTail";
+import { ChatBubbleText } from "./ChatBubbleText";
 import { iMessageStyles as styles } from "./DashboardPhone.styles";
 import type { IMessageChatProps } from "./DashboardPhone.types";
 
@@ -60,6 +62,7 @@ export function IMessageChat({
   initialDraft = "",
   showBack = true,
 }: IMessageChatProps) {
+  const router = useRouter();
   const session = useChatSession(live ? initialDraft : "", {
     enabled: live,
     unreadOnOpen: live ? conversation.unread : 0,
@@ -248,7 +251,19 @@ export function IMessageChat({
                             : styles.bubbleOutMiddle,
                       )}
                     >
-                      <span className={styles.bubbleText}>{message.text}</span>
+                      <ChatBubbleText
+                        text={message.text}
+                        className={styles.bubbleText}
+                        linkClassName={
+                          incoming
+                            ? "text-[var(--im-blue)]"
+                            : "text-white underline-offset-2"
+                        }
+                        onViewEvent={(href) => {
+                          onClose?.();
+                          router.push(href);
+                        }}
+                      />
                       {timeLabel ? (
                         <span
                           className={cn(

@@ -216,7 +216,7 @@ func buildNotificationPayload(item entity.TimelineItem, occurrenceID string) (js
 		"startAt":        item.StartAt.UTC().Format(time.RFC3339Nano),
 		"endAt":          item.EndAt.UTC().Format(time.RFC3339Nano),
 		"timezone":       item.Timezone,
-		"deepLink":       constant.NotificationDeepLinkPath + occurrenceID,
+		"deepLink":       constant.NotificationDeepLinkPath,
 	}
 	if item.ParentID != nil {
 		payload["parentId"] = *item.ParentID

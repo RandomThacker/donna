@@ -212,6 +212,11 @@ async function showBrowserNotification(body: string): Promise<void> {
   if (!document.hidden && liveChatOpen) return;
 
   const title = "Donna";
+  const landing =
+    typeof navigator !== "undefined" &&
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+      ? "/dashboard/chat"
+      : "/dashboard";
   const options: NotificationOptions & { sound?: string; renotify?: boolean } = {
     body: body.trim() || "New message",
     icon: "/icons/icon-192.png",
@@ -220,7 +225,7 @@ async function showBrowserNotification(body: string): Promise<void> {
     silent: false,
     // Chrome Android may honor this; iOS uses the system sound instead.
     sound: SOUND.notify,
-    data: { url: "/dashboard" },
+    data: { url: landing },
   };
 
   try {
@@ -238,6 +243,7 @@ async function showBrowserNotification(body: string): Promise<void> {
     note.onclick = () => {
       window.focus();
       note.close();
+      window.location.assign(landing);
     };
   } catch {
     // Notification constructor can throw on some platforms — ignore.

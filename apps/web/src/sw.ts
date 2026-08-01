@@ -30,6 +30,15 @@ type PushPayload = {
   notificationId?: string;
 };
 
+function isMobileUserAgent(): boolean {
+  return /Android|iPhone|iPad|iPod|Mobile/i.test(self.navigator.userAgent);
+}
+
+/** Desktop → home; mobile → chat. Event deep-links live in the chat "View Event" line. */
+function landingPathForNotification(): string {
+  return isMobileUserAgent() ? "/dashboard/chat" : "/dashboard";
+}
+
 self.addEventListener("push", (event) => {
   event.waitUntil(
     (async () => {
@@ -51,12 +60,7 @@ self.addEventListener("push", (event) => {
 
       const title = payload.title?.trim() || "Donna";
       const body = payload.body?.trim() || "You have a new notification";
-      let url = "/dashboard/notifications";
-      if (typeof payload.deepLink === "string" && payload.deepLink.startsWith("/")) {
-        url = payload.deepLink;
-      } else if (payload.occurrenceId) {
-        url = `/dashboard/calendar?event=${encodeURIComponent(payload.occurrenceId)}`;
-      }
+      const url = landingPathForNotification();
 
       const options: NotificationOptions & { renotify?: boolean } = {
         body,
@@ -64,7 +68,10 @@ self.addEventListener("push", (event) => {
         badge: "/icons/icon-192.png",
         tag: payload.notificationId || "donna-notification",
         renotify: true,
-        data: { url },
+        data: {
+          url,
+          occurrenceId: payload.occurrenceId,
+        },
       };
       await self.registration.showNotification(title, options);
     })(),
@@ -77,7 +84,7 @@ self.addEventListener("notificationclick", (event) => {
   const target =
     typeof raw?.url === "string" && raw.url.startsWith("/")
       ? raw.url
-      : "/dashboard";
+      : landingPathForNotification();
 
   event.waitUntil(
     (async () => {

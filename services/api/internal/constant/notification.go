@@ -48,9 +48,15 @@ var DefaultDeliveryChannels = []string{
 	DeliveryChannelWebPush,
 }
 
-// NotificationDeepLinkPath is the in-app path opened from a Web Push click.
-// Occurrence id is appended by callers / PayloadFromNotification.
-const NotificationDeepLinkPath = "/dashboard/calendar?event="
+// NotificationDeepLinkPath is the default in-app path for Web Push clicks (desktop).
+// Mobile clients open chat instead (handled in the service worker).
+const NotificationDeepLinkPath = "/dashboard"
+
+// NotificationChatLandingPath is where mobile push taps should land.
+const NotificationChatLandingPath = "/dashboard/chat"
+
+// NotificationCalendarEventPath prefixes occurrence ids for "View Event" chat links.
+const NotificationCalendarEventPath = "/dashboard/calendar?event="
 
 // NotificationDispatcherBatchLimit caps due notifications processed per tick.
 const NotificationDispatcherBatchLimit = 100

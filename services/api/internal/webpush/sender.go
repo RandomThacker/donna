@@ -101,11 +101,11 @@ func PayloadFromNotification(n entity.Notification) Payload {
 		Title:          n.Title,
 		Body:           n.Body,
 		NotificationID: n.ID.String(),
-		DeepLink:       constant.NotificationDeepLinkPath,
+		// Push taps land on home (desktop) or chat (mobile) — see service worker.
+		DeepLink: constant.NotificationDeepLinkPath,
 	}
 	if n.OccurrenceID != nil {
 		p.OccurrenceID = *n.OccurrenceID
-		p.DeepLink = constant.NotificationDeepLinkPath + *n.OccurrenceID
 	}
 	if n.NotificationType != nil {
 		p.TimelineType = *n.NotificationType
@@ -122,14 +122,8 @@ func PayloadFromNotification(n entity.Notification) Payload {
 			if v, ok := raw["startAt"].(string); ok {
 				p.StartTime = v
 			}
-			if v, ok := raw["deepLink"].(string); ok && v != "" {
-				p.DeepLink = v
-			}
 			if v, ok := raw["occurrenceId"].(string); ok && p.OccurrenceID == "" {
 				p.OccurrenceID = v
-				if p.DeepLink == constant.NotificationDeepLinkPath {
-					p.DeepLink = constant.NotificationDeepLinkPath + v
-				}
 			}
 		}
 	}
