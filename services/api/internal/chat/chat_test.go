@@ -84,13 +84,31 @@ func TestRuleBasedParserGreeting(t *testing.T) {
 		"hi",
 		"Hello!",
 		"hey donna",
-		"good morning",
 		"What's up",
 		"yo",
 	} {
 		got := parseWith(t, input, "UTC", now)
 		if got.Kind != chat.IntentGreeting {
 			t.Fatalf("%q => %s want GREETING", input, got.Kind)
+		}
+	}
+}
+
+func TestRuleBasedParserPeriodGreetings(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	cases := map[string]chat.IntentKind{
+		"good morning":     chat.IntentMorningGreeting,
+		"Morning greeting": chat.IntentMorningGreeting,
+		"good evening":     chat.IntentEveningGreeting,
+		"How was my day":   chat.IntentEveningGreeting,
+		"good night":       chat.IntentGoodNightGreeting,
+		"Night greeting":   chat.IntentGoodNightGreeting,
+	}
+	for input, want := range cases {
+		got := parseWith(t, input, "UTC", now)
+		if got.Kind != want {
+			t.Fatalf("%q => %s want %s", input, got.Kind, want)
 		}
 	}
 }

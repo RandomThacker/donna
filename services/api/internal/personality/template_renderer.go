@@ -72,7 +72,13 @@ func (r *TemplateRenderer) Render(ctx context.Context, input RenderInput) (Rende
 func (r *TemplateRenderer) renderKind(def Definition, kind Kind, vars map[string]string, canonical string) string {
 	switch kind {
 	case KindGreeting:
-		return vars["greeting"]
+		return joinNonEmpty(vars["greeting"], vars["punchline"])
+	case KindMorningGreeting:
+		return fill(pick(def.MorningGreetings, "Good morning, {name}.\n{punchline}"), vars)
+	case KindEveningGreeting:
+		return fill(pick(def.EveningGreetings, "Good evening, {name}. How was your day?"), vars)
+	case KindGoodNight:
+		return fill(pick(def.GoodNightGreetings, "Good night, {name}.\n{punchline}"), vars)
 	case KindReminder:
 		return fill(pick(def.Reminders, "{canonical}"), vars)
 	case KindNotification:
@@ -160,17 +166,30 @@ func (r *TemplateRenderer) buildVars(profile Profile, def Definition, now time.T
 
 	greetingTpl := pick(def.Greetings[period], "Hello, {name}.")
 	emoji := pickEmoji(def, profile.EmojiLevel)
+	punchline := pick(def.Punchlines, "")
 
 	vars := map[string]string{
-		"name":       name,
-		"nickname":   nickname,
-		"canonical":  canonical,
-		"period":     period,
-		"emoji":      emoji,
-		"greeting":   "", // filled below after recursive-safe fill
+		"name":      name,
+		"nickname":  nickname,
+		"canonical": canonical,
+		"period":    period,
+		"emoji":     emoji,
+		"punchline": "",
+		"greeting":  "", // filled below after recursive-safe fill
 	}
+	vars["punchline"] = fill(punchline, vars)
 	vars["greeting"] = fill(greetingTpl, vars)
 	return vars
+}
+
+func joinNonEmpty(parts ...string) string {
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if t := strings.TrimSpace(p); t != "" {
+			out = append(out, t)
+		}
+	}
+	return strings.Join(out, "\n")
 }
 
 // DefaultProfile returns Professional defaults for a user.

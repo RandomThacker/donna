@@ -21,7 +21,11 @@ type yamlFile struct {
 	EncouragementLevelDefault string              `yaml:"encouragement_level_default"`
 	ResponseStyleDefault      string              `yaml:"response_style_default"`
 	FallbackNicknames         []string            `yaml:"fallback_nicknames"`
+	Punchlines                []string            `yaml:"punchlines"`
 	Greetings                 map[string][]string `yaml:"greetings"`
+	MorningGreetings          []string            `yaml:"morning_greetings"`
+	EveningGreetings          []string            `yaml:"evening_greetings"`
+	GoodNightGreetings        []string            `yaml:"goodnight_greetings"`
 	Acknowledgements          []string            `yaml:"acknowledgements"`
 	TaskComplete              []string            `yaml:"task_complete"`
 	Errors                    []string            `yaml:"errors"`
@@ -105,7 +109,11 @@ func definitionFromYAML(f yamlFile) (Definition, error) {
 		EncouragementLevelDefault: normalizeLevel(f.EncouragementLevelDefault, LevelLow),
 		ResponseStyleDefault:      strings.TrimSpace(f.ResponseStyleDefault),
 		FallbackNicknames:         trimList(f.FallbackNicknames),
+		Punchlines:                trimList(f.Punchlines),
 		Greetings:                 f.Greetings,
+		MorningGreetings:          trimList(f.MorningGreetings),
+		EveningGreetings:          trimList(f.EveningGreetings),
+		GoodNightGreetings:        trimList(f.GoodNightGreetings),
 		Acknowledgements:          trimList(f.Acknowledgements),
 		TaskComplete:              trimList(f.TaskComplete),
 		Errors:                    trimList(f.Errors),

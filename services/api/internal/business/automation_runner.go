@@ -149,6 +149,8 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 	cmdResults := make([]AutomationCommandRunResult, 0, len(auto.Commands))
 	success, failed, skipped := 0, 0, 0
 	greetingOnly := false
+	greetingKind := personality.KindGreeting
+	periodGreetingInParts := false
 	order := 0
 
 	for _, structured := range auto.Commands {
@@ -158,7 +160,8 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 		status := constant.AutomationCommandSuccess
 		errText := ""
 		reply := ""
-		isGreeting := strings.EqualFold(strings.TrimSpace(structured.Command), constant.AutomationCommandGreeting)
+		cmdKey := strings.ToLower(strings.TrimSpace(structured.Command))
+		greetKind, isGreetCmd := automationGreetingKind(cmdKey)
 
 		if resolveErr != nil {
 			status = constant.AutomationCommandFailed
@@ -179,10 +182,23 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 			if errText != "" {
 				status = constant.AutomationCommandFailed
 				failed++
-			} else if reply == "" && isGreeting {
-				// Greeting body comes from the personality renderer on the combined reply.
+			} else if reply == "" && isGreetCmd {
 				success++
-				greetingOnly = greetingOnly || len(parts) == 0
+				if greetKind != personality.KindGreeting {
+					// Morning / evening / good night — bake personality text into the run body.
+					if text := r.renderGreeting(ctx, auto, greetKind, now); text != "" {
+						parts = append(parts, text)
+						reply = text
+						periodGreetingInParts = true
+						greetingOnly = false
+					} else {
+						greetingKind = greetKind
+						greetingOnly = greetingOnly || len(parts) == 0
+					}
+				} else {
+					greetingKind = personality.KindGreeting
+					greetingOnly = greetingOnly || len(parts) == 0
+				}
 			} else if reply == "" {
 				status = constant.AutomationCommandSkipped
 				skipped++
@@ -231,24 +247,38 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 
 	combined := strings.TrimSpace(strings.Join(parts, "\n\n"))
 	if r.personality != nil {
-		kind := personality.KindAutomation
 		switch {
+		case periodGreetingInParts:
+			// Period greetings are already personalized; keep joined body as-is.
+			if combined == "" {
+				combined = "I'm here — nothing to report just yet."
+			}
 		case greetingOnly && combined == "":
-			kind = personality.KindGreeting
-		case strings.Contains(strings.ToLower(auto.Name), "morning"):
-			kind = personality.KindMorningBrief
-		}
-		if combined == "" && kind != personality.KindGreeting {
-			combined = "I'm here — nothing to report just yet."
-		}
-		if rendered, err := r.personality.Render(ctx, personality.RenderInput{
-			UserID:    auto.UserID,
-			Canonical: combined,
-			Kind:      kind,
-			Now:       now,
-			Timezone:  auto.Timezone,
-		}); err == nil && strings.TrimSpace(rendered.Text) != "" {
-			combined = strings.TrimSpace(rendered.Text)
+			if rendered, err := r.personality.Render(ctx, personality.RenderInput{
+				UserID:   auto.UserID,
+				Kind:     greetingKind,
+				Now:      now,
+				Timezone: auto.Timezone,
+			}); err == nil && strings.TrimSpace(rendered.Text) != "" {
+				combined = strings.TrimSpace(rendered.Text)
+			}
+		default:
+			kind := personality.KindAutomation
+			if strings.Contains(strings.ToLower(auto.Name), "morning") {
+				kind = personality.KindMorningBrief
+			}
+			if combined == "" {
+				combined = "I'm here — nothing to report just yet."
+			}
+			if rendered, err := r.personality.Render(ctx, personality.RenderInput{
+				UserID:    auto.UserID,
+				Canonical: combined,
+				Kind:      kind,
+				Now:       now,
+				Timezone:  auto.Timezone,
+			}); err == nil && strings.TrimSpace(rendered.Text) != "" {
+				combined = strings.TrimSpace(rendered.Text)
+			}
 		}
 	} else if combined == "" {
 		combined = "I'm here — nothing to report just yet."
@@ -443,4 +473,40 @@ func truncatePushBody(text string) string {
 	}
 	runes := []rune(trimmed)
 	return strings.TrimSpace(string(runes[:automationPushBodyMaxRunes-1])) + "…"
+}
+
+func automationGreetingKind(commandKey string) (personality.Kind, bool) {
+	switch commandKey {
+	case constant.AutomationCommandGreeting:
+		return personality.KindGreeting, true
+	case constant.AutomationCommandMorningGreeting:
+		return personality.KindMorningGreeting, true
+	case constant.AutomationCommandEveningGreeting:
+		return personality.KindEveningGreeting, true
+	case constant.AutomationCommandGoodNight:
+		return personality.KindGoodNight, true
+	default:
+		return "", false
+	}
+}
+
+func (r *AutomationRunner) renderGreeting(
+	ctx context.Context,
+	auto entity.Automation,
+	kind personality.Kind,
+	now time.Time,
+) string {
+	if r == nil || r.personality == nil {
+		return ""
+	}
+	out, err := r.personality.Render(ctx, personality.RenderInput{
+		UserID:   auto.UserID,
+		Kind:     kind,
+		Now:      now,
+		Timezone: auto.Timezone,
+	})
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(out.Text)
 }

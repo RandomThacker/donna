@@ -86,18 +86,24 @@ const (
 
 // Structured automation command keys.
 const (
-	AutomationCommandGreeting     = "greeting"
-	AutomationCommandTodaysAgenda = "todays_agenda"
-	AutomationCommandTasksDue     = "tasks_due"
-	AutomationCommandChatMessage  = "chat_message"
+	AutomationCommandGreeting         = "greeting"
+	AutomationCommandMorningGreeting  = "morning_greeting"
+	AutomationCommandEveningGreeting  = "evening_greeting"
+	AutomationCommandGoodNight        = "goodnight_greeting"
+	AutomationCommandTodaysAgenda     = "todays_agenda"
+	AutomationCommandTasksDue         = "tasks_due"
+	AutomationCommandChatMessage      = "chat_message"
 )
 
-// AllowedAutomationCommands is the Phase 1.6 whitelist.
+// AllowedAutomationCommands is the Phase 1.6+ whitelist.
 var AllowedAutomationCommands = map[string]struct{}{
-	AutomationCommandGreeting:     {},
-	AutomationCommandTodaysAgenda: {},
-	AutomationCommandTasksDue:     {},
-	AutomationCommandChatMessage:  {},
+	AutomationCommandGreeting:        {},
+	AutomationCommandMorningGreeting: {},
+	AutomationCommandEveningGreeting: {},
+	AutomationCommandGoodNight:       {},
+	AutomationCommandTodaysAgenda:    {},
+	AutomationCommandTasksDue:        {},
+	AutomationCommandChatMessage:     {},
 }
 
 // Automation scheduler timing.

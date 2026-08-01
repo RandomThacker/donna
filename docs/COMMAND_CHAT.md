@@ -40,7 +40,10 @@ chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
 
 | Say | Intent |
 | --- | --- |
-| Hi / Hello / Good morning | `GREETING` |
+| Hi / Hello / Hey Donna | `GREETING` |
+| Good morning / Morning greeting | `MORNING_GREETING` |
+| Good evening / Evening greeting / How was my day | `EVENING_GREETING` |
+| Good night / Night greeting | `GOOD_NIGHT_GREETING` |
 | Add task Finish API | `CREATE_TASK` |
 | Complete task Finish API | `COMPLETE_TASK` |
 | Remind me tomorrow at 6 PM | `CREATE_REMINDER` |
@@ -48,6 +51,8 @@ chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
 | What do I have today? | `QUERY_TODAY` |
 | What do I have tomorrow? | `QUERY_TOMORROW` |
 | What's due today? | `QUERY_DUE_TODAY` |
+
+The Commands tab also lists automation templates (Morning Brief, Task Review, Evening Review, …) with the same phrases so you can try them manually.
 
 Everything else → help reply. Expand only after these feel effortless.
 

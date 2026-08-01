@@ -21,6 +21,12 @@ func ResolveAutomationCommand(cmd entity.AutomationCommand) (message, label stri
 	switch key {
 	case constant.AutomationCommandGreeting:
 		return "Hi", "Greeting", nil
+	case constant.AutomationCommandMorningGreeting:
+		return "Good morning", "Morning greeting", nil
+	case constant.AutomationCommandEveningGreeting:
+		return "Evening greeting", "Evening greeting", nil
+	case constant.AutomationCommandGoodNight:
+		return "Good night", "Good night", nil
 	case constant.AutomationCommandTodaysAgenda:
 		rng := strings.ToLower(strings.TrimSpace(vars["range"]))
 		if rng == "" {

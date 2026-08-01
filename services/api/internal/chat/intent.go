@@ -18,9 +18,12 @@ const (
 	IntentCreateEvent    IntentKind = "CREATE_EVENT"
 	IntentQueryToday     IntentKind = "QUERY_TODAY"
 	IntentQueryTomorrow  IntentKind = "QUERY_TOMORROW"
-	IntentQueryDueToday  IntentKind = "QUERY_DUE_TODAY"
-	IntentGreeting       IntentKind = "GREETING"
-	IntentUnknown        IntentKind = "UNKNOWN"
+	IntentQueryDueToday      IntentKind = "QUERY_DUE_TODAY"
+	IntentGreeting           IntentKind = "GREETING"
+	IntentMorningGreeting    IntentKind = "MORNING_GREETING"
+	IntentEveningGreeting    IntentKind = "EVENING_GREETING"
+	IntentGoodNightGreeting  IntentKind = "GOOD_NIGHT_GREETING"
+	IntentUnknown            IntentKind = "UNKNOWN"
 )
 
 // Intent is the parser output — transport-agnostic.

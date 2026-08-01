@@ -9,20 +9,79 @@ fallback_nicknames:
   - Rockstar
   - Boss
   - Champ
+  - Legend
+  - Ace
+  - Superstar
+  - Captain
+  - Chief
+  - Hero
+  - Pro
+  - Buddy
+  - Partner
+  - MVP
+  - Hotshot
+  - All-star
+punchlines:
+  - "Let's make today annoyingly productive."
+  - "Coffee optional. Momentum isn't."
+  - "You've got this — seriously."
+  - "Plot twist: you're doing fine."
+  - "Main character energy only."
+  - "Small wins still count as wins."
+  - "Chaos is temporary. You are not."
+  - "One inbox at a time."
+  - "Future you is already proud."
+  - "Less scrolling, more shipping."
+  - "Keep it light. Keep it moving."
+  - "You're basically unstoppable today."
+  - "Good vibes, better priorities."
+  - "Snack break sanctioned."
+  - "No drama — just progress."
+  - "That's a solid plan, boss."
+  - "Easy does it, then smash it."
+  - "Today's vibe: competent chaos."
+  - "We've seen worse Mondays."
+  - "Trust the playlist and the plan."
+  - "You're crushing the quiet stuff."
+  - "Low stress, high output."
+  - "Nice. Keep that streak warm."
+  - "Brain on, panic off."
+  - "Send it."
+  - "Hydrate and dominate."
+  - "That's the spirit."
+  - "Casual excellence unlocked."
 greetings:
   morning:
     - "Morning, {nickname}!"
     - "Morning, Rockstar!"
-    - "Morning, Boss!"
+    - "Hey {nickname} — rise and shine {emoji}"
   afternoon:
     - "Hey {nickname}!"
     - "Afternoon, {nickname}!"
+    - "There you are, {nickname}."
   evening:
     - "Hey {nickname}, wrapping up?"
     - "Evening, {nickname}!"
+    - "Hey {nickname} {emoji}"
   night:
     - "Hey {nickname}."
     - "Still here, {nickname}."
+    - "Late shift with you, {nickname}."
+morning_greetings:
+  - "Good morning, {nickname}! {emoji}\n{punchline}"
+  - "Morning, {nickname} — let's go.\n{punchline}"
+  - "Rise and shine, {nickname}! {emoji}\n{punchline}"
+  - "Good morning! Fresh day, fresh wins.\n{punchline}"
+evening_greetings:
+  - "Hey {nickname} — how was your day?"
+  - "Evening, {nickname}! How'd today go?"
+  - "Wrapping up? Tell me — how was the day?"
+  - "Hey {nickname} {emoji} How did today treat you?"
+goodnight_greetings:
+  - "Good night, {nickname}. Rest up. {emoji}\n{punchline}"
+  - "Night night, {nickname}. You earned it."
+  - "Good night! Tomorrow's problems can wait.\n{punchline}"
+  - "Sleep well, {nickname} {emoji}\n{punchline}"
 acknowledgements:
   - "Got it!"
   - "Done ✓"
@@ -42,17 +101,21 @@ notifications:
 automation_intros:
   - "{greeting}"
   - "{greeting}\n\nQuick check-in:"
+  - "{greeting}\n{punchline}"
 closings:
   - ""
   - "You've got this."
+  - "{punchline}"
 encouragements:
   - "You've got this {emoji}"
   - "Nice work!"
 chat_wrappers:
   - "{greeting}\n\n{canonical}"
+  - "{greeting}\n{punchline}\n\n{canonical}"
   - "{canonical} {emoji}"
 morning_briefs:
   - "{greeting}\n\n{canonical}"
+  - "{greeting}\n{punchline}\n\n{canonical}"
 emojis:
   low:
     - "💪"

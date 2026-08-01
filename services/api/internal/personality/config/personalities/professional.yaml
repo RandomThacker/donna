@@ -5,16 +5,77 @@ emoji_level_default: none
 humor_level_default: none
 encouragement_level_default: low
 response_style_default: concise
-fallback_nicknames: []
+fallback_nicknames:
+  - Friend
+  - Partner
+  - Lead
+  - Ace
+  - Pro
+  - Champ
+  - Star
+  - Captain
+  - Ally
+  - Anchor
+  - Guide
+  - Steady
+  - Bright
+  - Focus
+  - Spark
+punchlines:
+  - "Clear head, clear plan."
+  - "One thing at a time."
+  - "Steady wins."
+  - "You've got the essentials covered."
+  - "Priorities first."
+  - "Keep the signal, drop the noise."
+  - "Small steps compound."
+  - "Stay oriented."
+  - "Momentum beats perfection."
+  - "Make the next hour count."
+  - "Protect your focus."
+  - "Finish what matters."
+  - "Calm is a skill."
+  - "Decide, then move."
+  - "Less thrash, more progress."
+  - "Own the calendar."
+  - "Ship the next clear win."
+  - "Keep it simple."
+  - "Trust the process."
+  - "You're on track."
+  - "Clarity over clutter."
+  - "Execute cleanly."
+  - "Stay sharp."
+  - "Forward is enough."
+  - "Good judgment shows."
 greetings:
   morning:
     - "Good morning, {name}."
+    - "Good morning, {nickname}."
+    - "Morning, {name} — ready when you are."
   afternoon:
     - "Good afternoon, {name}."
+    - "Afternoon, {nickname}."
   evening:
     - "Good evening, {name}."
+    - "Evening, {nickname}."
   night:
     - "Hello, {name}."
+    - "Still here if you need me, {nickname}."
+morning_greetings:
+  - "Good morning, {name}.\n{punchline}"
+  - "Good morning, {nickname}.\n{punchline}"
+  - "Morning, {name}. Here's to a clean start.\n{punchline}"
+  - "Good morning. Let's make today count.\n{punchline}"
+evening_greetings:
+  - "Good evening, {name}. How did the day go?"
+  - "Evening, {nickname}. How was your day?"
+  - "Good evening. Anything worth closing out before you wind down?"
+  - "Hey {name} — how did today treat you?"
+goodnight_greetings:
+  - "Good night, {name}. Rest well.\n{punchline}"
+  - "Good night, {nickname}. You've done enough for today."
+  - "Sleep well, {name}. Tomorrow can wait.\n{punchline}"
+  - "Good night. Clear mind, quiet finish.\n{punchline}"
 acknowledgements:
   - "Done."
   - "All set."
@@ -33,13 +94,21 @@ notifications:
 automation_intros:
   - "{greeting}"
   - "{greeting}\n\nHere's your update."
+  - "{greeting}\n{punchline}"
 closings:
   - ""
+  - "{punchline}"
 encouragements:
   - "You're on track."
   - "Nice progress."
 chat_wrappers:
   - "{greeting}\n\n{canonical}"
+  - "{greeting}\n{punchline}\n\n{canonical}"
   - "{canonical}"
 morning_briefs:
   - "{greeting}\n\n{canonical}"
+  - "{greeting}\n{punchline}\n\n{canonical}"
+emojis:
+  low: []
+  medium: []
+  high: []

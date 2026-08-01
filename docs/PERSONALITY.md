@@ -35,7 +35,17 @@ Configuration (embedded):
 - `internal/personality/config/personalities/casual.yaml`
 - `internal/personality/config/personalities/flirty.yaml`
 
-Each file defines greetings (morning/afternoon/evening/night), acknowledgements, task-complete, errors, reminders, notifications, automation intros, closings, and chat wrappers.
+Each file defines:
+
+- `fallback_nicknames` (10–15+)
+- `punchlines` (15–30 tone-matched lines)
+- period `greetings` (morning / afternoon / evening / night)
+- dedicated `morning_greetings`, `evening_greetings`, `goodnight_greetings`
+- acknowledgements, task-complete, errors, reminders, notifications, automation intros, closings, chat wrappers
+
+Placeholders: `{name}`, `{nickname}`, `{emoji}`, `{punchline}`, `{greeting}`, `{canonical}`.
+
+Greeting kinds: `greeting`, `morning_greeting`, `evening_greeting`, `good_night`.
 
 ## Persistence
 

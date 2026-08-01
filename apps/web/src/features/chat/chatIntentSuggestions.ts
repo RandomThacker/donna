@@ -11,6 +11,10 @@ export type ChatIntentSuggestion = {
 /** Short labels for the chat suggestion strip — keep in sync with commandGuides. */
 const LABELS: Record<string, string> = {
   greeting: "Say hello",
+  "morning-greeting": "Morning hi",
+  "evening-greeting": "Evening hi",
+  "goodnight-greeting": "Good night",
+  "morning-brief": "Morning brief",
   "create-task": "Create a task",
   "complete-task": "Complete a task",
   "create-reminder": "Create a reminder",
@@ -18,11 +22,16 @@ const LABELS: Record<string, string> = {
   "query-today": "What's today",
   "query-tomorrow": "What's tomorrow",
   "query-due-today": "Due today",
+  "evening-review": "Evening review",
+  "upcoming-meetings": "Meetings",
 };
 
 /** Pill order in the chat strip (anything else follows in guide order). */
 const ORDER = [
   "greeting",
+  "morning-greeting",
+  "evening-greeting",
+  "goodnight-greeting",
   "query-due-today",
   "query-today",
   "query-tomorrow",

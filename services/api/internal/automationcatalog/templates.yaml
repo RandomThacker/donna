@@ -3,6 +3,7 @@ templates:
     name: Morning Brief
     description: Agenda plus tasks due today — Donna posts a combined morning check-in.
     commands:
+      - command: morning_greeting
       - command: todays_agenda
         variables:
           range: today
@@ -12,6 +13,33 @@ templates:
     default_schedule:
       type: daily
       time: "09:00"
+
+  - id: morning_greeting
+    name: Morning Greeting
+    description: Good morning plus a personality punchline.
+    commands:
+      - command: morning_greeting
+    default_schedule:
+      type: daily
+      time: "08:00"
+
+  - id: evening_greeting
+    name: Evening Greeting
+    description: Evening hello that asks how the day went.
+    commands:
+      - command: evening_greeting
+    default_schedule:
+      type: daily
+      time: "18:30"
+
+  - id: goodnight_greeting
+    name: Good Night
+    description: A warm good-night wish with a closing line.
+    commands:
+      - command: goodnight_greeting
+    default_schedule:
+      type: daily
+      time: "22:30"
 
   - id: todays_agenda
     name: Today's Agenda
@@ -50,6 +78,7 @@ templates:
     name: Evening Review
     description: Wrap today and glance at tomorrow.
     commands:
+      - command: evening_greeting
       - command: tasks_due
         variables:
           priority: all

@@ -108,6 +108,12 @@ export function commandLabel(command: AutomationCommand | string): string {
   switch (command.command) {
     case "greeting":
       return "Greeting";
+    case "morning_greeting":
+      return "Morning greeting";
+    case "evening_greeting":
+      return "Evening greeting";
+    case "goodnight_greeting":
+      return "Good night";
     case "todays_agenda":
       return command.variables?.range === "tomorrow"
         ? "Tomorrow's Agenda"

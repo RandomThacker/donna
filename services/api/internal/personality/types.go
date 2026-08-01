@@ -11,14 +11,17 @@ import (
 type Kind string
 
 const (
-	KindChat          Kind = "chat"
-	KindGreeting      Kind = "greeting"
-	KindReminder      Kind = "reminder"
-	KindNotification  Kind = "notification"
-	KindAutomation    Kind = "automation"
-	KindMorningBrief  Kind = "morning_brief"
-	KindTaskComplete  Kind = "task_complete"
-	KindError         Kind = "error"
+	KindChat            Kind = "chat"
+	KindGreeting        Kind = "greeting"
+	KindMorningGreeting Kind = "morning_greeting"
+	KindEveningGreeting Kind = "evening_greeting"
+	KindGoodNight       Kind = "good_night"
+	KindReminder        Kind = "reminder"
+	KindNotification    Kind = "notification"
+	KindAutomation      Kind = "automation"
+	KindMorningBrief    Kind = "morning_brief"
+	KindTaskComplete    Kind = "task_complete"
+	KindError           Kind = "error"
 	KindAcknowledgement Kind = "acknowledgement"
 )
 
@@ -97,7 +100,11 @@ type Definition struct {
 	EncouragementLevelDefault Level
 	ResponseStyleDefault      string
 	FallbackNicknames         []string
+	Punchlines                []string
 	Greetings                 map[string][]string // morning|afternoon|evening|night
+	MorningGreetings          []string
+	EveningGreetings          []string
+	GoodNightGreetings        []string
 	Acknowledgements          []string
 	TaskComplete              []string
 	Errors                    []string

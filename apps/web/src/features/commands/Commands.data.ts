@@ -14,19 +14,123 @@ export type CommandGuide = {
   examples: CommandExample[];
 };
 
-/** Canonical MVP phrases that RuleBasedParser accepts — keep in sync with docs/COMMAND_CHAT.md */
+/** Canonical MVP phrases — keep in sync with docs/COMMAND_CHAT.md and automation templates. */
 export const commandGuides: CommandGuide[] = [
   {
     id: "greeting",
     intent: "GREETING",
     title: "Say hello",
-    blurb: "Gets a warm time-of-day hello, a sweet or playful line, and one sample command.",
+    blurb: "Gets a warm time-of-day hello plus a personality punchline.",
     icon: "spark",
     examples: [
       { phrase: "Hi" },
       { phrase: "Hello" },
-      { phrase: "Good morning" },
       { phrase: "Hey Donna" },
+    ],
+  },
+  {
+    id: "morning-greeting",
+    intent: "MORNING_GREETING",
+    title: "Morning greeting",
+    blurb: "Good morning with a punchline — same as the Morning Greeting automation.",
+    icon: "sun",
+    examples: [
+      { phrase: "Good morning" },
+      { phrase: "Morning greeting" },
+    ],
+  },
+  {
+    id: "evening-greeting",
+    intent: "EVENING_GREETING",
+    title: "Evening greeting",
+    blurb: "Evening hello that asks how the day went.",
+    icon: "sunrise",
+    examples: [
+      { phrase: "Good evening" },
+      { phrase: "Evening greeting" },
+      { phrase: "How was my day" },
+    ],
+  },
+  {
+    id: "goodnight-greeting",
+    intent: "GOOD_NIGHT_GREETING",
+    title: "Good night",
+    blurb: "Wishes good night with a soft closing line.",
+    icon: "spark",
+    examples: [
+      { phrase: "Good night" },
+      { phrase: "Night greeting" },
+    ],
+  },
+  {
+    id: "morning-brief",
+    intent: "MORNING_BRIEF",
+    title: "Morning Brief",
+    blurb: "Same stack as the Morning Brief automation — greeting, today's agenda, tasks due. Try each line.",
+    icon: "sun",
+    examples: [
+      { phrase: "Good morning", note: "Greeting" },
+      { phrase: "What do I have today?", note: "Agenda" },
+      { phrase: "What's due today?", note: "Tasks" },
+    ],
+  },
+  {
+    id: "query-today",
+    intent: "QUERY_TODAY",
+    title: "Today's Agenda",
+    blurb: "Timeline for today — events and reminders (Today's Agenda automation).",
+    icon: "calendar",
+    examples: [
+      { phrase: "What do I have today?" },
+      { phrase: "What's on today" },
+      { phrase: "Show today" },
+    ],
+  },
+  {
+    id: "query-due-today",
+    intent: "QUERY_DUE_TODAY",
+    title: "Task Review",
+    blurb: "Open tasks on today’s journal — Task Review automation.",
+    icon: "tasks",
+    examples: [
+      { phrase: "What's due today?" },
+      { phrase: "Due today" },
+      { phrase: "Show my tasks today" },
+    ],
+  },
+  {
+    id: "query-tomorrow",
+    intent: "QUERY_TOMORROW",
+    title: "Tomorrow Prep",
+    blurb: "Peek at tomorrow — Tomorrow Prep automation.",
+    icon: "sunrise",
+    examples: [
+      { phrase: "What do I have tomorrow?" },
+      { phrase: "What's on tomorrow" },
+      { phrase: "Show tomorrow" },
+    ],
+  },
+  {
+    id: "evening-review",
+    intent: "EVENING_REVIEW",
+    title: "Evening Review",
+    blurb: "Evening greeting, tasks due, then tomorrow — same as Evening Review automation.",
+    icon: "clock",
+    examples: [
+      { phrase: "Evening greeting", note: "How was today?" },
+      { phrase: "What's due today?", note: "Open tasks" },
+      { phrase: "What do I have tomorrow?", note: "Tomorrow" },
+    ],
+  },
+  {
+    id: "upcoming-meetings",
+    intent: "QUERY_TODAY",
+    title: "Upcoming Meetings",
+    blurb: "Today's calendar in one place — Upcoming Meetings automation.",
+    icon: "calendar",
+    examples: [
+      { phrase: "What do I have today?" },
+      { phrase: "Show today" },
     ],
   },
   {
@@ -75,42 +179,6 @@ export const commandGuides: CommandGuide[] = [
       { phrase: "Schedule meeting Standup tomorrow at 10 AM" },
       { phrase: "Create event Guitar class today at 7 PM" },
       { phrase: "Meeting Design review tomorrow at 2 PM" },
-    ],
-  },
-  {
-    id: "query-today",
-    intent: "QUERY_TODAY",
-    title: "What’s on today",
-    blurb: "Timeline for today — events and reminders.",
-    icon: "sun",
-    examples: [
-      { phrase: "What do I have today?" },
-      { phrase: "What's on today" },
-      { phrase: "Show today" },
-    ],
-  },
-  {
-    id: "query-tomorrow",
-    intent: "QUERY_TOMORROW",
-    title: "What’s on tomorrow",
-    blurb: "Same idea, next civil day.",
-    icon: "sunrise",
-    examples: [
-      { phrase: "What do I have tomorrow?" },
-      { phrase: "What's on tomorrow" },
-      { phrase: "Show tomorrow" },
-    ],
-  },
-  {
-    id: "query-due-today",
-    intent: "QUERY_DUE_TODAY",
-    title: "What’s due today",
-    blurb: "Open tasks on today’s journal — not the calendar.",
-    icon: "spark",
-    examples: [
-      { phrase: "What's due today?" },
-      { phrase: "Due today" },
-      { phrase: "Show my tasks today" },
     ],
   },
 ];

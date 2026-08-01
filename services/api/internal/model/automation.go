@@ -187,6 +187,12 @@ func AutomationCommandLabel(c entity.AutomationCommand) string {
 	switch key {
 	case constant.AutomationCommandGreeting:
 		return "Greeting"
+	case constant.AutomationCommandMorningGreeting:
+		return "Morning greeting"
+	case constant.AutomationCommandEveningGreeting:
+		return "Evening greeting"
+	case constant.AutomationCommandGoodNight:
+		return "Good night"
 	case constant.AutomationCommandTodaysAgenda:
 		if strings.EqualFold(strings.TrimSpace(vars["range"]), "tomorrow") {
 			return "Tomorrow's Agenda"

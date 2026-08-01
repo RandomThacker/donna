@@ -55,8 +55,8 @@ func (e *Executor) Execute(ctx context.Context, in ExecuteInput) CommandResult {
 	if intent.Kind == IntentUnknown {
 		return e.finalize(ctx, in, CommandResult{Reply: UnknownHelp, Intent: IntentUnknown}, now, tz)
 	}
-	if intent.Kind == IntentGreeting {
-		return e.finalize(ctx, in, CommandResult{Reply: "", Intent: IntentGreeting}, now, tz)
+	if isGreetingIntent(intent.Kind) {
+		return e.finalize(ctx, in, CommandResult{Reply: "", Intent: intent.Kind}, now, tz)
 	}
 	if e.reg == nil {
 		return e.finalize(ctx, in, CommandResult{Reply: "Donna isn't ready for commands yet.", Intent: intent.Kind}, now, tz)
@@ -83,7 +83,7 @@ func (e *Executor) finalize(
 	if in.SkipPersonality || e == nil || e.personality == nil {
 		// Automations personalize the combined reply — do not invent a
 		// display-name fallback greeting here (it becomes "Good evening, there.").
-		if !in.SkipPersonality && result.Intent == IntentGreeting && strings.TrimSpace(result.Reply) == "" {
+		if !in.SkipPersonality && isGreetingIntent(result.Intent) && strings.TrimSpace(result.Reply) == "" {
 			result.Reply = fallbackGreeting(in.DisplayName, now, tz)
 		}
 		if result.Error != "" && strings.TrimSpace(result.Reply) != "" && !strings.HasPrefix(result.Reply, "I couldn't") {
@@ -104,7 +104,7 @@ func (e *Executor) finalize(
 		Timezone:  tz,
 	})
 	if err != nil || strings.TrimSpace(out.Text) == "" {
-		if canonical == "" && result.Intent == IntentGreeting {
+		if canonical == "" && isGreetingIntent(result.Intent) {
 			result.Reply = fallbackGreeting(in.DisplayName, now, tz)
 			return result
 		}
@@ -117,6 +117,15 @@ func (e *Executor) finalize(
 	return result
 }
 
+func isGreetingIntent(intent IntentKind) bool {
+	switch intent {
+	case IntentGreeting, IntentMorningGreeting, IntentEveningGreeting, IntentGoodNightGreeting:
+		return true
+	default:
+		return false
+	}
+}
+
 func kindForIntent(intent IntentKind, isError bool) personality.Kind {
 	if isError {
 		return personality.KindError
@@ -124,6 +133,12 @@ func kindForIntent(intent IntentKind, isError bool) personality.Kind {
 	switch intent {
 	case IntentGreeting:
 		return personality.KindGreeting
+	case IntentMorningGreeting:
+		return personality.KindMorningGreeting
+	case IntentEveningGreeting:
+		return personality.KindEveningGreeting
+	case IntentGoodNightGreeting:
+		return personality.KindGoodNight
 	case IntentCompleteTask:
 		return personality.KindTaskComplete
 	case IntentCreateTask, IntentCreateReminder, IntentCreateEvent:

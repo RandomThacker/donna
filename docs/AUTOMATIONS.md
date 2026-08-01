@@ -56,6 +56,9 @@ Public ids: `atm_`.
 | Key | Variables | Resolves to |
 | --- | --- | --- |
 | `greeting` | — | `Hi` |
+| `morning_greeting` | — | `Good morning` |
+| `evening_greeting` | — | `Evening greeting` |
+| `goodnight_greeting` | — | `Good night` |
 | `todays_agenda` | `range: today\|tomorrow` | agenda query |
 | `tasks_due` | `priority: all` (reserved) | due-today query |
 | `chat_message` | `message` | free-text chat line |
