@@ -8,6 +8,7 @@ import { Icon } from "@/components/common";
 import { useTheme } from "@/components/theme";
 import { useAuth } from "@/features/auth";
 import { AutomationsPanel } from "@/features/automations";
+import { PersonalityPanel } from "@/features/settings/Personality";
 import { navItemsForPath } from "@/features/dashboard/dashboardNav";
 import { DashboardSidebar } from "@/features/dashboard/sections/DashboardSidebar";
 
@@ -59,8 +60,8 @@ export function Settings() {
             <header className={styles.intro}>
               <h1 className={styles.pageTitle}>Settings</h1>
               <p className={styles.body}>
-                Appearance, automations, account, and a shortcut to chat
-                commands. Calendar connections live under Integrations.
+                Appearance, personality, automations, account, and a shortcut to
+                chat commands. Calendar connections live under Integrations.
               </p>
             </header>
 
@@ -94,6 +95,21 @@ export function Settings() {
                     </span>
                   </button>
                 </div>
+              </div>
+            </section>
+
+            <section className={styles.section} aria-labelledby="personality-heading">
+              <div>
+                <h2 id="personality-heading" className={styles.sectionTitle}>
+                  Personality
+                </h2>
+                <p className={styles.sectionHint}>
+                  How Donna talks — greetings, reminders, and chat tone. Business
+                  outcomes stay the same.
+                </p>
+              </div>
+              <div className={styles.card}>
+                <PersonalityPanel />
               </div>
             </section>
 

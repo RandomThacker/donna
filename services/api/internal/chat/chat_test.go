@@ -141,7 +141,7 @@ func (s stubParser) Parse(context.Context, string) (*chat.Intent, error) { retur
 
 func TestExecutorGreeting(t *testing.T) {
 	t.Parallel()
-	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentGreeting, Timezone: "UTC"}}, nil)
+	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentGreeting, Timezone: "UTC"}}, nil, nil)
 	morning := time.Date(2026, 7, 30, 9, 0, 0, 0, time.UTC)
 	out := ex.Execute(context.Background(), chat.ExecuteInput{
 		DisplayName: "Aryan Thacker",
@@ -152,17 +152,14 @@ func TestExecutorGreeting(t *testing.T) {
 	if out.Intent != chat.IntentGreeting {
 		t.Fatalf("intent = %s", out.Intent)
 	}
-	if !strings.Contains(out.Reply, "Hi Aryan, Good Morning") {
+	if !strings.Contains(out.Reply, "Good morning, Aryan") {
 		t.Fatalf("reply = %q", out.Reply)
-	}
-	if !strings.Contains(out.Reply, "Try this:") {
-		t.Fatalf("missing sample prompt in %q", out.Reply)
 	}
 }
 
 func TestExecutorUnknown(t *testing.T) {
 	t.Parallel()
-	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentUnknown}}, &actions.Registry{})
+	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentUnknown}}, &actions.Registry{}, nil)
 	out := ex.Execute(context.Background(), chat.ExecuteInput{
 		UserID:  uuid.MustParse("018f0000-0000-7000-8000-000000000501"),
 		Message: "???",
@@ -174,7 +171,7 @@ func TestExecutorUnknown(t *testing.T) {
 
 func TestExecutorNilParser(t *testing.T) {
 	t.Parallel()
-	ex := chat.NewExecutor(nil, &actions.Registry{})
+	ex := chat.NewExecutor(nil, &actions.Registry{}, nil)
 	out := ex.Execute(context.Background(), chat.ExecuteInput{Message: "hi"})
 	if out.Intent != chat.IntentUnknown {
 		t.Fatalf("intent = %s", out.Intent)
@@ -211,7 +208,7 @@ func TestExecutorCreateTaskViaActions(t *testing.T) {
 	reg := &actions.Registry{CreateTask: actions.NewCreateTaskAction(taskSvc, nil)}
 	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{
 		Kind: chat.IntentCreateTask, Title: "Finish Timeline UI", Timezone: "UTC",
-	}}, reg)
+	}}, reg, nil)
 	out := ex.Execute(context.Background(), chat.ExecuteInput{
 		UserID: uuid.MustParse("018f0000-0000-7000-8000-000000000502"), Timezone: "UTC",
 		Now: time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), Message: "Add task Finish Timeline UI",
@@ -227,7 +224,7 @@ func TestExecutorDryRunSkipsMutation(t *testing.T) {
 	reg := &actions.Registry{CreateTask: actions.NewCreateTaskAction(taskSvc, nil)}
 	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{
 		Kind: chat.IntentCreateTask, Title: "Finish Timeline UI", Timezone: "UTC",
-	}}, reg)
+	}}, reg, nil)
 	out := ex.Execute(context.Background(), chat.ExecuteInput{
 		UserID: uuid.MustParse("018f0000-0000-7000-8000-000000000502"), Timezone: "UTC",
 		Now: time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), Message: "Add task Finish Timeline UI",
@@ -259,7 +256,7 @@ func TestExecutorQueryTomorrow(t *testing.T) {
 			},
 		}),
 	}
-	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentQueryTomorrow, Timezone: "UTC"}}, reg)
+	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentQueryTomorrow, Timezone: "UTC"}}, reg, nil)
 	out := ex.Execute(context.Background(), chat.ExecuteInput{
 		UserID: uuid.MustParse("018f0000-0000-7000-8000-000000000503"), Timezone: "UTC",
 		Now: time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), Message: "What do I have tomorrow?",
@@ -287,7 +284,7 @@ func TestExecutorQueryDueToday(t *testing.T) {
 			},
 		}),
 	}
-	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentQueryDueToday, Timezone: "UTC"}}, reg)
+	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentQueryDueToday, Timezone: "UTC"}}, reg, nil)
 	out := ex.Execute(context.Background(), chat.ExecuteInput{
 		UserID: uuid.MustParse("018f0000-0000-7000-8000-000000000504"), Timezone: "UTC",
 		Now: time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), Message: "What's due today?",

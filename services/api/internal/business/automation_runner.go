@@ -9,6 +9,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
+	"github.com/RandomThacker/donna/services/api/internal/personality"
 	"github.com/google/uuid"
 )
 
@@ -37,27 +38,28 @@ type AutomationCommandRunResult struct {
 
 // AutomationRunResult is the outcome of Manual / Scheduled / Preview execution.
 type AutomationRunResult struct {
-	Response       string
-	Status         string
-	DeliveryStatus string
-	CommandsTotal  int
+	Response        string
+	Status          string
+	DeliveryStatus  string
+	CommandsTotal   int
 	CommandsSuccess int
-	CommandsFailed int
-	DurationMs     int
-	TriggerSource  string
-	Commands       []AutomationCommandRunResult
-	Execution      *entity.AutomationExecution
+	CommandsFailed  int
+	DurationMs      int
+	TriggerSource   string
+	Commands        []AutomationCommandRunResult
+	Execution       *entity.AutomationExecution
 }
 
 // AutomationRunner executes automation commands through the existing chat path.
 // Scheduling (due checks / tick) stays in AutomationScheduler.
 type AutomationRunner struct {
-	autos      AutomationLister
-	chat       ChatCommandExecutor
-	notices    AssistantNoticePoster
-	executions AutomationExecutionRecorder
-	log        *logger.Logger
-	now        func() time.Time
+	autos       AutomationLister
+	chat        ChatCommandExecutor
+	notices     AssistantNoticePoster
+	executions  AutomationExecutionRecorder
+	personality personality.Renderer
+	log         *logger.Logger
+	now         func() time.Time
 }
 
 // NewAutomationRunner constructs the shared runner used by scheduler, manual run, and preview.
@@ -75,6 +77,13 @@ func NewAutomationRunner(
 		executions: executions,
 		log:        log,
 		now:        time.Now,
+	}
+}
+
+// SetPersonality attaches an optional personality renderer for combined replies.
+func (r *AutomationRunner) SetPersonality(renderer personality.Renderer) {
+	if r != nil {
+		r.personality = renderer
 	}
 }
 
@@ -136,12 +145,13 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 			failed++
 		} else {
 			result = r.chat.Execute(ctx, ChatCommandInput{
-				UserID:      auto.UserID,
-				Timezone:    auto.Timezone,
-				Now:         now,
-				Message:     message,
-				DisplayName: opts.DisplayName,
-				DryRun:      opts.DryRun,
+				UserID:          auto.UserID,
+				Timezone:        auto.Timezone,
+				Now:             now,
+				Message:         message,
+				DisplayName:     opts.DisplayName,
+				DryRun:          opts.DryRun,
+				SkipPersonality: true,
 			})
 			reply = strings.TrimSpace(result.Reply)
 			errText = strings.TrimSpace(result.Error)
@@ -196,6 +206,21 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 	combined := strings.TrimSpace(strings.Join(parts, "\n\n"))
 	if combined == "" {
 		combined = "I'm here — nothing to report just yet."
+	}
+	if r.personality != nil {
+		kind := personality.KindAutomation
+		if strings.Contains(strings.ToLower(auto.Name), "morning") {
+			kind = personality.KindMorningBrief
+		}
+		if rendered, err := r.personality.Render(ctx, personality.RenderInput{
+			UserID:    auto.UserID,
+			Canonical: combined,
+			Kind:      kind,
+			Now:       now,
+			Timezone:  auto.Timezone,
+		}); err == nil && strings.TrimSpace(rendered.Text) != "" {
+			combined = strings.TrimSpace(rendered.Text)
+		}
 	}
 
 	deliveryStatus := constant.AutomationDeliverySkipped

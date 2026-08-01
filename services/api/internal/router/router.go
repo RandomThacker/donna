@@ -26,6 +26,7 @@ type Options struct {
 	DonnaEventHandler       *handler.DonnaEventHandler
 	DonnaReminderHandler    *handler.DonnaReminderHandler
 	AutomationHandler       *handler.AutomationHandler
+	PersonalityHandler      *handler.PersonalityHandler
 	NotificationHandler     *handler.NotificationHandler
 	PushHandler             *handler.PushHandler
 	ChatHandler             *handler.ChatHandler
@@ -145,6 +146,14 @@ func New(opts Options) *gin.Engine {
 			v1.POST(constant.PathDonnaReminders, auth, opts.DonnaReminderHandler.Create)
 			v1.PATCH(constant.PathDonnaReminderByID, auth, opts.DonnaReminderHandler.Update)
 			v1.DELETE(constant.PathDonnaReminderByID, auth, opts.DonnaReminderHandler.Delete)
+		}
+
+		if opts.PersonalityHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathPersonalityCatalog, auth, opts.PersonalityHandler.Catalog)
+			v1.GET(constant.PathPersonality, auth, opts.PersonalityHandler.Get)
+			v1.PATCH(constant.PathPersonality, auth, opts.PersonalityHandler.Update)
+			v1.POST(constant.PathPersonalityPreview, auth, opts.PersonalityHandler.Preview)
 		}
 
 		if opts.AutomationHandler != nil && opts.TokenIssuer != nil {

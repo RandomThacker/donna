@@ -30,6 +30,10 @@ type Registry struct {
 	MarkNotificationRead        *MarkNotificationReadAction
 	DismissNotification         *DismissNotificationAction
 	ListDayTasks                *ListDayTasksAction
+	GetPersonality              *GetPersonalityAction
+	UpdatePersonality           *UpdatePersonalityAction
+	ListPersonalityCatalog      *ListPersonalityCatalogAction
+	PreviewPersonality          *PreviewPersonalityAction
 }
 
 // Deps wires services into the Action registry.

@@ -26,6 +26,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/oauthstate"
 	"github.com/RandomThacker/donna/services/api/internal/occurrence"
 	occurrenceprovider "github.com/RandomThacker/donna/services/api/internal/occurrence/provider"
+	"github.com/RandomThacker/donna/services/api/internal/personality"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/RandomThacker/donna/services/api/internal/router"
 	"github.com/RandomThacker/donna/services/api/internal/scheduler"
@@ -133,6 +134,14 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		business.NewNotificationPolicyResolver(),
 	)
 
+	personalityCatalog, err := personality.LoadCatalog()
+	if err != nil {
+		return fmt.Errorf("personality catalog: %w", err)
+	}
+	personalityRepo := repository.NewUserPersonalityRepository(pool)
+	personalitySvc := business.NewPersonalityService(personalityRepo, userRepo, personalityCatalog)
+	personalityRenderer := personality.NewTemplateRenderer(personalityCatalog, personalitySvc)
+
 	actionRegistry := actions.NewRegistry(actions.Deps{
 		Events:               donnaEventSvc,
 		Reminders:            donnaReminderSvc,
@@ -201,12 +210,25 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	}
 
 	chatLog := logFactory.Module(constant.ModuleChat)
-	chatExecutor := chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
+	chatExecutor := chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry, personalityRenderer)
 	tx := repository.NewTxManager(pool)
 	conversationRepo := repository.NewConversationRepository(pool)
 	messageRepo := repository.NewMessageRepository(pool)
 	conversationSvc := business.NewConversationService(conversationRepo, messageRepo, tx)
 	chatHandler := handler.NewChatHandler(chatExecutor, conversationSvc, userSvc, chatLog)
+
+	actionRegistry.GetPersonality = actions.NewGetPersonalityAction(personalitySvc)
+	actionRegistry.UpdatePersonality = actions.NewUpdatePersonalityAction(personalitySvc)
+	actionRegistry.ListPersonalityCatalog = actions.NewListPersonalityCatalogAction(personalitySvc)
+	actionRegistry.PreviewPersonality = actions.NewPreviewPersonalityAction(personalitySvc, personalityRenderer)
+	personalityLog := logFactory.Module(constant.ModulePersonality)
+	personalityHandler := handler.NewPersonalityHandler(
+		actionRegistry.GetPersonality,
+		actionRegistry.UpdatePersonality,
+		actionRegistry.ListPersonalityCatalog,
+		actionRegistry.PreviewPersonality,
+		personalityLog,
+	)
 
 	automationRunner := business.NewAutomationRunner(
 		automationSvc,
@@ -215,6 +237,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		automationExecSvc,
 		automationLog,
 	)
+	automationRunner.SetPersonality(personalityRenderer)
 	actionRegistry.RunAutomation = actions.NewRunAutomationAction(automationSvc, automationRunner)
 	actionRegistry.PreviewAutomation = actions.NewPreviewAutomationAction(automationSvc, automationRunner)
 
@@ -241,12 +264,16 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		automationExecSvc,
 		automationLog,
 	)
+	if schedRunner := automationScheduler.Runner(); schedRunner != nil {
+		schedRunner.SetPersonality(personalityRenderer)
+	}
 
 	notificationDispatcher := business.NewNotificationDispatcher(
 		notificationRepo,
 		conversationSvc,
 		pushSubSvc,
 		pushSender,
+		personalityRenderer,
 		notificationLog,
 	)
 
@@ -266,6 +293,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		DonnaEventHandler:     donnaEventHandler,
 		DonnaReminderHandler:  donnaReminderHandler,
 		AutomationHandler:     automationHandler,
+		PersonalityHandler:    personalityHandler,
 		NotificationHandler:   notificationHandler,
 		PushHandler:           pushHandler,
 		ChatHandler:           chatHandler,

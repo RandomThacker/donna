@@ -115,4 +115,6 @@ type ExecuteInput struct {
 	DisplayName string
 	// DryRun simulates mutation intents without writing to the database.
 	DryRun bool
+	// SkipPersonality returns canonical replies (automations personalize the combined message).
+	SkipPersonality bool
 }

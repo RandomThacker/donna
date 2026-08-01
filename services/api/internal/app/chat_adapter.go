@@ -18,12 +18,13 @@ func (a chatCommandAdapter) Execute(ctx context.Context, in business.ChatCommand
 		return business.ChatCommandResult{}
 	}
 	out := a.exec.Execute(ctx, chat.ExecuteInput{
-		UserID:      in.UserID,
-		Timezone:    in.Timezone,
-		Now:         in.Now,
-		Message:     in.Message,
-		DisplayName: in.DisplayName,
-		DryRun:      in.DryRun,
+		UserID:          in.UserID,
+		Timezone:        in.Timezone,
+		Now:             in.Now,
+		Message:         in.Message,
+		DisplayName:     in.DisplayName,
+		DryRun:          in.DryRun,
+		SkipPersonality: in.SkipPersonality,
 	})
 	return business.ChatCommandResult{
 		Reply:  out.Reply,

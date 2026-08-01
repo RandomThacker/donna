@@ -1,0 +1,68 @@
+id: casual
+name: Casual
+description: Friendly and light — feels like a good teammate.
+emoji_level_default: low
+humor_level_default: low
+encouragement_level_default: medium
+response_style_default: friendly
+fallback_nicknames:
+  - Rockstar
+  - Boss
+  - Champ
+greetings:
+  morning:
+    - "Morning, {nickname}!"
+    - "Morning, Rockstar!"
+    - "Morning, Boss!"
+  afternoon:
+    - "Hey {nickname}!"
+    - "Afternoon, {nickname}!"
+  evening:
+    - "Hey {nickname}, wrapping up?"
+    - "Evening, {nickname}!"
+  night:
+    - "Hey {nickname}."
+    - "Still here, {nickname}."
+acknowledgements:
+  - "Got it!"
+  - "Done ✓"
+  - "On it — done."
+task_complete:
+  - "Nice — marked complete {emoji}"
+  - "Done! {canonical}"
+errors:
+  - "Hmm, that didn't work. {canonical}"
+  - "Couldn't do that one. {canonical}"
+reminders:
+  - "Hey {nickname}, {canonical}"
+  - "{canonical} {emoji}"
+notifications:
+  - "Hey {nickname} — {canonical}"
+  - "{canonical}"
+automation_intros:
+  - "Quick check-in:"
+  - "Here's what I've got:"
+closings:
+  - ""
+  - "You've got this."
+encouragements:
+  - "You've got this {emoji}"
+  - "Nice work!"
+chat_wrappers:
+  - "{greeting}\n\n{canonical}"
+  - "{canonical} {emoji}"
+morning_briefs:
+  - "{greeting}\n\n{canonical}"
+emojis:
+  low:
+    - "💪"
+    - "✨"
+  medium:
+    - "💪"
+    - "✨"
+    - "🙌"
+  high:
+    - "💪"
+    - "✨"
+    - "🙌"
+    - "🔥"

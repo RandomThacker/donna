@@ -10,6 +10,7 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
+	"github.com/RandomThacker/donna/services/api/internal/personality"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/RandomThacker/donna/services/api/internal/webpush"
 )
@@ -21,6 +22,7 @@ type NotificationDispatcher struct {
 	chat          *ConversationService
 	pushSubs      *PushSubscriptionService
 	pushSender    webpush.Sender
+	personality   personality.Renderer
 	log           *logger.Logger
 	interval      time.Duration
 	now           func() time.Time
@@ -29,11 +31,13 @@ type NotificationDispatcher struct {
 
 // NewNotificationDispatcher constructs a minute-tick publisher.
 // pushSubs / pushSender may be nil when Web Push is not configured.
+// personality may be nil (canonical chat text only).
 func NewNotificationDispatcher(
 	notifications repository.NotificationRepository,
 	chat *ConversationService,
 	pushSubs *PushSubscriptionService,
 	pushSender webpush.Sender,
+	personalityRenderer personality.Renderer,
 	log *logger.Logger,
 ) *NotificationDispatcher {
 	return &NotificationDispatcher{
@@ -41,6 +45,7 @@ func NewNotificationDispatcher(
 		chat:          chat,
 		pushSubs:      pushSubs,
 		pushSender:    pushSender,
+		personality:   personalityRenderer,
 		log:           log,
 		interval:      constant.NotificationDispatcherInterval,
 		now:           time.Now,
@@ -234,9 +239,40 @@ func (d *NotificationDispatcher) postChatNotice(ctx context.Context, n entity.No
 	if text == "" {
 		return false, nil
 	}
+	text = d.personalizeNotification(ctx, n, text)
 	clientID := notificationChatClientMessageID(n)
 	_, created, err := d.chat.PostAssistantNotice(ctx, n.UserID, text, clientID)
 	return created, err
+}
+
+func (d *NotificationDispatcher) personalizeNotification(ctx context.Context, n entity.Notification, canonical string) string {
+	if d == nil || d.personality == nil {
+		return canonical
+	}
+	// Keep markdown event links outside the templated body.
+	body := canonical
+	link := ""
+	if idx := strings.Index(canonical, "[View Event]("); idx >= 0 {
+		body = strings.TrimSpace(canonical[:idx])
+		link = strings.TrimSpace(canonical[idx:])
+	}
+	kind := personality.KindNotification
+	if n.NotificationType != nil && strings.EqualFold(*n.NotificationType, constant.NotificationTypeReminder) {
+		kind = personality.KindReminder
+	}
+	out, err := d.personality.Render(ctx, personality.RenderInput{
+		UserID:    n.UserID,
+		Canonical: body,
+		Kind:      kind,
+		Now:       d.now(),
+	})
+	if err != nil || strings.TrimSpace(out.Text) == "" {
+		return canonical
+	}
+	if link == "" {
+		return out.Text
+	}
+	return strings.TrimSpace(out.Text) + "\n\n" + link
 }
 
 func wantsChatChannel(n entity.Notification) bool {

@@ -1,0 +1,45 @@
+id: professional
+name: Professional
+description: Calm, clear, and composed — warm without fluff.
+emoji_level_default: none
+humor_level_default: none
+encouragement_level_default: low
+response_style_default: concise
+fallback_nicknames: []
+greetings:
+  morning:
+    - "Good morning, {name}."
+  afternoon:
+    - "Good afternoon, {name}."
+  evening:
+    - "Good evening, {name}."
+  night:
+    - "Hello, {name}."
+acknowledgements:
+  - "Done."
+  - "All set."
+  - "Noted."
+task_complete:
+  - "Marked complete."
+  - "Done — {canonical}"
+errors:
+  - "I couldn't do that. {canonical}"
+  - "Something went wrong. {canonical}"
+reminders:
+  - "{canonical}"
+  - "Reminder: {canonical}"
+notifications:
+  - "{canonical}"
+automation_intros:
+  - ""
+  - "Here's your update."
+closings:
+  - ""
+encouragements:
+  - "You're on track."
+  - "Nice progress."
+chat_wrappers:
+  - "{greeting}\n\n{canonical}"
+  - "{canonical}"
+morning_briefs:
+  - "{greeting}\n\n{canonical}"

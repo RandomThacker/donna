@@ -3,26 +3,29 @@ package chat
 import (
 	"context"
 	"fmt"
-	"math/rand/v2"
 	"strings"
 	"time"
 
 	"github.com/RandomThacker/donna/services/api/internal/actions"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
+	"github.com/RandomThacker/donna/services/api/internal/personality"
 	"github.com/google/uuid"
 )
 
 // Executor runs parsed intents through the Action Layer.
 // It depends on IntentParser — never on a concrete parser type.
+// Personality rendering is presentation-only and never mutates business outcomes.
 type Executor struct {
-	parser IntentParser
-	reg    *actions.Registry
+	parser     IntentParser
+	reg        *actions.Registry
+	personality personality.Renderer
 }
 
 // NewExecutor constructs a chat command executor.
 // parser must be provided (RuleBasedParser today; OpenAI/Claude later).
-func NewExecutor(parser IntentParser, reg *actions.Registry) *Executor {
-	return &Executor{parser: parser, reg: reg}
+// renderer may be nil (canonical replies only).
+func NewExecutor(parser IntentParser, reg *actions.Registry, renderer personality.Renderer) *Executor {
+	return &Executor{parser: parser, reg: reg, personality: renderer}
 }
 
 // Execute parses a message and runs the matching Action(s).
@@ -43,34 +46,110 @@ func (e *Executor) Execute(ctx context.Context, in ExecuteInput) CommandResult {
 	parseCtx := WithParseTimezone(WithParseNow(ctx, now), tz)
 	intent, err := e.parser.Parse(parseCtx, in.Message)
 	if err != nil || intent == nil {
-		return CommandResult{Reply: UnknownHelp, Intent: IntentUnknown}
+		return e.finalize(ctx, in, CommandResult{Reply: UnknownHelp, Intent: IntentUnknown}, now, tz)
 	}
 	if intent.Timezone == "" {
 		intent.Timezone = tz
 	}
 
 	if intent.Kind == IntentUnknown {
-		return CommandResult{Reply: UnknownHelp, Intent: IntentUnknown}
+		return e.finalize(ctx, in, CommandResult{Reply: UnknownHelp, Intent: IntentUnknown}, now, tz)
 	}
 	if intent.Kind == IntentGreeting {
-		return CommandResult{
-			Reply:  greetingReply(in.DisplayName, now, intent.Timezone),
-			Intent: IntentGreeting,
-		}
+		return e.finalize(ctx, in, CommandResult{Reply: "", Intent: IntentGreeting}, now, tz)
 	}
 	if e.reg == nil {
-		return CommandResult{Reply: "Donna isn't ready for commands yet.", Intent: intent.Kind}
+		return e.finalize(ctx, in, CommandResult{Reply: "Donna isn't ready for commands yet.", Intent: intent.Kind}, now, tz)
 	}
 
 	reply, err := e.dispatch(ctx, in.UserID, now, *intent, in.DryRun)
 	if err != nil {
-		return CommandResult{
-			Reply:  fmt.Sprintf("I couldn't do that. %s", friendlyErr(err)),
+		return e.finalize(ctx, in, CommandResult{
+			Reply:  friendlyErr(err),
 			Intent: intent.Kind,
 			Error:  friendlyErr(err),
-		}
+		}, now, tz)
 	}
-	return CommandResult{Reply: reply, Intent: intent.Kind}
+	return e.finalize(ctx, in, CommandResult{Reply: reply, Intent: intent.Kind}, now, tz)
+}
+
+func (e *Executor) finalize(
+	ctx context.Context,
+	in ExecuteInput,
+	result CommandResult,
+	now time.Time,
+	tz string,
+) CommandResult {
+	if in.SkipPersonality || e == nil || e.personality == nil {
+		if result.Intent == IntentGreeting && strings.TrimSpace(result.Reply) == "" {
+			result.Reply = fallbackGreeting(in.DisplayName, now, tz)
+		}
+		if result.Error != "" && strings.TrimSpace(result.Reply) != "" && !strings.HasPrefix(result.Reply, "I couldn't") {
+			result.Reply = fmt.Sprintf("I couldn't do that. %s", result.Reply)
+		}
+		return result
+	}
+	kind := kindForIntent(result.Intent, result.Error != "")
+	canonical := strings.TrimSpace(result.Reply)
+	if kind == personality.KindError && canonical == "" {
+		canonical = result.Error
+	}
+	out, err := e.personality.Render(ctx, personality.RenderInput{
+		UserID:    in.UserID,
+		Canonical: canonical,
+		Kind:      kind,
+		Now:       now,
+		Timezone:  tz,
+	})
+	if err != nil || strings.TrimSpace(out.Text) == "" {
+		if canonical == "" && result.Intent == IntentGreeting {
+			result.Reply = fallbackGreeting(in.DisplayName, now, tz)
+			return result
+		}
+		if canonical != "" {
+			result.Reply = canonical
+		}
+		return result
+	}
+	result.Reply = out.Text
+	return result
+}
+
+func kindForIntent(intent IntentKind, isError bool) personality.Kind {
+	if isError {
+		return personality.KindError
+	}
+	switch intent {
+	case IntentGreeting:
+		return personality.KindGreeting
+	case IntentCompleteTask:
+		return personality.KindTaskComplete
+	case IntentCreateTask, IntentCreateReminder, IntentCreateEvent:
+		return personality.KindAcknowledgement
+	case IntentUnknown:
+		return personality.KindError
+	default:
+		return personality.KindChat
+	}
+}
+
+func fallbackGreeting(displayName string, now time.Time, tz string) string {
+	name := firstName(displayName)
+	if name == "" {
+		name = "there"
+	}
+	loc := loadLocation(tz)
+	local := now.In(loc)
+	switch {
+	case local.Hour() >= 5 && local.Hour() < 12:
+		return fmt.Sprintf("Good morning, %s.", name)
+	case local.Hour() >= 12 && local.Hour() < 17:
+		return fmt.Sprintf("Good afternoon, %s.", name)
+	case local.Hour() >= 17 && local.Hour() < 21:
+		return fmt.Sprintf("Good evening, %s.", name)
+	default:
+		return fmt.Sprintf("Hello, %s.", name)
+	}
 }
 
 func (e *Executor) dispatch(ctx context.Context, userID uuid.UUID, now time.Time, intent Intent, dryRun bool) (string, error) {
@@ -104,7 +183,7 @@ func (e *Executor) dispatch(ctx context.Context, userID uuid.UUID, now time.Time
 	case IntentQueryDueToday:
 		return e.queryDueToday(ctx, userID, now, intent.Timezone)
 	case IntentGreeting:
-		return greetingReply("", now, intent.Timezone), nil
+		return "", nil
 	default:
 		return UnknownHelp, nil
 	}
@@ -116,92 +195,6 @@ func dryRunMutationReply(action, title string) string {
 		return fmt.Sprintf("Preview: would %s (nothing was saved).", action)
 	}
 	return fmt.Sprintf("Preview: would %s %q (nothing was saved).", action, title)
-}
-
-func greetingReply(displayName string, now time.Time, tz string) string {
-	name := firstName(displayName)
-	if name == "" {
-		name = "there"
-	}
-	loc := loadLocation(tz)
-	local := now.In(loc)
-	period := dayPeriod(local.Hour())
-	line := pickGreetingLine(local.Hour())
-	sample := greetingSampleCommands[rand.IntN(len(greetingSampleCommands))]
-	emoji := greetingEmojis[rand.IntN(len(greetingEmojis))]
-
-	return fmt.Sprintf(`Hi %s, %s %s
-
-%s
-
-Try this: %s`, name, period, emoji, line, sample)
-}
-
-func dayPeriod(hour int) string {
-	switch {
-	case hour >= 5 && hour < 12:
-		return "Good Morning"
-	case hour >= 12 && hour < 17:
-		return "Good Afternoon"
-	default:
-		return "Good Evening"
-	}
-}
-
-func pickGreetingLine(hour int) string {
-	// Mix sweet and playful — slightly prefer sweet.
-	pool := make([]string, 0, len(greetingSweetLines)+len(greetingPlayfulLines)+2)
-	pool = append(pool, greetingSweetLines...)
-	pool = append(pool, greetingSweetLines...) // weight sweet a bit higher
-	pool = append(pool, greetingPlayfulLines...)
-	if hour >= 5 && hour < 12 {
-		pool = append(pool, greetingMorningLines...)
-	} else if hour >= 17 || hour < 5 {
-		pool = append(pool, greetingEveningLines...)
-	}
-	return pool[rand.IntN(len(pool))]
-}
-
-var greetingEmojis = []string{"💛", "✨", "🥰", "💕", "🌸", "😌"}
-
-var greetingSweetLines = []string{
-	"Missed that little hello. Come here — I've been thinking about you.",
-	"Hi, love. Soft spot for you, always. How's your heart doing?",
-	"There you are. You make ordinary minutes feel warmer.",
-	"Hey you. Just seeing your name pop up made me smile.",
-	"Come talk to me. I'll keep you company while you figure the day out.",
-	"Hi baby. I'm here, I've got you — even if all you needed was a hello.",
-	"You didn't have to say hi… but I'm glad you did. Stay a second?",
-	"Aww. I was hoping you'd check in. Want me to help with something small?",
-}
-
-var greetingPlayfulLines = []string{
-	"Oh look who remembered I exist. Cute. Very cute.",
-	"A greeting? Bold of you. I accept payment in attention.",
-	"Hi. I'll try not to roast you today. No promises though.",
-	"You pinged me. I'm choosing to believe that means you missed me.",
-	"Hello, chaos. Ready when you are — preferably with a plan this time.",
-}
-
-var greetingMorningLines = []string{
-	"Morning, love. Coffee first, world later. I've got your back either way.",
-	"Good morning, handsome. Soft start — then we pretend to be productive.",
-}
-
-var greetingEveningLines = []string{
-	"Evening, love. Come unwind with me for a minute before the night runs away.",
-	"Hey. Late ping, soft reply. I'm still here if you need me.",
-}
-
-var greetingSampleCommands = []string{
-	"Add task Finish API",
-	"What's due today?",
-	"Remind me tomorrow at 6 PM to stretch",
-	"What do I have today?",
-	"What do I have tomorrow?",
-	"Schedule meeting Standup tomorrow at 10 AM",
-	"Complete task Finish API",
-	"Add task Drink water (yes, again)",
 }
 
 func firstName(displayName string) string {

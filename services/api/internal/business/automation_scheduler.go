@@ -19,12 +19,13 @@ type AutomationLister interface {
 
 // ChatCommandInput is the runner's view of a chat execute call (avoids importing chat).
 type ChatCommandInput struct {
-	UserID      uuid.UUID
-	Timezone    string
-	Now         time.Time
-	Message     string
-	DisplayName string
-	DryRun      bool // preview: no mutation intents
+	UserID          uuid.UUID
+	Timezone        string
+	Now             time.Time
+	Message         string
+	DisplayName     string
+	DryRun          bool // preview: no mutation intents
+	SkipPersonality bool // automation: personalize the combined reply instead
 }
 
 // ChatCommandResult is the runner's view of a chat execute result.

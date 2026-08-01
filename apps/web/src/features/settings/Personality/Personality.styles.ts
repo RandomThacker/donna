@@ -1,0 +1,38 @@
+export const personalityStyles = {
+  root: "flex flex-col gap-5 px-5 py-4",
+  field: "flex min-w-0 flex-col gap-1.5",
+  label: "text-xs font-medium text-donna-muted",
+  input: [
+    "rounded-xl border border-donna-border bg-donna-surface-2 px-3 py-2",
+    "text-sm text-donna-text",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+    "focus-visible:outline-donna-accent",
+  ].join(" "),
+  select: [
+    "rounded-xl border border-donna-border bg-donna-surface-2 px-3 py-2",
+    "text-sm text-donna-text",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+    "focus-visible:outline-donna-accent",
+  ].join(" "),
+  grid: "grid gap-3 sm:grid-cols-2",
+  actions: "flex flex-wrap items-center gap-2",
+  saveBtn: [
+    "inline-flex items-center justify-center rounded-full",
+    "border border-donna-border bg-donna-surface-2 px-3.5 py-2",
+    "text-sm text-donna-text",
+    "transition-[border-color,background-color] duration-150",
+    "hover:border-donna-accent/40 hover:bg-donna-accent-soft",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+    "focus-visible:outline-donna-accent",
+    "disabled:cursor-not-allowed disabled:opacity-50",
+  ].join(" "),
+  hint: "text-xs text-donna-muted",
+  error: "text-sm text-rose-300",
+  previewGrid: "grid gap-3",
+  previewCard: [
+    "rounded-xl border border-donna-hairline bg-donna-surface-2 px-3 py-3",
+  ].join(" "),
+  previewLabel: "text-xs font-medium uppercase tracking-[0.12em] text-donna-muted",
+  previewBody: "mt-2 whitespace-pre-wrap text-sm text-donna-text",
+  optionHint: "mt-1 text-xs text-donna-muted",
+} as const;
