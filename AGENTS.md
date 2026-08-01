@@ -21,6 +21,7 @@ Read before implementing:
 17. [docs/OCCURRENCE_SERVICE.md](docs/OCCURRENCE_SERVICE.md) — OccurrenceService pipeline (scheduling feed)
 18. [docs/PERFORMANCE_SPRINT_1A.md](docs/PERFORMANCE_SPRINT_1A.md) — narrow Occurrence SQL projections
 19. [docs/PERFORMANCE_SPRINT_1B.md](docs/PERFORMANCE_SPRINT_1B.md) — shared calendar Occurrence query (query count)
+20. [docs/AUTOMATIONS.md](docs/AUTOMATIONS.md) — Automation Engine (scheduled chat commands)
 
 Project rules also live in `.cursor/rules/`.
 

@@ -98,9 +98,13 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 
 	donnaEventRepo := repository.NewDonnaEventRepository(pool)
 	donnaReminderRepo := repository.NewDonnaReminderRepository(pool)
+	automationRepo := repository.NewAutomationRepository(pool)
+	automationExecRepo := repository.NewAutomationExecutionRepository(pool)
 	calendarEventsRepo := repository.NewCalendarEventRepository(pool)
 	donnaEventSvc := business.NewDonnaEventService(donnaEventRepo)
 	donnaReminderSvc := business.NewDonnaReminderService(donnaReminderRepo)
+	automationSvc := business.NewAutomationService(automationRepo)
+	automationExecSvc := business.NewAutomationExecutionService(automationExecRepo, automationRepo)
 	timelineSvc := business.NewTimelineService(business.TimelineServiceDeps{
 		Providers: []business.TimelineProvider{
 			business.NewGoogleTimelineProvider(calendarEventsRepo),
@@ -130,12 +134,14 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	)
 
 	actionRegistry := actions.NewRegistry(actions.Deps{
-		Events:        donnaEventSvc,
-		Reminders:     donnaReminderSvc,
-		Tasks:         taskSvc,
-		Timeline:      timelineSvc,
-		Notifications: notificationSvc,
-		Publisher:     actions.NoopPublisher{},
+		Events:               donnaEventSvc,
+		Reminders:            donnaReminderSvc,
+		Automations:          automationSvc,
+		AutomationExecutions: automationExecSvc,
+		Tasks:                taskSvc,
+		Timeline:             timelineSvc,
+		Notifications:        notificationSvc,
+		Publisher:            actions.NoopPublisher{},
 	})
 
 	taskHandler := handler.NewTaskHandler(
@@ -169,6 +175,8 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		timelineLog,
 	)
 
+	automationLog := logFactory.Module(constant.ModuleAutomation)
+
 	notificationHandler := handler.NewNotificationHandler(
 		actionRegistry.GetNotifications,
 		actionRegistry.MarkNotificationRead,
@@ -200,6 +208,40 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	conversationSvc := business.NewConversationService(conversationRepo, messageRepo, tx)
 	chatHandler := handler.NewChatHandler(chatExecutor, conversationSvc, userSvc, chatLog)
 
+	automationRunner := business.NewAutomationRunner(
+		automationSvc,
+		chatCommandAdapter{exec: chatExecutor},
+		conversationSvc,
+		automationExecSvc,
+		automationLog,
+	)
+	actionRegistry.RunAutomation = actions.NewRunAutomationAction(automationSvc, automationRunner)
+	actionRegistry.PreviewAutomation = actions.NewPreviewAutomationAction(automationSvc, automationRunner)
+
+	automationHandler := handler.NewAutomationHandler(
+		actionRegistry.ListAutomations,
+		actionRegistry.ListAutomationTemplates,
+		actionRegistry.CreateAutomation,
+		actionRegistry.UpdateAutomation,
+		actionRegistry.DeleteAutomation,
+		actionRegistry.ListAutomationHistory,
+		actionRegistry.ListAllAutomationHistory,
+		actionRegistry.GetAutomationExecution,
+		actionRegistry.GetAutomationAnalytics,
+		actionRegistry.RunAutomation,
+		actionRegistry.PreviewAutomation,
+		cfg.App.Environment,
+		automationLog,
+	)
+
+	automationScheduler := business.NewAutomationScheduler(
+		automationSvc,
+		chatCommandAdapter{exec: chatExecutor},
+		conversationSvc,
+		automationExecSvc,
+		automationLog,
+	)
+
 	notificationDispatcher := business.NewNotificationDispatcher(
 		notificationRepo,
 		conversationSvc,
@@ -223,6 +265,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		TimelineHandler:       timelineHandler,
 		DonnaEventHandler:     donnaEventHandler,
 		DonnaReminderHandler:  donnaReminderHandler,
+		AutomationHandler:     automationHandler,
 		NotificationHandler:   notificationHandler,
 		PushHandler:           pushHandler,
 		ChatHandler:           chatHandler,
@@ -235,6 +278,8 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	defer runCancel()
 	go notificationScheduler.Run(runCtx)
 	appLog.Info(ctx, "notification scheduler started")
+	go automationScheduler.Run(runCtx)
+	appLog.Info(ctx, "automation scheduler started")
 	go notificationDispatcher.Run(runCtx)
 	appLog.Info(ctx, "notification dispatcher started")
 	if calendarParts.service != nil {

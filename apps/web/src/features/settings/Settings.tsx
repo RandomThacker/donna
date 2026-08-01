@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Icon } from "@/components/common";
 import { useTheme } from "@/components/theme";
 import { useAuth } from "@/features/auth";
+import { AutomationsPanel } from "@/features/automations";
 import { navItemsForPath } from "@/features/dashboard/dashboardNav";
 import { DashboardSidebar } from "@/features/dashboard/sections/DashboardSidebar";
 
@@ -58,8 +59,8 @@ export function Settings() {
             <header className={styles.intro}>
               <h1 className={styles.pageTitle}>Settings</h1>
               <p className={styles.body}>
-                Appearance, account, and a shortcut to chat commands.
-                Calendar connections live under Integrations.
+                Appearance, automations, account, and a shortcut to chat
+                commands. Calendar connections live under Integrations.
               </p>
             </header>
 
@@ -93,6 +94,21 @@ export function Settings() {
                     </span>
                   </button>
                 </div>
+              </div>
+            </section>
+
+            <section className={styles.section} aria-labelledby="automations-heading">
+              <div>
+                <h2 id="automations-heading" className={styles.sectionTitle}>
+                  Automations
+                </h2>
+                <p className={styles.sectionHint}>
+                  Scheduled Donna commands — agenda, tasks, or a custom set —
+                  posted into chat at a local time.
+                </p>
+              </div>
+              <div className={styles.card}>
+                <AutomationsPanel />
               </div>
             </section>
 

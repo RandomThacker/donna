@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/RandomThacker/donna/services/api/internal/actions"
+	"github.com/RandomThacker/donna/services/api/internal/business"
+	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/model"
 )
 
@@ -41,6 +43,152 @@ func donnaReminderFromAction(r actions.ReminderResult) model.DonnaReminderRespon
 		CreatedAt:      r.CreatedAt.UTC().Format(time.RFC3339Nano),
 		UpdatedAt:      r.UpdatedAt.UTC().Format(time.RFC3339Nano),
 	}
+}
+
+func automationFromAction(a actions.AutomationResult) model.AutomationResponse {
+	out := model.AutomationResponse{
+		ID:          a.ID.String(),
+		PublicID:    a.PublicID,
+		Name:        a.Name,
+		Description: a.Description,
+		Enabled:     a.Enabled,
+		Trigger: model.AutomationTriggerResponse{
+			Type: a.TriggerType,
+			Time: a.TriggerTime,
+		},
+		Timezone: a.Timezone,
+		Commands: model.AutomationCommandsFromEntities(a.Commands),
+		Delivery: model.AutomationDeliveryResponse{
+			Channels: a.DeliveryChannels,
+		},
+		TemplateID:          a.TemplateID,
+		LastStatus:          a.LastStatus,
+		SuccessRate:         a.SuccessRate,
+		AverageDurationMs:   a.AverageDurationMs,
+		LastCommandsTotal:   a.LastCommandsTotal,
+		LastCommandsSuccess: a.LastCommandsSuccess,
+		TotalExecutions:     a.TotalExecutions,
+		CreatedAt:           a.CreatedAt.UTC().Format(time.RFC3339Nano),
+		UpdatedAt:           a.UpdatedAt.UTC().Format(time.RFC3339Nano),
+	}
+	if a.LastRunAt != nil {
+		s := a.LastRunAt.UTC().Format(time.RFC3339Nano)
+		out.LastRunAt = &s
+	}
+	if a.NextRunAt != nil {
+		s := a.NextRunAt.UTC().Format(time.RFC3339Nano)
+		out.NextRunAt = &s
+	}
+	return out
+}
+
+func automationsFromActions(autos []actions.AutomationResult) []model.AutomationResponse {
+	out := make([]model.AutomationResponse, 0, len(autos))
+	for _, a := range autos {
+		out = append(out, automationFromAction(a))
+	}
+	return out
+}
+
+func automationRunFromBusiness(r business.AutomationRunResult, dryRun bool) model.AutomationRunResponse {
+	cmds := make([]model.AutomationRunCommandResponse, 0, len(r.Commands))
+	for _, c := range r.Commands {
+		cmds = append(cmds, model.AutomationRunCommandResponse{
+			OrderIndex:  c.OrderIndex,
+			Command:     c.Command,
+			CommandKey:  c.CommandKey,
+			CommandType: c.CommandType,
+			Status:      c.Status,
+			DurationMs:  c.DurationMs,
+			Response:    c.Response,
+			Error:       c.Error,
+		})
+	}
+	out := model.AutomationRunResponse{
+		Response:        r.Response,
+		Status:          r.Status,
+		DeliveryStatus:  r.DeliveryStatus,
+		CommandsTotal:   r.CommandsTotal,
+		CommandsSuccess: r.CommandsSuccess,
+		CommandsFailed:  r.CommandsFailed,
+		DurationMs:      r.DurationMs,
+		TriggerSource:   r.TriggerSource,
+		Commands:        cmds,
+		DryRun:          dryRun,
+	}
+	if r.Execution != nil {
+		id := r.Execution.ID.String()
+		out.ExecutionID = &id
+	}
+	return out
+}
+
+func automationExecutionFromAction(e actions.AutomationExecutionResult, includeDebug bool) model.AutomationExecutionResponse {
+	entityLike := entity.AutomationExecution{
+		ID:               e.ID,
+		PublicID:         e.PublicID,
+		AutomationID:     e.AutomationID,
+		AutomationName:   e.AutomationName,
+		UserID:           e.UserID,
+		StartedAt:        e.StartedAt,
+		CompletedAt:      e.CompletedAt,
+		Status:           e.Status,
+		DurationMs:       e.DurationMs,
+		CommandsTotal:    e.CommandsTotal,
+		CommandsSuccess:  e.CommandsSuccess,
+		CommandsFailed:   e.CommandsFailed,
+		TriggerSource:    e.TriggerSource,
+		DeliveryChannels: e.DeliveryChannels,
+		DeliveryStatus:   e.DeliveryStatus,
+		Response:         e.Response,
+		Error:            e.Error,
+		CreatedAt:        e.CreatedAt,
+		UpdatedAt:        e.UpdatedAt,
+	}
+	if len(e.Commands) > 0 {
+		entityLike.Commands = make([]entity.AutomationCommandExecution, 0, len(e.Commands))
+		for _, c := range e.Commands {
+			entityLike.Commands = append(entityLike.Commands, entity.AutomationCommandExecution{
+				ID:          c.ID,
+				PublicID:    c.PublicID,
+				ExecutionID: e.ID,
+				OrderIndex:  c.OrderIndex,
+				Command:     c.Command,
+				CommandType: c.CommandType,
+				StartedAt:   c.StartedAt,
+				CompletedAt: c.CompletedAt,
+				Status:      c.Status,
+				DurationMs:  c.DurationMs,
+				Response:    c.Response,
+				Error:       c.Error,
+			})
+		}
+	}
+	return model.AutomationExecutionFromEntity(entityLike, includeDebug)
+}
+
+func automationExecutionsFromActions(rows []actions.AutomationExecutionResult, includeDebug bool) []model.AutomationExecutionResponse {
+	out := make([]model.AutomationExecutionResponse, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, automationExecutionFromAction(row, includeDebug))
+	}
+	return out
+}
+
+func automationAnalyticsFromBusiness(a business.AutomationAnalytics) model.AutomationAnalyticsResponse {
+	out := model.AutomationAnalyticsResponse{
+		TotalExecutions:            a.TotalExecutions,
+		SuccessRate:                a.SuccessRate,
+		FailureRate:                a.FailureRate,
+		AverageDurationMs:          a.AverageDurationMs,
+		AverageCommandsPerRun:      a.AverageCommandsPerRun,
+		MostFrequentAutomationName: a.MostFrequentAutomationName,
+	}
+	if a.MostFrequentAutomationID != nil {
+		s := a.MostFrequentAutomationID.String()
+		out.MostFrequentAutomationID = &s
+	}
+	return out
 }
 
 func taskOccurrenceFromAction(o actions.TaskOccurrenceResult) model.TaskOccurrenceResponse {

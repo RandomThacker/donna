@@ -1,0 +1,89 @@
+templates:
+  - id: morning_brief
+    name: Morning Brief
+    description: Agenda plus tasks due today — Donna posts a combined morning check-in.
+    commands:
+      - command: todays_agenda
+        variables:
+          range: today
+      - command: tasks_due
+        variables:
+          priority: all
+    default_schedule:
+      type: daily
+      time: "09:00"
+
+  - id: todays_agenda
+    name: Today's Agenda
+    description: What's on your timeline for today.
+    commands:
+      - command: todays_agenda
+        variables:
+          range: today
+    default_schedule:
+      type: daily
+      time: "08:30"
+
+  - id: task_due
+    name: Task Review
+    description: Open tasks due on today's journal.
+    commands:
+      - command: tasks_due
+        variables:
+          priority: all
+    default_schedule:
+      type: daily
+      time: "10:00"
+
+  - id: tomorrow_prep
+    name: Tomorrow Prep
+    description: Peek at tomorrow so tonight feels calmer.
+    commands:
+      - command: todays_agenda
+        variables:
+          range: tomorrow
+    default_schedule:
+      type: daily
+      time: "20:00"
+
+  - id: evening_review
+    name: Evening Review
+    description: Wrap today and glance at tomorrow.
+    commands:
+      - command: tasks_due
+        variables:
+          priority: all
+      - command: todays_agenda
+        variables:
+          range: tomorrow
+    default_schedule:
+      type: daily
+      time: "18:30"
+
+  - id: upcoming_meetings
+    name: Upcoming Meetings
+    description: Today's calendar and reminders in one place.
+    commands:
+      - command: todays_agenda
+        variables:
+          range: today
+    default_schedule:
+      type: daily
+      time: "08:00"
+
+  - id: say_hello
+    name: Say Hello
+    description: A warm hello from Donna in chat.
+    commands:
+      - command: greeting
+    default_schedule:
+      type: daily
+      time: "09:00"
+
+  - id: custom
+    name: Custom Automation
+    description: Write your own commands — same phrases you'd type in chat.
+    commands: []
+    default_schedule:
+      type: daily
+      time: "09:00"

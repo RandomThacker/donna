@@ -25,6 +25,7 @@ type Options struct {
 	TimelineHandler       *handler.TimelineHandler
 	DonnaEventHandler       *handler.DonnaEventHandler
 	DonnaReminderHandler    *handler.DonnaReminderHandler
+	AutomationHandler       *handler.AutomationHandler
 	NotificationHandler     *handler.NotificationHandler
 	PushHandler             *handler.PushHandler
 	ChatHandler             *handler.ChatHandler
@@ -144,6 +145,21 @@ func New(opts Options) *gin.Engine {
 			v1.POST(constant.PathDonnaReminders, auth, opts.DonnaReminderHandler.Create)
 			v1.PATCH(constant.PathDonnaReminderByID, auth, opts.DonnaReminderHandler.Update)
 			v1.DELETE(constant.PathDonnaReminderByID, auth, opts.DonnaReminderHandler.Delete)
+		}
+
+		if opts.AutomationHandler != nil && opts.TokenIssuer != nil {
+			auth := middleware.RequireAuth(opts.TokenIssuer)
+			v1.GET(constant.PathAutomationTemplates, auth, opts.AutomationHandler.ListTemplates)
+			v1.GET(constant.PathAutomationHistoryAll, auth, opts.AutomationHandler.ListAllHistory)
+			v1.GET(constant.PathAutomationAnalytics, auth, opts.AutomationHandler.Analytics)
+			v1.GET(constant.PathAutomationExecutionByID, auth, opts.AutomationHandler.GetExecution)
+			v1.GET(constant.PathAutomations, auth, opts.AutomationHandler.List)
+			v1.POST(constant.PathAutomations, auth, opts.AutomationHandler.Create)
+			v1.POST(constant.PathAutomationRun, auth, opts.AutomationHandler.Run)
+			v1.POST(constant.PathAutomationPreview, auth, opts.AutomationHandler.Preview)
+			v1.GET(constant.PathAutomationHistory, auth, opts.AutomationHandler.History)
+			v1.PATCH(constant.PathAutomationByID, auth, opts.AutomationHandler.Update)
+			v1.DELETE(constant.PathAutomationByID, auth, opts.AutomationHandler.Delete)
 		}
 
 		if opts.NotificationHandler != nil && opts.TokenIssuer != nil {

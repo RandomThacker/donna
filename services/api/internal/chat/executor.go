@@ -62,25 +62,38 @@ func (e *Executor) Execute(ctx context.Context, in ExecuteInput) CommandResult {
 		return CommandResult{Reply: "Donna isn't ready for commands yet.", Intent: intent.Kind}
 	}
 
-	reply, err := e.dispatch(ctx, in.UserID, now, *intent)
+	reply, err := e.dispatch(ctx, in.UserID, now, *intent, in.DryRun)
 	if err != nil {
 		return CommandResult{
 			Reply:  fmt.Sprintf("I couldn't do that. %s", friendlyErr(err)),
 			Intent: intent.Kind,
+			Error:  friendlyErr(err),
 		}
 	}
 	return CommandResult{Reply: reply, Intent: intent.Kind}
 }
 
-func (e *Executor) dispatch(ctx context.Context, userID uuid.UUID, now time.Time, intent Intent) (string, error) {
+func (e *Executor) dispatch(ctx context.Context, userID uuid.UUID, now time.Time, intent Intent, dryRun bool) (string, error) {
 	switch intent.Kind {
 	case IntentCreateTask:
+		if dryRun {
+			return dryRunMutationReply("create task", intent.Title), nil
+		}
 		return e.createTask(ctx, userID, now, intent)
 	case IntentCompleteTask:
+		if dryRun {
+			return dryRunMutationReply("complete task", intent.TargetTitle), nil
+		}
 		return e.completeTask(ctx, userID, now, intent)
 	case IntentCreateReminder:
+		if dryRun {
+			return dryRunMutationReply("create reminder", intent.Title), nil
+		}
 		return e.createReminder(ctx, userID, intent)
 	case IntentCreateEvent:
+		if dryRun {
+			return dryRunMutationReply("create event", intent.Title), nil
+		}
 		return e.createEvent(ctx, userID, intent)
 	case IntentQueryToday:
 		from, to := dayWindow(now, intent.Timezone, 0)
@@ -95,6 +108,14 @@ func (e *Executor) dispatch(ctx context.Context, userID uuid.UUID, now time.Time
 	default:
 		return UnknownHelp, nil
 	}
+}
+
+func dryRunMutationReply(action, title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return fmt.Sprintf("Preview: would %s (nothing was saved).", action)
+	}
+	return fmt.Sprintf("Preview: would %s %q (nothing was saved).", action, title)
 }
 
 func greetingReply(displayName string, now time.Time, tz string) string {

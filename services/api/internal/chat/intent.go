@@ -102,6 +102,8 @@ type CommandRequest struct {
 type CommandResult struct {
 	Reply  string     `json:"reply"`
 	Intent IntentKind `json:"intent"`
+	// Error is set when action-layer execution failed (reply may still be user-facing).
+	Error string `json:"error,omitempty"`
 }
 
 // ExecuteInput is required by the executor (not part of Intent).
@@ -111,4 +113,6 @@ type ExecuteInput struct {
 	Now         time.Time
 	Message     string
 	DisplayName string
+	// DryRun simulates mutation intents without writing to the database.
+	DryRun bool
 }

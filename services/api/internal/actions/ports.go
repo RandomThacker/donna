@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/RandomThacker/donna/services/api/internal/automationcatalog"
 	"github.com/RandomThacker/donna/services/api/internal/business"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/google/uuid"
@@ -21,6 +22,25 @@ type ReminderService interface {
 	Create(ctx context.Context, userID uuid.UUID, in business.CreateDonnaReminderInput) (entity.DonnaReminder, error)
 	Update(ctx context.Context, userID, reminderID uuid.UUID, in business.UpdateDonnaReminderInput) (entity.DonnaReminder, error)
 	Delete(ctx context.Context, userID, reminderID uuid.UUID) error
+}
+
+// AutomationService is the service port used by automation actions.
+type AutomationService interface {
+	Create(ctx context.Context, userID uuid.UUID, in business.CreateAutomationInput) (entity.Automation, error)
+	Update(ctx context.Context, userID, autoID uuid.UUID, in business.UpdateAutomationInput) (entity.Automation, error)
+	Delete(ctx context.Context, userID, autoID uuid.UUID) error
+	List(ctx context.Context, userID uuid.UUID) ([]entity.Automation, error)
+	ListTemplates() ([]automationcatalog.Template, error)
+	GetOwned(ctx context.Context, userID, autoID uuid.UUID) (entity.Automation, error)
+}
+
+// AutomationExecutionQueryService is the port for history / metrics / analytics.
+type AutomationExecutionQueryService interface {
+	GetExecution(ctx context.Context, userID, executionID uuid.UUID) (entity.AutomationExecution, error)
+	ListHistoryForAutomation(ctx context.Context, userID, automationID uuid.UUID, limit int) ([]entity.AutomationExecution, error)
+	ListHistoryForUser(ctx context.Context, userID uuid.UUID, limit int) ([]entity.AutomationExecution, error)
+	MetricsForAutomations(ctx context.Context, userID uuid.UUID, automationIDs []uuid.UUID) (map[uuid.UUID]entity.AutomationRunMetrics, error)
+	Analytics(ctx context.Context, userID uuid.UUID) (business.AutomationAnalytics, error)
 }
 
 // TaskService is the service port used by task actions.

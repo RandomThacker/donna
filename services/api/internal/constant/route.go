@@ -58,6 +58,16 @@ const (
 	PathDonnaReminders    = "/donna/reminders"
 	PathDonnaReminderByID = "/donna/reminders/:id"
 
+	PathAutomations             = "/automations"
+	PathAutomationByID          = "/automations/:id"
+	PathAutomationRun           = "/automations/:id/run"
+	PathAutomationPreview       = "/automations/:id/preview"
+	PathAutomationTemplates     = "/automations/templates"
+	PathAutomationHistoryAll    = "/automations/history"
+	PathAutomationAnalytics     = "/automations/analytics"
+	PathAutomationHistory       = "/automations/:id/history"
+	PathAutomationExecutionByID = "/automations/executions/:id"
+
 	PathNotifications           = "/notifications"
 	PathNotificationRead        = "/notifications/:id/read"
 	PathNotificationDismiss     = "/notifications/:id/dismiss"

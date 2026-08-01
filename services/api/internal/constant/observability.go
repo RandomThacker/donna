@@ -47,6 +47,7 @@ const (
 	ModuleTask         = "task"
 	ModuleNote         = "note"
 	ModuleChat         = "chat"
+	ModuleAutomation   = "automation"
 	ModuleDashboard    = "dashboard"
 	ModuleScheduler    = "scheduler"
 	ModuleAI           = "ai"

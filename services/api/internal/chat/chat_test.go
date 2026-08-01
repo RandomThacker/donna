@@ -221,6 +221,26 @@ func TestExecutorCreateTaskViaActions(t *testing.T) {
 	}
 }
 
+func TestExecutorDryRunSkipsMutation(t *testing.T) {
+	t.Parallel()
+	taskSvc := &memTaskService{}
+	reg := &actions.Registry{CreateTask: actions.NewCreateTaskAction(taskSvc, nil)}
+	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{
+		Kind: chat.IntentCreateTask, Title: "Finish Timeline UI", Timezone: "UTC",
+	}}, reg)
+	out := ex.Execute(context.Background(), chat.ExecuteInput{
+		UserID: uuid.MustParse("018f0000-0000-7000-8000-000000000502"), Timezone: "UTC",
+		Now: time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), Message: "Add task Finish Timeline UI",
+		DryRun: true,
+	})
+	if taskSvc.created {
+		t.Fatal("dry-run must not create tasks")
+	}
+	if !strings.Contains(out.Reply, "Preview") || !strings.Contains(out.Reply, "nothing was saved") {
+		t.Fatalf("reply = %q", out.Reply)
+	}
+}
+
 type memTimelineService struct {
 	items []entity.TimelineItem
 }
