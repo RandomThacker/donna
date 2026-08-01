@@ -10,14 +10,15 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/idgen"
+	"github.com/RandomThacker/donna/services/api/internal/occurrence"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/google/uuid"
 )
 
-// NotificationService manages timeline-derived notification records (no delivery).
+// NotificationService manages occurrence-derived notification records (no delivery).
 type NotificationService struct {
 	notifications repository.NotificationRepository
-	timeline      *TimelineService
+	occurrences   occurrence.Service
 	policies      *NotificationPolicyResolver
 	now           func() time.Time
 }
@@ -25,7 +26,7 @@ type NotificationService struct {
 // NewNotificationService constructs a NotificationService.
 func NewNotificationService(
 	notifications repository.NotificationRepository,
-	timeline *TimelineService,
+	occurrences occurrence.Service,
 	policies *NotificationPolicyResolver,
 ) *NotificationService {
 	if policies == nil {
@@ -33,7 +34,7 @@ func NewNotificationService(
 	}
 	return &NotificationService{
 		notifications: notifications,
-		timeline:      timeline,
+		occurrences:   occurrences,
 		policies:      policies,
 		now:           time.Now,
 	}
@@ -77,27 +78,43 @@ func (s *NotificationService) MarkDismissed(ctx context.Context, userID, id uuid
 	return s.notifications.MarkDismissed(ctx, id, userID, s.now().UTC())
 }
 
-// EnqueueForUser inspects the user's near-term timeline and creates PENDING notifications.
+// EnqueueForUser inspects the user's near-term occurrences and creates PENDING notifications.
 // Idempotent on (occurrence_id, notification_type).
 func (s *NotificationService) EnqueueForUser(ctx context.Context, userID uuid.UUID) (created int, err error) {
+	created, _, err = s.enqueueForUser(ctx, userID)
+	return created, err
+}
+
+func (s *NotificationService) enqueueForUser(
+	ctx context.Context,
+	userID uuid.UUID,
+) (created int, stats FeedBuildStats, err error) {
+	stats.FeedSource = FeedSourceOccurrence
 	if userID == uuid.Nil {
-		return 0, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
+		return 0, stats, fmt.Errorf("%w: user id is required", apperr.ErrValidation)
 	}
-	if s.timeline == nil {
-		return 0, fmt.Errorf("%w: timeline service is not configured", apperr.ErrInvalid)
+	if s.occurrences == nil {
+		return 0, stats, fmt.Errorf("%w: occurrence service is not configured", apperr.ErrInvalid)
 	}
 
 	now := s.now().UTC()
 	windowEnd := now.Add(constant.NotificationLookaheadWindow)
-	timelineTo := windowEnd.Add(constant.NotificationMaxPolicyLead)
+	queryTo := windowEnd.Add(constant.NotificationMaxPolicyLead)
+	stats.WindowFrom = now
+	stats.WindowTo = windowEnd
 
-	items, err := s.timeline.List(ctx, userID, now, timelineTo)
+	items, listStats, err := occurrence.ListUpcomingWithStats(s.occurrences, ctx, userID, now, queryTo)
 	if err != nil {
-		return 0, err
+		return 0, stats, err
 	}
+	stats.ProvidersQueried = listStats.ProvidersQueried
+	stats.OccurrencesReturned = listStats.OccurrencesReturned
+	stats.AfterExpansion = listStats.AfterExpansion
+	stats.AfterDedup = listStats.AfterDedup
+	stats.DatabaseQueries = listStats.DatabaseQueries
 
 	for _, item := range items {
-		if item.Status == constant.TimelineStatusCancelled {
+		if item.Status == occurrence.StatusCancelled {
 			continue
 		}
 		policy := s.policies.Resolve(item)
@@ -110,27 +127,29 @@ func (s *NotificationService) EnqueueForUser(ctx context.Context, userID uuid.UU
 			continue
 		}
 		ok, err := s.enqueueItem(ctx, userID, item, reminderAt)
+		stats.DatabaseQueries++ // CreateIdempotent (insert or conflict check)
 		if err != nil {
-			return created, err
+			return created, stats, err
 		}
 		if ok {
 			created++
 		}
 	}
-	return created, nil
+	stats.Notifications = created
+	return created, stats, nil
 }
 
 func (s *NotificationService) enqueueItem(
 	ctx context.Context,
 	userID uuid.UUID,
-	item entity.TimelineItem,
+	item occurrence.Occurrence,
 	scheduledFor time.Time,
 ) (bool, error) {
 	occID := item.OccurrenceID
 	if occID == "" {
 		occID = item.ID
 	}
-	notifType := notificationTypeFromTimeline(item.Type)
+	notifType := notificationTypeFromOccurrence(item.Type)
 	if notifType == "" {
 		return false, nil
 	}
@@ -183,20 +202,20 @@ func (s *NotificationService) enqueueItem(
 	return created, err
 }
 
-func notificationTypeFromTimeline(timelineType string) string {
-	switch timelineType {
-	case constant.TimelineTypeEvent:
+func notificationTypeFromOccurrence(t occurrence.OccurrenceType) string {
+	switch t {
+	case occurrence.TypeEvent:
 		return constant.NotificationTypeEvent
-	case constant.TimelineTypeReminder:
+	case occurrence.TypeReminder:
 		return constant.NotificationTypeReminder
 	default:
 		return ""
 	}
 }
 
-func notificationBody(item entity.TimelineItem, scheduledFor time.Time) string {
+func notificationBody(item occurrence.Occurrence, scheduledFor time.Time) string {
 	switch item.Type {
-	case constant.TimelineTypeReminder:
+	case occurrence.TypeReminder:
 		return "Reminder is due"
 	default:
 		mins := int(item.StartAt.Sub(scheduledFor).Minutes())
@@ -207,12 +226,13 @@ func notificationBody(item entity.TimelineItem, scheduledFor time.Time) string {
 	}
 }
 
-func buildNotificationPayload(item entity.TimelineItem, occurrenceID string) (json.RawMessage, error) {
+func buildNotificationPayload(item occurrence.Occurrence, occurrenceID string) (json.RawMessage, error) {
+	// Keep payload keys stable for clients (timelineItemId remains the concrete id).
 	payload := map[string]any{
 		"timelineItemId": item.ID,
 		"occurrenceId":   occurrenceID,
-		"source":         item.Source,
-		"type":           item.Type,
+		"source":         string(item.Source),
+		"type":           string(item.Type),
 		"startAt":        item.StartAt.UTC().Format(time.RFC3339Nano),
 		"endAt":          item.EndAt.UTC().Format(time.RFC3339Nano),
 		"timezone":       item.Timezone,

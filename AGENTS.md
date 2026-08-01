@@ -17,6 +17,8 @@ Read before implementing:
 13. [docs/DATABASE.md](docs/DATABASE.md) — persistence standards (no tables yet)
 14. [docs/PHASE1_PLAN.md](docs/PHASE1_PLAN.md) — milestone order
 15. [docs/TIMELINE_UI.md](docs/TIMELINE_UI.md) — Timeline planning UI (Phase 3.1)
+16. [docs/OCCURRENCE_DOMAIN.md](docs/OCCURRENCE_DOMAIN.md) — scheduling Occurrence model vs Timeline
+17. [docs/OCCURRENCE_SERVICE.md](docs/OCCURRENCE_SERVICE.md) — OccurrenceService pipeline (scheduling feed)
 
 Project rules also live in `.cursor/rules/`.
 

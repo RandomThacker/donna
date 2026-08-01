@@ -24,6 +24,8 @@ import (
 	"github.com/RandomThacker/donna/services/api/internal/microsoftcalendar"
 	"github.com/RandomThacker/donna/services/api/internal/microsoftoauth"
 	"github.com/RandomThacker/donna/services/api/internal/oauthstate"
+	"github.com/RandomThacker/donna/services/api/internal/occurrence"
+	occurrenceprovider "github.com/RandomThacker/donna/services/api/internal/occurrence/provider"
 	"github.com/RandomThacker/donna/services/api/internal/repository"
 	"github.com/RandomThacker/donna/services/api/internal/router"
 	"github.com/RandomThacker/donna/services/api/internal/scheduler"
@@ -107,10 +109,18 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 			business.NewDonnaReminderTimelineProvider(donnaReminderRepo),
 		},
 	})
+	occurrenceSvc := occurrence.NewService(occurrence.ServiceDeps{
+		Providers: []occurrence.Provider{
+			occurrenceprovider.NewGoogleOccurrenceProvider(calendarEventsRepo),
+			occurrenceprovider.NewMicrosoftICSOccurrenceProvider(calendarEventsRepo),
+			occurrenceprovider.NewDonnaEventOccurrenceProvider(donnaEventRepo),
+			occurrenceprovider.NewDonnaReminderOccurrenceProvider(donnaReminderRepo),
+		},
+	})
 	notificationRepo := repository.NewNotificationRepository(pool)
 	notificationSvc := business.NewNotificationService(
 		notificationRepo,
-		timelineSvc,
+		occurrenceSvc,
 		business.NewNotificationPolicyResolver(),
 	)
 

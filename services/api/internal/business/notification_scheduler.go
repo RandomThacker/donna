@@ -2,10 +2,12 @@ package business
 
 import (
 	"context"
+	"runtime"
 	"time"
 
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
+	"github.com/RandomThacker/donna/services/api/internal/occurrence"
 	"github.com/google/uuid"
 )
 
@@ -14,7 +16,7 @@ type ActiveUserIDLister interface {
 	ListActiveIDs(ctx context.Context) ([]uuid.UUID, error)
 }
 
-// NotificationScheduler periodically enqueues PENDING notifications from the timeline.
+// NotificationScheduler periodically enqueues PENDING notifications from occurrences.
 type NotificationScheduler struct {
 	notifications *NotificationService
 	users         ActiveUserIDLister
@@ -57,18 +59,41 @@ func (s *NotificationScheduler) Run(ctx context.Context) {
 	}
 }
 
-// Tick scans all active users once (exported for tests).
+// Tick scans all active users once (exported for tests) and logs tick metrics.
 func (s *NotificationScheduler) Tick(ctx context.Context) {
+	wallStart := time.Now()
+	var memBefore runtime.MemStats
+	runtime.ReadMemStats(&memBefore)
+
+	now := s.now().UTC()
+	metrics := SchedulerTickMetrics{
+		FeedSource: FeedSourceOccurrence,
+		WindowFrom: now,
+		WindowTo:   now.Add(constant.NotificationLookaheadWindow),
+	}
+
 	ids, err := s.users.ListActiveIDs(ctx)
+	metrics.DatabaseQueries++ // ListActiveIDs
 	if err != nil {
 		if s.log != nil {
 			s.log.Error(ctx, "notification scheduler list users failed", constant.LogAttrError, err)
 		}
+		metrics.Duration = time.Since(wallStart)
+		var memAfter runtime.MemStats
+		runtime.ReadMemStats(&memAfter)
+		if memAfter.TotalAlloc >= memBefore.TotalAlloc {
+			metrics.AllocBytes = memAfter.TotalAlloc - memBefore.TotalAlloc
+		}
+		metrics.Log(ctx, s.log)
 		return
 	}
-	var total int
+	metrics.UsersScanned = len(ids)
+	if s.notifications != nil {
+		metrics.ProvidersQueried = occurrence.ProviderCount(s.notifications.occurrences)
+	}
+
 	for _, userID := range ids {
-		n, err := s.notifications.EnqueueForUser(ctx, userID)
+		_, userStats, err := s.notifications.enqueueForUser(ctx, userID)
 		if err != nil {
 			if s.log != nil {
 				s.log.Warn(ctx, "notification enqueue failed",
@@ -78,9 +103,14 @@ func (s *NotificationScheduler) Tick(ctx context.Context) {
 			}
 			continue
 		}
-		total += n
+		metrics.MergeUser(userStats)
 	}
-	if s.log != nil && total > 0 {
-		s.log.Info(ctx, "notification scheduler enqueued", "created", total, "users", len(ids))
+
+	var memAfter runtime.MemStats
+	runtime.ReadMemStats(&memAfter)
+	if memAfter.TotalAlloc >= memBefore.TotalAlloc {
+		metrics.AllocBytes = memAfter.TotalAlloc - memBefore.TotalAlloc
 	}
+	metrics.Duration = time.Since(wallStart)
+	metrics.Log(ctx, s.log)
 }
