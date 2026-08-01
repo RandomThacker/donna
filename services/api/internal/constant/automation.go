@@ -26,18 +26,25 @@ var AllowedAutomationTriggerTypes = map[string]struct{}{
 	AutomationTriggerWeekly: {},
 }
 
-// Automation delivery channels (Phase 1: chat only).
+// Automation delivery channels.
 const (
 	AutomationDeliveryChat     = "chat"
+	AutomationDeliveryPush     = "push"
 	AutomationDeliveryTelegram = "telegram" // future
-	AutomationDeliveryPush     = "push"     // future
 	AutomationDeliveryWhatsApp = "whatsapp" // future
 	AutomationDeliveryEmail    = "email"    // future
 )
 
-// AllowedAutomationDeliveryChannels is the Phase 1 whitelist.
+// AllowedAutomationDeliveryChannels is the whitelist for create/update.
 var AllowedAutomationDeliveryChannels = map[string]struct{}{
 	AutomationDeliveryChat: {},
+	AutomationDeliveryPush: {},
+}
+
+// DefaultAutomationDeliveryChannels is applied when create omits delivery.
+var DefaultAutomationDeliveryChannels = []string{
+	AutomationDeliveryChat,
+	AutomationDeliveryPush,
 }
 
 // Automation execution statuses.

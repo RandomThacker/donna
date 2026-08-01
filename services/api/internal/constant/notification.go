@@ -61,5 +61,7 @@ const NotificationCalendarEventPath = "/dashboard/calendar?event="
 // NotificationDispatcherBatchLimit caps due notifications processed per tick.
 const NotificationDispatcherBatchLimit = 100
 
-// WebPushTTL is the push message time-to-live in seconds.
-const WebPushTTL = 60
+// WebPushTTL is how long the push service may retain a message if the device
+// is offline (seconds). 60s was too short for mobile Doze / brief offline —
+// FCM accepted the send then dropped it before the phone woke up.
+const WebPushTTL = 86400

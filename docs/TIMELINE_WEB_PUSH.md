@@ -28,3 +28,5 @@ Promotes due **PENDING** notifications to **SENT** for in-app surfaces and brows
 | Installed PWA + notification permission | Required on iOS; recommended on Android |
 
 Local `next dev` disables the service worker by default — use a production web build / installed PWA to receive OS pushes.
+
+Push TTL is **24 hours** (`WebPushTTL`) with high urgency so briefly offline / Doze phones still receive calendar alerts. Automations deliver to **chat and Web Push** when `push` is in `delivery.channels` (default).

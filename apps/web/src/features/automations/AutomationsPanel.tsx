@@ -429,7 +429,8 @@ export function AutomationsPanel() {
       {error ? <p className={styles.error}>{error}</p> : null}
       <p className={styles.note}>
         Uses your device timezone ({timezone}). Donna runs each command through
-        chat and posts one combined reply.{" "}
+        chat, then posts to Donna Chat and sends a phone push when you&apos;re
+        subscribed.{" "}
         <a href="/dashboard/automations" className="underline underline-offset-2">
           View history
         </a>

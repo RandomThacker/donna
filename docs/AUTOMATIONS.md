@@ -46,7 +46,7 @@ Intent Catalog (`internal/automationcatalog/templates.yaml`) is **configuration*
 | `enabled` | Soft pause |
 | `trigger` | `{ type: "daily"\|"weekly", time: "HH:MM", days?: ["MO"…"SU"] }` — `days` required for weekly |
 | `commands` | Ordered structured steps: `{ command, variables }` |
-| `delivery` | Phase 1: `{ channels: ["chat"] }` |
+| `delivery` | `{ channels: ["chat","push"] }` — chat bubble + Web Push |
 | `last_run_at` / `next_run_at` | Schedule markers (updated by scheduled runs only) |
 
 Public ids: `atm_`.
@@ -102,15 +102,20 @@ Development builds include a `debug` object on execution detail (raw command out
 - `000033` — automation_executions + automation_command_executions
 - `000034` — structured commands (`command` + `variables`)
 - `000036` — weekly trigger days (`trigger_days`, `daily|weekly`)
+- `000037` — add `push` delivery channel (default chat+push)
 
 ## Personality
 
 Combined automation replies go through the Personality Engine (`KindAutomation` / `KindGreeting` / `KindMorningBrief`). Per-command chat execution skips personality so the wrap owns tone, name, and nickname.
 
+## Delivery
+
+After commands finish, Donna posts one combined reply to **chat** and fans out the same text via **Web Push** (when VAPID is configured and the user has a subscribed device). Preview skips both.
+
 ## Explicit non-goals (this phase)
 
 - Retries / replay / conditions
-- Telegram / Push / WhatsApp / Email delivery
+- Telegram / WhatsApp / Email delivery
 - AI-authored automations
 - Cron expressions / time windows beyond daily & weekly weekdays
 

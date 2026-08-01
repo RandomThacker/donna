@@ -137,9 +137,9 @@ func (s *AutomationScheduler) Tick(ctx context.Context) {
 }
 
 func (s *AutomationScheduler) fire(ctx context.Context, auto entity.Automation, now time.Time) error {
-	if !deliversChat(auto.DeliveryChannels) {
+	if !deliversChat(auto.DeliveryChannels) && !deliversPush(auto.DeliveryChannels) {
 		if s.log != nil {
-			s.log.Warn(ctx, "automation skipped — no chat delivery channel",
+			s.log.Warn(ctx, "automation skipped — no delivery channels",
 				"automation_id", auto.ID.String(),
 			)
 		}
@@ -173,4 +173,13 @@ func deliversChat(channels []string) bool {
 	}
 	// Empty channels default to chat for migrated/legacy rows.
 	return len(channels) == 0
+}
+
+func deliversPush(channels []string) bool {
+	for _, ch := range channels {
+		if strings.EqualFold(strings.TrimSpace(ch), constant.AutomationDeliveryPush) {
+			return true
+		}
+	}
+	return false
 }

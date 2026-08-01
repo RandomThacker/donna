@@ -161,7 +161,7 @@ func (d *NotificationDispatcher) webPushConfigured() bool {
 }
 
 // deliverWebPush fans out to all live device subscriptions.
-// Returns true when delivery is considered successful (any device ok, or no devices).
+// Returns true when at least one device accepted the push.
 func (d *NotificationDispatcher) deliverWebPush(ctx context.Context, n entity.Notification) bool {
 	subs, err := d.pushSubs.List(ctx, n.UserID)
 	if err != nil {
@@ -174,7 +174,13 @@ func (d *NotificationDispatcher) deliverWebPush(ctx context.Context, n entity.No
 		return false
 	}
 	if len(subs) == 0 {
-		return true
+		if d.log != nil {
+			d.log.Info(ctx, "web push skipped — no device subscriptions",
+				"notification_id", n.ID.String(),
+				"user_id", n.UserID.String(),
+			)
+		}
+		return false
 	}
 
 	payload := webpush.PayloadFromNotification(n)
@@ -196,6 +202,13 @@ func (d *NotificationDispatcher) deliverWebPush(ctx context.Context, n entity.No
 			continue
 		}
 		delivered++
+	}
+	if d.log != nil {
+		d.log.Info(ctx, "web push fan-out",
+			"notification_id", n.ID.String(),
+			"subscriptions", len(subs),
+			"delivered", delivered,
+		)
 	}
 	return delivered > 0
 }

@@ -81,7 +81,8 @@ func (s *vapidSender) Send(ctx context.Context, sub entity.PushSubscription, pay
 		VAPIDPublicKey:  s.publicKey,
 		VAPIDPrivateKey: s.privateKey,
 		TTL:             s.ttl,
-		Urgency:         webpushlib.UrgencyNormal,
+		// High: time-sensitive calendar / reminder alerts should bypass quiet deferral.
+		Urgency: webpushlib.UrgencyHigh,
 	})
 	if err != nil {
 		return Result{}, err

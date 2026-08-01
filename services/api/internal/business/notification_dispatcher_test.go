@@ -143,6 +143,41 @@ func TestDispatcherSendsWebPushWhenConfigured(t *testing.T) {
 	}
 }
 
+func TestDispatcherMarksWebPushFailedWithoutSubscriptions(t *testing.T) {
+	t.Parallel()
+	userID := uuid.MustParse("018f0000-0000-7000-8000-000000000229")
+	notifID := uuid.MustParse("018f0000-0000-7000-8000-000000000230")
+	now := time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC)
+	scheduled := now.Add(-time.Minute)
+
+	notifRepo := newMemNotificationRepo()
+	notifRepo.byID[notifID] = entity.Notification{
+		ID: notifID, UserID: userID, Title: "Solo", Body: "No devices",
+		Status: constant.NotificationStatusPending, ScheduledFor: &scheduled,
+		DeliveryChannels: []string{constant.DeliveryChannelWebPush, constant.DeliveryChannelChat},
+		ChannelDeliveryStatus: json.RawMessage(`{"WEB_PUSH":"PENDING","CHAT":"PENDING"}`),
+	}
+
+	pushSvc := NewPushSubscriptionService(newMemPushSubRepo())
+	sender := &stubPushSender{}
+	d := NewNotificationDispatcher(notifRepo, nil, pushSvc, sender, nil, nil)
+	d.now = func() time.Time { return now }
+	d.Tick(context.Background())
+
+	if sender.calls != 0 {
+		t.Fatalf("expected no push sends, got %d", sender.calls)
+	}
+	n := notifRepo.byID[notifID]
+	var status map[string]string
+	_ = json.Unmarshal(n.ChannelDeliveryStatus, &status)
+	if status[constant.DeliveryChannelWebPush] != constant.ChannelDeliveryFailed {
+		t.Fatalf("WEB_PUSH should be FAILED with no subscriptions, got %v", status)
+	}
+	if status[constant.DeliveryChannelChat] != constant.ChannelDeliverySent {
+		t.Fatalf("CHAT should still be SENT, got %v", status)
+	}
+}
+
 func TestDispatcherIgnoresFuturePending(t *testing.T) {
 	t.Parallel()
 	userID := uuid.MustParse("018f0000-0000-7000-8000-000000000215")

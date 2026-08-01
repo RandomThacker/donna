@@ -70,11 +70,12 @@ export function formatSchedule(auto: Automation): string {
 }
 
 export function formatDelivery(auto: Automation): string {
-  const channels = auto.delivery?.channels ?? ["chat"];
-  if (channels.length === 0) return "Donna Chat";
+  const channels = auto.delivery?.channels ?? ["chat", "push"];
+  if (channels.length === 0) return "Donna Chat, Push";
   return channels
     .map((ch) => {
       if (ch === "chat") return "Donna Chat";
+      if (ch === "push") return "Push";
       return ch.charAt(0).toUpperCase() + ch.slice(1);
     })
     .join(", ");
@@ -197,7 +198,7 @@ export function buildCreatePayloadFromTemplate(
       command: cmd.command,
       variables: cmd.variables,
     })),
-    delivery: { channels: ["chat"] },
+    delivery: { channels: ["chat", "push"] },
     enabled: true,
   };
 }

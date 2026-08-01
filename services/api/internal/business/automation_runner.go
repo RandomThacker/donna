@@ -5,18 +5,22 @@ import (
 	"fmt"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/logger"
 	"github.com/RandomThacker/donna/services/api/internal/personality"
+	"github.com/RandomThacker/donna/services/api/internal/webpush"
 	"github.com/google/uuid"
 )
 
 // AutomationRunOptions controls history, delivery, schedule markers, and dry-run.
 type AutomationRunOptions struct {
-	TriggerSource  string
-	RecordHistory  bool
+	TriggerSource string
+	RecordHistory bool
+	// DeliverToChat, when true, delivers the combined reply to configured
+	// channels (chat and/or web push). Preview sets this false.
 	DeliverToChat  bool
 	UpdateSchedule bool
 	DryRun         bool
@@ -58,6 +62,8 @@ type AutomationRunner struct {
 	notices     AssistantNoticePoster
 	executions  AutomationExecutionRecorder
 	personality personality.Renderer
+	pushSubs    *PushSubscriptionService
+	pushSender  webpush.Sender
 	log         *logger.Logger
 	now         func() time.Time
 }
@@ -85,6 +91,19 @@ func (r *AutomationRunner) SetPersonality(renderer personality.Renderer) {
 	if r != nil {
 		r.personality = renderer
 	}
+}
+
+// SetWebPush attaches optional Web Push delivery (VAPID). Nil/unconfigured is fine.
+func (r *AutomationRunner) SetWebPush(subs *PushSubscriptionService, sender webpush.Sender) {
+	if r == nil {
+		return
+	}
+	r.pushSubs = subs
+	r.pushSender = sender
+}
+
+func (r *AutomationRunner) webPushConfigured() bool {
+	return r != nil && r.pushSubs != nil && r.pushSender != nil && r.pushSender.Configured()
 }
 
 // Run executes an automation according to opts. Does not change due/idempotency logic.
@@ -241,28 +260,50 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 	var deliveryErr error
 
 	if opts.DeliverToChat {
-		if r.notices == nil {
-			deliveryErr = fmt.Errorf("assistant notice poster is not configured")
-		} else if !deliversChat(auto.DeliveryChannels) {
-			deliveryStatus = constant.AutomationDeliverySkipped
-		} else {
-			loc, err := time.LoadLocation(strings.TrimSpace(auto.Timezone))
-			if err != nil || loc == nil {
-				loc = time.UTC
-			}
-			localNow := now.In(loc)
-			clientID := ClientMessageIDForAutomationRun(auto.PublicID, localNow)
-			if trigger == constant.AutomationTriggerSourceManual && exec.PublicID != "" {
-				clientID = ClientMessageIDForManualRun(exec.PublicID)
-			}
-			_, _, deliveryErr = r.notices.PostAssistantNotice(ctx, auto.UserID, combined, clientID)
-			if deliveryErr != nil {
+		chatWanted := deliversChat(auto.DeliveryChannels)
+		pushWanted := deliversPush(auto.DeliveryChannels)
+		anySent := false
+
+		if chatWanted {
+			if r.notices == nil {
+				deliveryErr = fmt.Errorf("assistant notice poster is not configured")
 				deliveryStatus = constant.AutomationDeliveryFailed
 				execStatus = constant.AutomationExecutionFailed
 				deliveryErrText = deliveryErr.Error()
 			} else {
-				deliveryStatus = constant.AutomationDeliverySent
+				loc, err := time.LoadLocation(strings.TrimSpace(auto.Timezone))
+				if err != nil || loc == nil {
+					loc = time.UTC
+				}
+				localNow := now.In(loc)
+				clientID := ClientMessageIDForAutomationRun(auto.PublicID, localNow)
+				if trigger == constant.AutomationTriggerSourceManual && exec.PublicID != "" {
+					clientID = ClientMessageIDForManualRun(exec.PublicID)
+				}
+				_, _, deliveryErr = r.notices.PostAssistantNotice(ctx, auto.UserID, combined, clientID)
+				if deliveryErr != nil {
+					deliveryStatus = constant.AutomationDeliveryFailed
+					execStatus = constant.AutomationExecutionFailed
+					deliveryErrText = deliveryErr.Error()
+				} else {
+					anySent = true
+					deliveryStatus = constant.AutomationDeliverySent
+				}
 			}
+		}
+
+		if pushWanted && deliveryErr == nil {
+			if r.deliverWebPush(ctx, auto, combined) {
+				anySent = true
+				deliveryStatus = constant.AutomationDeliverySent
+			} else if !anySent {
+				deliveryStatus = constant.AutomationDeliveryFailed
+				deliveryErrText = "web push delivery failed or no device subscribed"
+			}
+		}
+
+		if !chatWanted && !pushWanted {
+			deliveryStatus = constant.AutomationDeliverySkipped
 		}
 	}
 
@@ -320,4 +361,86 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 // ClientMessageIDForManualRun builds a unique delivery id per manual execution.
 func ClientMessageIDForManualRun(executionPublicID string) string {
 	return fmt.Sprintf("automation:manual:%s", strings.TrimSpace(executionPublicID))
+}
+
+func (r *AutomationRunner) deliverWebPush(ctx context.Context, auto entity.Automation, body string) bool {
+	if !r.webPushConfigured() {
+		if r.log != nil {
+			r.log.Info(ctx, "automation web push skipped — not configured",
+				"automation_id", auto.ID.String(),
+			)
+		}
+		return false
+	}
+	subs, err := r.pushSubs.List(ctx, auto.UserID)
+	if err != nil {
+		if r.log != nil {
+			r.log.Warn(ctx, "automation web push list failed",
+				"automation_id", auto.ID.String(),
+				constant.LogAttrError, err,
+			)
+		}
+		return false
+	}
+	if len(subs) == 0 {
+		if r.log != nil {
+			r.log.Info(ctx, "automation web push skipped — no device subscriptions",
+				"automation_id", auto.ID.String(),
+				"user_id", auto.UserID.String(),
+			)
+		}
+		return false
+	}
+
+	title := strings.TrimSpace(auto.Name)
+	if title == "" {
+		title = "Donna"
+	}
+	payload := webpush.Payload{
+		Title:    title,
+		Body:     truncatePushBody(body),
+		DeepLink: constant.NotificationDeepLinkPath,
+	}
+
+	var delivered int
+	for _, sub := range subs {
+		result, sendErr := r.pushSender.Send(ctx, sub, payload)
+		if sendErr != nil {
+			if r.log != nil {
+				r.log.Warn(ctx, "automation web push send failed",
+					"automation_id", auto.ID.String(),
+					"endpoint", sub.Endpoint,
+					"status_code", result.StatusCode,
+					constant.LogAttrError, sendErr,
+				)
+			}
+			if result.Gone {
+				_ = r.pushSubs.Unsubscribe(ctx, auto.UserID, sub.Endpoint)
+			}
+			continue
+		}
+		delivered++
+	}
+	if r.log != nil {
+		r.log.Info(ctx, "automation web push fan-out",
+			"automation_id", auto.ID.String(),
+			"subscriptions", len(subs),
+			"delivered", delivered,
+		)
+	}
+	return delivered > 0
+}
+
+const automationPushBodyMaxRunes = 240
+
+func truncatePushBody(text string) string {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return "Donna has an update for you."
+	}
+	if utf8.RuneCountInString(trimmed) <= automationPushBodyMaxRunes {
+		return trimmed
+	}
+	runes := []rune(trimmed)
+	return strings.TrimSpace(string(runes[:automationPushBodyMaxRunes-1])) + "…"
 }

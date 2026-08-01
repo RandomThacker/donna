@@ -238,6 +238,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 		automationLog,
 	)
 	automationRunner.SetPersonality(personalityRenderer)
+	automationRunner.SetWebPush(pushSubSvc, pushSender)
 	actionRegistry.RunAutomation = actions.NewRunAutomationAction(automationSvc, automationRunner)
 	actionRegistry.PreviewAutomation = actions.NewPreviewAutomationAction(automationSvc, automationRunner)
 
@@ -266,6 +267,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	)
 	if schedRunner := automationScheduler.Runner(); schedRunner != nil {
 		schedRunner.SetPersonality(personalityRenderer)
+		schedRunner.SetWebPush(pushSubSvc, pushSender)
 	}
 
 	notificationDispatcher := business.NewNotificationDispatcher(

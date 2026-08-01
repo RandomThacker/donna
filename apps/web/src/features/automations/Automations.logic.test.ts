@@ -32,7 +32,7 @@ describe("automations", () => {
       command: "todays_agenda",
       variables: { range: "today" },
     });
-    expect(payload.delivery.channels).toEqual(["chat"]);
+    expect(payload.delivery.channels).toEqual(["chat", "push"]);
     expect(payload.enabled).toBe(true);
   });
 

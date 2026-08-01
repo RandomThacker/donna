@@ -463,7 +463,7 @@ func weekdayCode(day time.Weekday) string {
 
 func normalizeDeliveryChannels(raw []string) ([]string, error) {
 	if len(raw) == 0 {
-		return []string{constant.AutomationDeliveryChat}, nil
+		return append([]string(nil), constant.DefaultAutomationDeliveryChannels...), nil
 	}
 	out := make([]string, 0, len(raw))
 	seen := map[string]struct{}{}
@@ -482,7 +482,7 @@ func normalizeDeliveryChannels(raw []string) ([]string, error) {
 		out = append(out, c)
 	}
 	if len(out) == 0 {
-		return []string{constant.AutomationDeliveryChat}, nil
+		return append([]string(nil), constant.DefaultAutomationDeliveryChannels...), nil
 	}
 	return out, nil
 }
