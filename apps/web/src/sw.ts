@@ -34,9 +34,24 @@ function isMobileUserAgent(): boolean {
   return /Android|iPhone|iPad|iPod|Mobile/i.test(self.navigator.userAgent);
 }
 
-/** Desktop → home; mobile → chat. Event deep-links live in the chat "View Event" line. */
+/** Desktop → home; mobile → home with phone sheet open (`?phone=1`). */
 function landingPathForNotification(): string {
-  return isMobileUserAgent() ? "/dashboard/chat" : "/dashboard";
+  return isMobileUserAgent() ? "/dashboard?phone=1" : "/dashboard";
+}
+
+/** Prefer current landing rules; rewrite legacy mobile `/dashboard/chat` payloads. */
+function resolveNotificationTarget(rawUrl: unknown): string {
+  const fallback = landingPathForNotification();
+  if (typeof rawUrl !== "string" || !rawUrl.startsWith("/")) {
+    return fallback;
+  }
+  if (
+    rawUrl === "/dashboard/chat" ||
+    rawUrl.startsWith("/dashboard/chat?")
+  ) {
+    return "/dashboard?phone=1";
+  }
+  return rawUrl;
 }
 
 self.addEventListener("push", (event) => {
@@ -81,11 +96,7 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const raw = event.notification.data as { url?: string } | undefined;
-  const target =
-    typeof raw?.url === "string" && raw.url.startsWith("/")
-      ? raw.url
-      : landingPathForNotification();
-
+  const target = resolveNotificationTarget(raw?.url);
   event.waitUntil(
     (async () => {
       const all = await self.clients.matchAll({
@@ -93,13 +104,19 @@ self.addEventListener("notificationclick", (event) => {
         includeUncontrolled: true,
       });
       for (const client of all) {
-        if ("focus" in client) {
-          await client.focus();
-          if ("navigate" in client) {
-            await (client as WindowClient).navigate(target);
-          }
-          return;
+        if (!("focus" in client)) {
+          continue;
         }
+        await client.focus();
+        try {
+          client.postMessage({ type: "DONNA_OPEN_PHONE" });
+        } catch {
+          // Older clients may not accept messages.
+        }
+        if ("navigate" in client) {
+          await (client as WindowClient).navigate(target);
+        }
+        return;
       }
       await self.clients.openWindow(target);
     })(),

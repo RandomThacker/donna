@@ -49,11 +49,11 @@ var DefaultDeliveryChannels = []string{
 }
 
 // NotificationDeepLinkPath is the default in-app path for Web Push clicks (desktop).
-// Mobile clients open chat instead (handled in the service worker).
+// Mobile clients open /dashboard?phone=1 so the Home phone sheet opens (service worker).
 const NotificationDeepLinkPath = "/dashboard"
 
-// NotificationChatLandingPath is where mobile push taps should land.
-const NotificationChatLandingPath = "/dashboard/chat"
+// NotificationChatLandingPath is the mobile push landing (Home + phone popup).
+const NotificationChatLandingPath = "/dashboard?phone=1"
 
 // NotificationCalendarEventPath prefixes occurrence ids for "View Event" chat links.
 const NotificationCalendarEventPath = "/dashboard/calendar?event="

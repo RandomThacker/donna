@@ -215,7 +215,7 @@ async function showBrowserNotification(body: string): Promise<void> {
   const landing =
     typeof navigator !== "undefined" &&
     /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
-      ? "/dashboard/chat"
+      ? "/dashboard?phone=1"
       : "/dashboard";
   const options: NotificationOptions & { sound?: string; renotify?: boolean } = {
     body: body.trim() || "New message",

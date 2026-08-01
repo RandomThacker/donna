@@ -57,6 +57,38 @@ export function useDonnaPhoneFab() {
     setOpen(true);
   }, []);
 
+  // Web Push / local notification taps land on /dashboard?phone=1 (mobile).
+  useEffect(() => {
+    function consumePhoneQuery(): void {
+      if (typeof window === "undefined") return;
+      const url = new URL(window.location.href);
+      const flag = url.searchParams.get("phone");
+      if (flag !== "1" && flag !== "open") return;
+      openPhone();
+      url.searchParams.delete("phone");
+      const next = `${url.pathname}${url.search}${url.hash}`;
+      window.history.replaceState(null, "", next);
+    }
+
+    function onMessage(event: MessageEvent): void {
+      if (event.data?.type === "DONNA_OPEN_PHONE") {
+        openPhone();
+      }
+    }
+
+    consumePhoneQuery();
+    window.addEventListener("popstate", consumePhoneQuery);
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.addEventListener("message", onMessage);
+    }
+    return () => {
+      window.removeEventListener("popstate", consumePhoneQuery);
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.removeEventListener("message", onMessage);
+      }
+    };
+  }, [openPhone]);
+
   const requestClose = useCallback(() => {
     setExiting(true);
   }, []);
