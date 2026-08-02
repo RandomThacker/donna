@@ -114,14 +114,22 @@ export function Settings() {
             </section>
 
             <section className={styles.section} aria-labelledby="automations-heading">
-              <div>
-                <h2 id="automations-heading" className={styles.sectionTitle}>
-                  Automations
-                </h2>
-                <p className={styles.sectionHint}>
-                  Scheduled Donna commands — agenda, tasks, or a custom set —
-                  posted into chat at a local time.
-                </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 id="automations-heading" className={styles.sectionTitle}>
+                    Automations
+                  </h2>
+                  <p className={styles.sectionHint}>
+                    Scheduled Donna commands — agenda, tasks, or a custom set —
+                    posted into chat at a local time.
+                  </p>
+                </div>
+                <a
+                  href="/dashboard/automations"
+                  className={styles.themeBtn}
+                >
+                  View runs
+                </a>
               </div>
               <div className={styles.card}>
                 <AutomationsPanel />

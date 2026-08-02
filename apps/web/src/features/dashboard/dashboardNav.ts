@@ -49,12 +49,6 @@ export const dashboardNavItems: DashboardNavItem[] = [
     href: "/dashboard/integrations",
   },
   {
-    id: "automations",
-    label: "Automations",
-    icon: "clock",
-    href: "/dashboard/automations",
-  },
-  {
     id: "settings",
     label: "Settings",
     icon: "settings",

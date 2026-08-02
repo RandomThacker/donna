@@ -28,11 +28,5 @@ export const personalityStyles = {
   ].join(" "),
   hint: "text-xs text-donna-muted",
   error: "text-sm text-rose-300",
-  previewGrid: "grid gap-3",
-  previewCard: [
-    "rounded-xl border border-donna-hairline bg-donna-surface-2 px-3 py-3",
-  ].join(" "),
-  previewLabel: "text-xs font-medium uppercase tracking-[0.12em] text-donna-muted",
-  previewBody: "mt-2 whitespace-pre-wrap text-sm text-donna-text",
   optionHint: "mt-1 text-xs text-donna-muted",
 } as const;

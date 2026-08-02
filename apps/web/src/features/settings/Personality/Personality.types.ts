@@ -33,18 +33,3 @@ export type UpdatePersonalityInput = {
   encouragement_level?: string;
   response_style?: string;
 };
-
-export type PersonalityPreviewInput = UpdatePersonalityInput & {
-  timezone?: string;
-};
-
-export type PersonalityPreview = {
-  greeting: string;
-  reminder: string;
-  task_complete: string;
-  error: string;
-  notification: string;
-  automation: string;
-  morning_brief: string;
-  chat: string;
-};

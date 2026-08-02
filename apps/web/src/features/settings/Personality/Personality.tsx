@@ -1,68 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   fetchPersonalityCatalog,
   fetchPersonalityProfile,
-  previewPersonality,
   updatePersonalityProfile,
 } from "./Personality.api";
-import {
-  defaultBrowserTimezone,
-  EMOJI_LEVELS,
-  PREVIEW_LABELS,
-} from "./Personality.logic";
+import { EMOJI_LEVELS } from "./Personality.logic";
 import { personalityStyles as styles } from "./Personality.styles";
 import type {
   PersonalityDefinition,
-  PersonalityPreview,
   PersonalityProfile,
 } from "./Personality.types";
-
-const EMPTY_PREVIEW: PersonalityPreview = {
-  greeting: "",
-  reminder: "",
-  task_complete: "",
-  error: "",
-  notification: "",
-  automation: "",
-  morning_brief: "",
-  chat: "",
-};
 
 export function PersonalityPanel() {
   const [catalog, setCatalog] = useState<PersonalityDefinition[]>([]);
   const [form, setForm] = useState<PersonalityProfile | null>(null);
-  const [preview, setPreview] = useState<PersonalityPreview>(EMPTY_PREVIEW);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const timezone = defaultBrowserTimezone();
-
-  const refreshPreview = useCallback(
-    async (next: PersonalityProfile, signal?: AbortSignal) => {
-      try {
-        const samples = await previewPersonality({
-          timezone,
-          personality_id: next.personality_id,
-          display_name: next.display_name,
-          nickname: next.nickname,
-          emoji_level: next.emoji_level,
-          humor_level: next.humor_level,
-          greeting_style: next.greeting_style,
-          encouragement_level: next.encouragement_level,
-          response_style: next.response_style,
-        });
-        if (signal?.aborted) return;
-        setPreview(samples);
-      } catch (err) {
-        if (signal?.aborted) return;
-        setError(err instanceof Error ? err.message : "Couldn’t preview personality");
-      }
-    },
-    [timezone],
-  );
+  const [savedNotice, setSavedNotice] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -77,7 +35,6 @@ export function PersonalityPanel() {
         if (controller.signal.aborted) return;
         setForm(profile);
         setCatalog(catalogData.personalities ?? []);
-        await refreshPreview(profile, controller.signal);
       } catch (err) {
         if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : "Couldn’t load personality");
@@ -88,21 +45,18 @@ export function PersonalityPanel() {
       }
     })();
     return () => controller.abort();
-  }, [refreshPreview]);
+  }, []);
 
   function patchForm(partial: Partial<PersonalityProfile>) {
-    setForm((prev) => {
-      if (!prev) return prev;
-      const next = { ...prev, ...partial };
-      void refreshPreview(next);
-      return next;
-    });
+    setForm((prev) => (prev ? { ...prev, ...partial } : prev));
+    setSavedNotice(false);
   }
 
   async function handleSave() {
     if (!form) return;
     setSaving(true);
     setError(null);
+    setSavedNotice(false);
     try {
       const saved = await updatePersonalityProfile({
         personality_id: form.personality_id,
@@ -115,7 +69,7 @@ export function PersonalityPanel() {
         response_style: form.response_style,
       });
       setForm(saved);
-      await refreshPreview(saved);
+      setSavedNotice(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn’t save personality");
     } finally {
@@ -205,28 +159,10 @@ export function PersonalityPanel() {
           {saving ? "Saving…" : "Save personality"}
         </button>
         <p className={styles.hint}>
-          Preview updates as you type — hit Save so chat and automations use it.
+          {savedNotice
+            ? "Saved — chat and automations will use this."
+            : "Hit Save so chat and automations pick this up."}
         </p>
-      </div>
-
-      <div className={styles.previewGrid}>
-        {(
-          [
-            "greeting",
-            "morning_brief",
-            "reminder",
-            "task_complete",
-            "chat",
-            "automation",
-            "notification",
-            "error",
-          ] as const
-        ).map((key) => (
-          <div key={key} className={styles.previewCard}>
-            <p className={styles.previewLabel}>{PREVIEW_LABELS[key]}</p>
-            <p className={styles.previewBody}>{preview[key] || "—"}</p>
-          </div>
-        ))}
       </div>
 
       {error ? <p className={styles.error}>{error}</p> : null}
