@@ -68,6 +68,8 @@ func TestRuleBasedParserMVPQueries(t *testing.T) {
 		"what's on today":          chat.IntentQueryToday,
 		"What's due today?":        chat.IntentQueryDueToday,
 		"due today":                chat.IntentQueryDueToday,
+		"Show backlog":             chat.IntentQueryBacklog,
+		"What's my backlog?":       chat.IntentQueryBacklog,
 	}
 	for input, want := range cases {
 		got := parseWith(t, input, "UTC", now)
@@ -309,5 +311,35 @@ func TestExecutorQueryDueToday(t *testing.T) {
 	})
 	if !strings.Contains(out.Reply, "Finish API") || strings.Contains(out.Reply, "Done already") {
 		t.Fatalf("reply = %q", out.Reply)
+	}
+}
+
+func TestExecutorQueryBacklog(t *testing.T) {
+	t.Parallel()
+	reg := &actions.Registry{
+		ListDayTasks: actions.NewListDayTasksAction(&memDayLister{
+			occs: []actions.TaskOccurrenceResult{
+				{Title: "Ship notifications", Completed: false, CarriedForward: true},
+				{Title: "Call dentist", Completed: false},
+				{Title: "Pay rent", Completed: true},
+			},
+		}),
+	}
+	ex := chat.NewExecutor(stubParser{intent: &chat.Intent{Kind: chat.IntentQueryBacklog, Timezone: "UTC"}}, reg, nil)
+	out := ex.Execute(context.Background(), chat.ExecuteInput{
+		UserID: uuid.MustParse("018f0000-0000-7000-8000-000000000505"), Timezone: "UTC",
+		Now: time.Date(2026, 7, 30, 12, 0, 0, 0, time.UTC), Message: "Show backlog",
+	})
+	if out.Intent != chat.IntentQueryBacklog {
+		t.Fatalf("intent = %s", out.Intent)
+	}
+	if !strings.Contains(out.Reply, "Completed: 1/3") || !strings.Contains(out.Reply, "Left: 2") {
+		t.Fatalf("counts missing in %q", out.Reply)
+	}
+	if !strings.Contains(out.Reply, "Ship notifications (carried)") || !strings.Contains(out.Reply, "Call dentist") {
+		t.Fatalf("open list missing in %q", out.Reply)
+	}
+	if !strings.Contains(out.Reply, "Pay rent") {
+		t.Fatalf("done list missing in %q", out.Reply)
 	}
 }

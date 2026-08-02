@@ -151,6 +151,7 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 	greetingOnly := false
 	greetingKind := personality.KindGreeting
 	periodGreetingInParts := false
+	hadGreetingCmd := false
 	order := 0
 
 	for _, structured := range auto.Commands {
@@ -184,6 +185,7 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 				failed++
 			} else if reply == "" && isGreetCmd {
 				success++
+				hadGreetingCmd = true
 				if greetKind != personality.KindGreeting {
 					// Morning / evening / good night — bake personality text into the run body.
 					if text := r.renderGreeting(ctx, auto, greetKind, now); text != "" {
@@ -249,9 +251,20 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 	if r.personality != nil {
 		switch {
 		case periodGreetingInParts:
-			// Period greetings are already personalized; keep joined body as-is.
 			if combined == "" {
 				combined = "I'm here — nothing to report just yet."
+			}
+			// Morning Brief already includes morning_greeting — frame with emojis, don't re-greet.
+			if isMorningBriefAutomation(auto) {
+				if rendered, err := r.personality.Render(ctx, personality.RenderInput{
+					UserID:    auto.UserID,
+					Canonical: combined,
+					Kind:      personality.KindMorningBriefFrame,
+					Now:       now,
+					Timezone:  auto.Timezone,
+				}); err == nil && strings.TrimSpace(rendered.Text) != "" {
+					combined = strings.TrimSpace(rendered.Text)
+				}
 			}
 		case greetingOnly && combined == "":
 			if rendered, err := r.personality.Render(ctx, personality.RenderInput{
@@ -263,9 +276,12 @@ func (r *AutomationRunner) Run(ctx context.Context, auto entity.Automation, opts
 				combined = strings.TrimSpace(rendered.Text)
 			}
 		default:
-			kind := personality.KindAutomation
-			if strings.Contains(strings.ToLower(auto.Name), "morning") {
+			kind := personality.KindAutomationBody
+			switch {
+			case isMorningBriefAutomation(auto):
 				kind = personality.KindMorningBrief
+			case hadGreetingCmd:
+				kind = personality.KindAutomation
 			}
 			if combined == "" {
 				combined = "I'm here — nothing to report just yet."
@@ -488,6 +504,17 @@ func automationGreetingKind(commandKey string) (personality.Kind, bool) {
 	default:
 		return "", false
 	}
+}
+
+func isMorningBriefAutomation(auto entity.Automation) bool {
+	name := strings.ToLower(strings.TrimSpace(auto.Name))
+	if strings.Contains(name, "morning brief") {
+		return true
+	}
+	if auto.TemplateID != nil && strings.EqualFold(strings.TrimSpace(*auto.TemplateID), "morning_brief") {
+		return true
+	}
+	return false
 }
 
 func (r *AutomationRunner) renderGreeting(

@@ -32,6 +32,13 @@ var (
 	reQueryToday = regexp.MustCompile(`(?i)^\s*(?:what(?:'s| is| do i have)?\s+(?:on\s+)?today|today(?:'s)?\s+(?:schedule|agenda|plan)|show\s+today)\s*[?.!]?\s*$`)
 	reQueryTomorrow = regexp.MustCompile(`(?i)^\s*(?:what(?:'s| is| do i have)?\s+(?:on\s+)?tomorrow|tomorrow(?:'s)?\s+(?:schedule|agenda|plan)|show\s+tomorrow)\s*[?.!]?\s*$`)
 	reQueryDueToday = regexp.MustCompile(`(?i)^\s*(?:what(?:'s| is)\s+due(?:\s+today)?|due\s+today|what\s+tasks?\s+(?:do i have\s+)?(?:today|due)|show\s+(?:my\s+)?(?:tasks|todos?)(?:\s+today)?)\s*[?.!]?\s*$`)
+	reQueryBacklog  = regexp.MustCompile(`(?i)^\s*(?:` +
+		`(?:show\s+(?:me\s+)?(?:my\s+)?)?backlog|` +
+		`(?:what(?:'s| is)|show)\s+(?:my\s+)?(?:task\s+)?backlog|` +
+		`task\s+backlog|` +
+		`today(?:'s)?\s+backlog|` +
+		`how(?:'s| is)\s+(?:my\s+)?backlog` +
+		`)\s*[?.!]?\s*$`)
 
 	reMorningGreeting = regexp.MustCompile(`(?i)^\s*(?:good\s+morning|morning\s+greeting)\s*[!.]*\s*$`)
 	reEveningGreeting = regexp.MustCompile(`(?i)^\s*(?:good\s+evening|evening\s+greeting|how\s+was\s+(?:my\s+)?(?:the\s+)?day)\s*[!.]*\s*$`)
@@ -71,6 +78,8 @@ func (p *RuleBasedParser) Parse(ctx context.Context, input string) (*Intent, err
 		return &Intent{Kind: IntentGoodNightGreeting, Raw: raw, Timezone: loc.String(), Confidence: 0.99}, nil
 	case reGreeting.MatchString(raw):
 		return &Intent{Kind: IntentGreeting, Raw: raw, Timezone: loc.String(), Confidence: 0.99}, nil
+	case reQueryBacklog.MatchString(raw):
+		return &Intent{Kind: IntentQueryBacklog, Raw: raw, Timezone: loc.String(), Confidence: 0.95}, nil
 	case reQueryDueToday.MatchString(raw):
 		return &Intent{Kind: IntentQueryDueToday, Raw: raw, Timezone: loc.String(), Confidence: 0.95}, nil
 	case reQueryToday.MatchString(raw):
@@ -119,6 +128,9 @@ func (p *RuleBasedParser) Parse(ctx context.Context, input string) (*Intent, err
 	}
 	if strings.Contains(lower, "today") && (strings.Contains(lower, "have") || strings.Contains(lower, "schedule") || strings.Contains(lower, "agenda")) {
 		return &Intent{Kind: IntentQueryToday, Raw: raw, Timezone: loc.String(), Confidence: 0.7}, nil
+	}
+	if strings.Contains(lower, "backlog") {
+		return &Intent{Kind: IntentQueryBacklog, Raw: raw, Timezone: loc.String(), Confidence: 0.7}, nil
 	}
 	if strings.Contains(lower, "due") && strings.Contains(lower, "today") {
 		return &Intent{Kind: IntentQueryDueToday, Raw: raw, Timezone: loc.String(), Confidence: 0.7}, nil

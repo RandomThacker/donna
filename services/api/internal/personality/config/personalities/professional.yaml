@@ -95,6 +95,9 @@ automation_intros:
   - "{greeting}"
   - "{greeting}\n\nHere's your update."
   - "{greeting}\n{punchline}"
+automation_bodies:
+  - "{canonical}"
+  - "Here's your update.\n\n{canonical}"
 closings:
   - ""
   - "{punchline}"
@@ -106,8 +109,13 @@ chat_wrappers:
   - "{greeting}\n{punchline}\n\n{canonical}"
   - "{canonical}"
 morning_briefs:
-  - "{greeting}\n\n{canonical}"
-  - "{greeting}\n{punchline}\n\n{canonical}"
+  - "☀️ {greeting}\n\n{canonical}"
+  - "☀️ {greeting}\n{punchline}\n\n📋 {canonical}"
+  - "{greeting}\n\n✨ Your morning brief\n\n{canonical}"
+morning_brief_frames:
+  - "☀️ Morning brief\n\n{canonical}"
+  - "☀️ Morning check-in\n\n📋 {canonical}"
+  - "✨ Here's your morning brief\n\n{canonical}"
 emojis:
   low: []
   medium: []

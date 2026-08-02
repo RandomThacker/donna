@@ -61,6 +61,7 @@ Public ids: `atm_`.
 | `goodnight_greeting` | — | `Good night` |
 | `todays_agenda` | `range: today\|tomorrow` | agenda query |
 | `tasks_due` | `priority: all` (reserved) | due-today query |
+| `tasks_backlog` | — | today's completed vs open backlog |
 | `chat_message` | `message` | free-text chat line |
 
 API still accepts legacy string commands (stored as `chat_message`). UI shows readable `label`s.

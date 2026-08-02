@@ -99,6 +99,19 @@ export const commandGuides: CommandGuide[] = [
     ],
   },
   {
+    id: "query-backlog",
+    intent: "QUERY_BACKLOG",
+    title: "Task Backlog",
+    blurb: "Today's completed count, what's left, and the full open list.",
+    icon: "tasks",
+    examples: [
+      { phrase: "Show backlog" },
+      { phrase: "What's my backlog?" },
+      { phrase: "Task backlog" },
+      { phrase: "Today's backlog" },
+    ],
+  },
+  {
     id: "query-tomorrow",
     intent: "QUERY_TOMORROW",
     title: "Tomorrow Prep",

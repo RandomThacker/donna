@@ -92,6 +92,7 @@ const (
 	AutomationCommandGoodNight        = "goodnight_greeting"
 	AutomationCommandTodaysAgenda     = "todays_agenda"
 	AutomationCommandTasksDue         = "tasks_due"
+	AutomationCommandTasksBacklog     = "tasks_backlog"
 	AutomationCommandChatMessage      = "chat_message"
 )
 
@@ -103,6 +104,7 @@ var AllowedAutomationCommands = map[string]struct{}{
 	AutomationCommandGoodNight:       {},
 	AutomationCommandTodaysAgenda:    {},
 	AutomationCommandTasksDue:        {},
+	AutomationCommandTasksBacklog:    {},
 	AutomationCommandChatMessage:     {},
 }
 

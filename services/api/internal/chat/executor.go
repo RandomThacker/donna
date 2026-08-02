@@ -199,6 +199,8 @@ func (e *Executor) dispatch(ctx context.Context, userID uuid.UUID, now time.Time
 		return e.queryTimeline(ctx, userID, from, to)
 	case IntentQueryDueToday:
 		return e.queryDueToday(ctx, userID, now, intent.Timezone)
+	case IntentQueryBacklog:
+		return e.queryBacklog(ctx, userID, now, intent.Timezone)
 	case IntentGreeting:
 		return "", nil
 	default:
@@ -344,6 +346,67 @@ func (e *Executor) queryDueToday(ctx context.Context, userID uuid.UUID, now time
 	for _, o := range pending {
 		fmt.Fprintf(&b, "• %s\n", o.Title)
 	}
+	return strings.TrimRight(b.String(), "\n"), nil
+}
+
+func (e *Executor) queryBacklog(ctx context.Context, userID uuid.UUID, now time.Time, tz string) (string, error) {
+	loc := loadLocation(tz)
+	y, m, d := now.In(loc).Date()
+	date := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	day, err := e.reg.ListDayTasks.Execute(ctx, actions.ListDayTasksRequest{UserID: userID, Date: date})
+	if err != nil {
+		return "", err
+	}
+
+	total := len(day.Occurrences)
+	if total == 0 {
+		return "Today's backlog\n\nNothing on today's journal yet.", nil
+	}
+
+	pending := make([]actions.TaskOccurrenceResult, 0, total)
+	done := make([]actions.TaskOccurrenceResult, 0, total)
+	for _, o := range day.Occurrences {
+		if o.Completed {
+			done = append(done, o)
+		} else {
+			pending = append(pending, o)
+		}
+	}
+	completed := len(done)
+
+	var b strings.Builder
+	b.WriteString("Today's backlog\n\n")
+	fmt.Fprintf(&b, "Completed: %d/%d\n", completed, total)
+	fmt.Fprintf(&b, "Left: %d\n", len(pending))
+
+	if len(pending) == 0 {
+		b.WriteString("\nAll clear — nothing left on today's list.")
+	} else {
+		b.WriteString("\nStill open\n")
+		for _, o := range pending {
+			title := strings.TrimSpace(o.Title)
+			if title == "" {
+				title = "Untitled task"
+			}
+			if o.CarriedForward {
+				fmt.Fprintf(&b, "• %s (carried)\n", title)
+			} else {
+				fmt.Fprintf(&b, "• %s\n", title)
+			}
+		}
+	}
+
+	if len(done) > 0 {
+		b.WriteString("\nDone today\n")
+		for _, o := range done {
+			title := strings.TrimSpace(o.Title)
+			if title == "" {
+				title = "Untitled task"
+			}
+			fmt.Fprintf(&b, "• %s\n", title)
+		}
+	}
+
 	return strings.TrimRight(b.String(), "\n"), nil
 }
 

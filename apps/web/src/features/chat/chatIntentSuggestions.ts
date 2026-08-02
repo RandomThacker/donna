@@ -22,6 +22,7 @@ const LABELS: Record<string, string> = {
   "query-today": "What's today",
   "query-tomorrow": "What's tomorrow",
   "query-due-today": "Due today",
+  "query-backlog": "Backlog",
   "evening-review": "Evening review",
   "upcoming-meetings": "Meetings",
 };
@@ -33,6 +34,7 @@ const ORDER = [
   "evening-greeting",
   "goodnight-greeting",
   "query-due-today",
+  "query-backlog",
   "query-today",
   "query-tomorrow",
 ] as const;

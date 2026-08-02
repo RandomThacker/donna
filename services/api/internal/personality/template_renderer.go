@@ -125,8 +125,14 @@ func (r *TemplateRenderer) renderKind(def Definition, kind Kind, vars map[string
 			parts = append(parts, closing)
 		}
 		return strings.Join(parts, "\n\n")
+	case KindAutomationBody:
+		// Agenda / task updates — no time-of-day greeting.
+		return fill(pick(def.AutomationBodies, "{canonical}"), vars)
 	case KindMorningBrief:
-		return fill(pick(def.MorningBriefs, "{greeting}\n\n{canonical}"), vars)
+		return fill(pick(def.MorningBriefs, "☀️ {greeting}\n\n{canonical}"), vars)
+	case KindMorningBriefFrame:
+		// Greeting already in canonical (from morning_greeting command).
+		return fill(pick(def.MorningBriefFrames, "☀️ Morning brief\n\n{canonical}"), vars)
 	case KindTaskComplete:
 		return fill(pick(def.TaskComplete, "{canonical}"), vars)
 	case KindError:

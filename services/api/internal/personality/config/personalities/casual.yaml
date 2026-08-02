@@ -102,6 +102,9 @@ automation_intros:
   - "{greeting}"
   - "{greeting}\n\nQuick check-in:"
   - "{greeting}\n{punchline}"
+automation_bodies:
+  - "{canonical}"
+  - "Quick check-in:\n\n{canonical}"
 closings:
   - ""
   - "You've got this."
@@ -114,8 +117,13 @@ chat_wrappers:
   - "{greeting}\n{punchline}\n\n{canonical}"
   - "{canonical} {emoji}"
 morning_briefs:
-  - "{greeting}\n\n{canonical}"
-  - "{greeting}\n{punchline}\n\n{canonical}"
+  - "☀️ {greeting}\n\n{canonical}"
+  - "☀️ {greeting} {emoji}\n{punchline}\n\n📋 {canonical}"
+  - "{greeting}\n\n✨ Morning brief\n\n{canonical}"
+morning_brief_frames:
+  - "☀️ Morning brief {emoji}\n\n{canonical}"
+  - "☀️ Rise and shine\n\n📋 {canonical}"
+  - "✨ Here's your morning check-in\n\n{canonical}"
 emojis:
   low:
     - "💪"

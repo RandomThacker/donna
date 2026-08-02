@@ -103,6 +103,9 @@ automation_intros:
   - "{greeting}"
   - "{greeting}\n\nFor you:"
   - "{greeting}\n{punchline}"
+automation_bodies:
+  - "{canonical}"
+  - "For you:\n\n{canonical}"
 closings:
   - ""
   - "I'm here if you need me."
@@ -115,8 +118,13 @@ chat_wrappers:
   - "{greeting}\n{punchline}\n\n{canonical}"
   - "Looks like you've got a busy stretch {emoji}\n\n{canonical}"
 morning_briefs:
-  - "{greeting}\n\n{canonical}"
-  - "{greeting}\n{punchline}\n\n{canonical}"
+  - "☀️ {greeting}\n\n{canonical}"
+  - "☀️ {greeting} {emoji}\n{punchline}\n\n💕 {canonical}"
+  - "{greeting}\n\n✨ Soft morning brief for you\n\n{canonical}"
+morning_brief_frames:
+  - "☀️ Morning brief {emoji}\n\n{canonical}"
+  - "☀️ Good morning energy\n\n📋 {canonical}"
+  - "✨ Your morning brief, {nickname}\n\n{canonical}"
 emojis:
   low:
     - "❤️"

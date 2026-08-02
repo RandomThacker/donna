@@ -32,10 +32,12 @@ type yamlFile struct {
 	Reminders                 []string            `yaml:"reminders"`
 	Notifications             []string            `yaml:"notifications"`
 	AutomationIntros          []string            `yaml:"automation_intros"`
+	AutomationBodies          []string            `yaml:"automation_bodies"`
 	Closings                  []string            `yaml:"closings"`
 	Encouragements            []string            `yaml:"encouragements"`
 	ChatWrappers              []string            `yaml:"chat_wrappers"`
 	MorningBriefs             []string            `yaml:"morning_briefs"`
+	MorningBriefFrames        []string            `yaml:"morning_brief_frames"`
 	Emojis                    map[string][]string `yaml:"emojis"`
 }
 
@@ -120,10 +122,12 @@ func definitionFromYAML(f yamlFile) (Definition, error) {
 		Reminders:                 trimList(f.Reminders),
 		Notifications:             trimList(f.Notifications),
 		AutomationIntros:          f.AutomationIntros, // keep blanks
+		AutomationBodies:          trimList(f.AutomationBodies),
 		Closings:                  f.Closings,
 		Encouragements:            trimList(f.Encouragements),
 		ChatWrappers:              trimList(f.ChatWrappers),
 		MorningBriefs:             trimList(f.MorningBriefs),
+		MorningBriefFrames:        trimList(f.MorningBriefFrames),
 		Emojis:                    f.Emojis,
 	}, nil
 }

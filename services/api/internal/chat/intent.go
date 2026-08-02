@@ -16,14 +16,15 @@ const (
 	IntentCompleteTask   IntentKind = "COMPLETE_TASK"
 	IntentCreateReminder IntentKind = "CREATE_REMINDER"
 	IntentCreateEvent    IntentKind = "CREATE_EVENT"
-	IntentQueryToday     IntentKind = "QUERY_TODAY"
-	IntentQueryTomorrow  IntentKind = "QUERY_TOMORROW"
-	IntentQueryDueToday      IntentKind = "QUERY_DUE_TODAY"
-	IntentGreeting           IntentKind = "GREETING"
-	IntentMorningGreeting    IntentKind = "MORNING_GREETING"
-	IntentEveningGreeting    IntentKind = "EVENING_GREETING"
-	IntentGoodNightGreeting  IntentKind = "GOOD_NIGHT_GREETING"
-	IntentUnknown            IntentKind = "UNKNOWN"
+	IntentQueryToday             IntentKind = "QUERY_TODAY"
+	IntentQueryTomorrow          IntentKind = "QUERY_TOMORROW"
+	IntentQueryDueToday          IntentKind = "QUERY_DUE_TODAY"
+	IntentQueryBacklog           IntentKind = "QUERY_BACKLOG"
+	IntentGreeting               IntentKind = "GREETING"
+	IntentMorningGreeting        IntentKind = "MORNING_GREETING"
+	IntentEveningGreeting        IntentKind = "EVENING_GREETING"
+	IntentGoodNightGreeting      IntentKind = "GOOD_NIGHT_GREETING"
+	IntentUnknown                IntentKind = "UNKNOWN"
 )
 
 // Intent is the parser output — transport-agnostic.
@@ -93,7 +94,8 @@ Try something like
 • Schedule meeting Standup tomorrow at 10 AM
 • What do I have today?
 • What do I have tomorrow?
-• What's due today?`
+• What's due today?
+• Show backlog`
 
 // CommandRequest is POST /chat/command.
 type CommandRequest struct {

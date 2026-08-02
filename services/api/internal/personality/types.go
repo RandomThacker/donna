@@ -19,7 +19,9 @@ const (
 	KindReminder        Kind = "reminder"
 	KindNotification    Kind = "notification"
 	KindAutomation      Kind = "automation"
+	KindAutomationBody   Kind = "automation_body"
 	KindMorningBrief    Kind = "morning_brief"
+	KindMorningBriefFrame Kind = "morning_brief_frame"
 	KindTaskComplete    Kind = "task_complete"
 	KindError           Kind = "error"
 	KindAcknowledgement Kind = "acknowledgement"
@@ -111,9 +113,11 @@ type Definition struct {
 	Reminders                 []string
 	Notifications             []string
 	AutomationIntros          []string
+	AutomationBodies          []string
 	Closings                  []string
 	Encouragements            []string
 	ChatWrappers              []string
 	MorningBriefs             []string
+	MorningBriefFrames        []string
 	Emojis                    map[string][]string // low|medium|high
 }

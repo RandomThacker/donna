@@ -120,6 +120,8 @@ export function commandLabel(command: AutomationCommand | string): string {
         : "Today's Agenda";
     case "tasks_due":
       return "Tasks Due";
+    case "tasks_backlog":
+      return "Task Backlog";
     default:
       return command.command || "Command";
   }

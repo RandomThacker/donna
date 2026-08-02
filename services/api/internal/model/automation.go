@@ -200,6 +200,8 @@ func AutomationCommandLabel(c entity.AutomationCommand) string {
 		return "Today's Agenda"
 	case constant.AutomationCommandTasksDue:
 		return "Tasks Due"
+	case constant.AutomationCommandTasksBacklog:
+		return "Task Backlog"
 	case constant.AutomationCommandChatMessage:
 		if msg := strings.TrimSpace(vars["message"]); msg != "" {
 			return msg

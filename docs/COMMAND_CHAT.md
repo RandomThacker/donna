@@ -51,6 +51,7 @@ chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
 | What do I have today? | `QUERY_TODAY` |
 | What do I have tomorrow? | `QUERY_TOMORROW` |
 | What's due today? | `QUERY_DUE_TODAY` |
+| Show backlog / What's my backlog? | `QUERY_BACKLOG` |
 
 The Commands tab also lists automation templates (Morning Brief, Task Review, Evening Review, …) with the same phrases so you can try them manually.
 

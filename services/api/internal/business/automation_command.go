@@ -43,6 +43,8 @@ func ResolveAutomationCommand(cmd entity.AutomationCommand) (message, label stri
 	case constant.AutomationCommandTasksDue:
 		// priority is reserved for future filtering; Phase 1.6 always uses today's open tasks.
 		return "What's due today?", "Tasks Due", nil
+	case constant.AutomationCommandTasksBacklog:
+		return "Show backlog", "Task Backlog", nil
 	case constant.AutomationCommandChatMessage:
 		msg := strings.TrimSpace(vars["message"])
 		if msg == "" {

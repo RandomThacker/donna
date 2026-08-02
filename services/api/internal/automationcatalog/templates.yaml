@@ -63,6 +63,15 @@ templates:
       type: daily
       time: "10:00"
 
+  - id: task_backlog
+    name: Task Backlog
+    description: Today's completed vs open tasks — full backlog list.
+    commands:
+      - command: tasks_backlog
+    default_schedule:
+      type: daily
+      time: "17:00"
+
   - id: tomorrow_prep
     name: Tomorrow Prep
     description: Peek at tomorrow so tonight feels calmer.
