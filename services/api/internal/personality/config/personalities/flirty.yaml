@@ -81,7 +81,7 @@ evening_greetings:
   - "Hey {nickname} {emoji} How was your day?"
   - "Evening, {nickname}. Come tell me how today treated you."
   - "Soft landing time — how was the day, love?"
-  - "Hey you. How did today go?"
+  - "Hey cutie patootie. How did today go?"
 goodnight_greetings:
   - "Good night, {nickname} {emoji}\n{punchline}"
   - "Sleep well, gorgeous. Dream about winning… or me.\n{punchline}"
