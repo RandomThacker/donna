@@ -10,5 +10,6 @@ export const landingNavStyles = {
     "font-sans text-sm text-donna-muted transition-colors duration-200",
     "hover:text-donna-copper-bright",
   ].join(" "),
+  linkActive: "text-donna-copper-bright",
   actions: "flex items-center gap-1.5 sm:gap-2",
 } as const;

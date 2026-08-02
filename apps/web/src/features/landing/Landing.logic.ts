@@ -11,8 +11,8 @@ export const siteMetadata: Metadata = {
 export const landingCopy: LandingCopy = {
   brand: "Donna",
   navLinks: [
-    { label: "How she works", href: "#rhythm" },
-    { label: "Capabilities", href: "#capabilities" },
+    { label: "Features", href: "/features" },
+    { label: "How she works", href: "/#rhythm" },
   ],
   getStarted: { label: "Get started", href: "#sign-in" },
   hero: {
