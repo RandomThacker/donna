@@ -43,6 +43,11 @@ var (
 	reMorningGreeting = regexp.MustCompile(`(?i)^\s*(?:good\s+morning|morning\s+greeting)\s*[!.]*\s*$`)
 	reEveningGreeting = regexp.MustCompile(`(?i)^\s*(?:good\s+evening|evening\s+greeting|how\s+was\s+(?:my\s+)?(?:the\s+)?day)\s*[!.]*\s*$`)
 	reGoodNight       = regexp.MustCompile(`(?i)^\s*(?:good\s*night|goodnight|night\s+greeting)\s*[!.]*\s*$`)
+	reThanks = regexp.MustCompile(`(?i)^\s*(?:` +
+		`thank\s+you|thanks|thx|ty` +
+		`)` +
+		`(?:\s+(?:so\s+much|a\s+lot|again|donna|for\s+.+))?` +
+		`\s*[!.]*\s*$`)
 
 	reGreeting = regexp.MustCompile(`(?i)^\s*(?:` +
 		`hi+|hello|hey+|heya|hiya|howdy|yo|sup|hola|greetings|` +
@@ -76,6 +81,8 @@ func (p *RuleBasedParser) Parse(ctx context.Context, input string) (*Intent, err
 		return &Intent{Kind: IntentEveningGreeting, Raw: raw, Timezone: loc.String(), Confidence: 0.99}, nil
 	case reGoodNight.MatchString(raw):
 		return &Intent{Kind: IntentGoodNightGreeting, Raw: raw, Timezone: loc.String(), Confidence: 0.99}, nil
+	case reThanks.MatchString(raw):
+		return &Intent{Kind: IntentThanks, Raw: raw, Timezone: loc.String(), Confidence: 0.99}, nil
 	case reGreeting.MatchString(raw):
 		return &Intent{Kind: IntentGreeting, Raw: raw, Timezone: loc.String(), Confidence: 0.99}, nil
 	case reQueryBacklog.MatchString(raw):

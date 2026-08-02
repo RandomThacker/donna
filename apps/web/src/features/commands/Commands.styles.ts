@@ -39,7 +39,7 @@ export const commandsStyles = {
     "focus-visible:outline-donna-accent",
   ].join(" "),
   secondaryHint: "text-xs text-donna-faint",
-  list: "grid grid-cols-1 gap-4 sm:grid-cols-2",
+  list: "grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3",
   guide: [
     "group relative flex h-full flex-col overflow-hidden rounded-2xl",
     "border border-donna-hairline bg-donna-surface/80",
@@ -59,11 +59,11 @@ export const commandsStyles = {
     "bg-donna-accent-soft text-donna-accent ring-1 ring-donna-accent/20",
   ].join(" "),
   guideCopy: "min-w-0 flex-1",
-  guideTitle: "font-display text-lg tracking-tight text-donna-text sm:text-xl",
+  guideTitle: "mt-1.5 font-display text-lg tracking-tight text-donna-text sm:text-xl",
   guideBlurb: "mt-1 text-xs text-donna-muted sm:text-sm",
   intentPill: [
-    "hidden shrink-0 rounded-full border border-donna-hairline bg-donna-bg/60",
-    "px-2 py-1 font-mono text-[0.6rem] tracking-wide text-donna-faint sm:inline",
+    "inline-flex w-fit max-w-full truncate rounded-full border border-donna-hairline",
+    "bg-donna-bg/60 px-2 py-1 font-mono text-[0.6rem] tracking-wide text-donna-faint",
   ].join(" "),
   examples: "relative mt-3 flex flex-1 flex-col space-y-1.5 px-4 pb-4 sm:px-5 sm:pb-5",
   exampleRow: [

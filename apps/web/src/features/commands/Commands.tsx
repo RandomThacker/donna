@@ -119,10 +119,10 @@ export function Commands() {
                       <Icon name={guide.icon} className="h-4 w-4" />
                     </span>
                     <div className={styles.guideCopy}>
+                      <span className={styles.intentPill}>{guide.intent}</span>
                       <h2 className={styles.guideTitle}>{guide.title}</h2>
                       <p className={styles.guideBlurb}>{guide.blurb}</p>
                     </div>
-                    <span className={styles.intentPill}>{guide.intent}</span>
                   </div>
                   <div className={styles.examples}>
                     {guide.examples.map((example) => (

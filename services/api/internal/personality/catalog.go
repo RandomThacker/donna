@@ -26,6 +26,7 @@ type yamlFile struct {
 	MorningGreetings          []string            `yaml:"morning_greetings"`
 	EveningGreetings          []string            `yaml:"evening_greetings"`
 	GoodNightGreetings        []string            `yaml:"goodnight_greetings"`
+	Thanks                    []string            `yaml:"thanks"`
 	Acknowledgements          []string            `yaml:"acknowledgements"`
 	TaskComplete              []string            `yaml:"task_complete"`
 	Errors                    []string            `yaml:"errors"`
@@ -116,6 +117,7 @@ func definitionFromYAML(f yamlFile) (Definition, error) {
 		MorningGreetings:          trimList(f.MorningGreetings),
 		EveningGreetings:          trimList(f.EveningGreetings),
 		GoodNightGreetings:        trimList(f.GoodNightGreetings),
+		Thanks:                    trimList(f.Thanks),
 		Acknowledgements:          trimList(f.Acknowledgements),
 		TaskComplete:              trimList(f.TaskComplete),
 		Errors:                    trimList(f.Errors),

@@ -41,6 +41,7 @@ chat.NewExecutor(chat.NewRuleBasedParser(), actionRegistry)
 | Say | Intent |
 | --- | --- |
 | Hi / Hello / Hey Donna | `GREETING` |
+| Thank you / Thanks / Thanks for helping | `THANKS` |
 | Good morning / Morning greeting | `MORNING_GREETING` |
 | Good evening / Evening greeting / How was my day | `EVENING_GREETING` |
 | Good night / Night greeting | `GOOD_NIGHT_GREETING` |

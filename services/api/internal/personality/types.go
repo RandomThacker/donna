@@ -16,6 +16,7 @@ const (
 	KindMorningGreeting Kind = "morning_greeting"
 	KindEveningGreeting Kind = "evening_greeting"
 	KindGoodNight       Kind = "good_night"
+	KindThanks          Kind = "thanks"
 	KindReminder        Kind = "reminder"
 	KindNotification    Kind = "notification"
 	KindAutomation      Kind = "automation"
@@ -107,6 +108,7 @@ type Definition struct {
 	MorningGreetings          []string
 	EveningGreetings          []string
 	GoodNightGreetings        []string
+	Thanks                    []string
 	Acknowledgements          []string
 	TaskComplete              []string
 	Errors                    []string

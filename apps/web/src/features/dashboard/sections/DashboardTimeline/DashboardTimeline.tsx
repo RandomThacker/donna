@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import Link from "next/link";
 
+import { Icon } from "@/components/common";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/features/auth";
 import { calendarAgendaHref } from "@/features/calendar/Calendar.routes";
@@ -59,11 +60,21 @@ export function DashboardTimeline() {
         {!timelineQuery.isLoading &&
         !timelineQuery.isError &&
         items.length === 0 ? (
-          <div className={styles.state}>
-            <p>Nothing scheduled today.</p>
-            <Link href={calendarAgendaHref()} className={styles.link}>
-              Open agenda
-            </Link>
+          <div className={styles.empty}>
+            <div className={styles.emptyInner}>
+              <span className={styles.emptyIcon} aria-hidden>
+                <Icon name="calendar" className="h-5 w-5" />
+              </span>
+              <h3 className={styles.emptyTitle}>Clear day</h3>
+              <p className={styles.emptyBody}>
+                Nothing on the books. Enjoy the space — or add something when
+                you&apos;re ready.
+              </p>
+              <Link href={calendarAgendaHref()} className={styles.emptyCta}>
+                Open agenda
+                <Icon name="arrow" className="h-3.5 w-3.5" />
+              </Link>
+            </div>
           </div>
         ) : null}
         {!timelineQuery.isLoading &&

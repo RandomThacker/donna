@@ -55,7 +55,7 @@ func (e *Executor) Execute(ctx context.Context, in ExecuteInput) CommandResult {
 	if intent.Kind == IntentUnknown {
 		return e.finalize(ctx, in, CommandResult{Reply: UnknownHelp, Intent: IntentUnknown}, now, tz)
 	}
-	if isGreetingIntent(intent.Kind) {
+	if isPersonalityOnlyIntent(intent.Kind) {
 		return e.finalize(ctx, in, CommandResult{Reply: "", Intent: intent.Kind}, now, tz)
 	}
 	if e.reg == nil {
@@ -83,8 +83,8 @@ func (e *Executor) finalize(
 	if in.SkipPersonality || e == nil || e.personality == nil {
 		// Automations personalize the combined reply — do not invent a
 		// display-name fallback greeting here (it becomes "Good evening, there.").
-		if !in.SkipPersonality && isGreetingIntent(result.Intent) && strings.TrimSpace(result.Reply) == "" {
-			result.Reply = fallbackGreeting(in.DisplayName, now, tz)
+		if !in.SkipPersonality && isPersonalityOnlyIntent(result.Intent) && strings.TrimSpace(result.Reply) == "" {
+			result.Reply = fallbackPersonalityOnly(result.Intent, in.DisplayName, now, tz)
 		}
 		if result.Error != "" && strings.TrimSpace(result.Reply) != "" && !strings.HasPrefix(result.Reply, "I couldn't") {
 			result.Reply = fmt.Sprintf("I couldn't do that. %s", result.Reply)
@@ -104,8 +104,8 @@ func (e *Executor) finalize(
 		Timezone:  tz,
 	})
 	if err != nil || strings.TrimSpace(out.Text) == "" {
-		if canonical == "" && isGreetingIntent(result.Intent) {
-			result.Reply = fallbackGreeting(in.DisplayName, now, tz)
+		if canonical == "" && isPersonalityOnlyIntent(result.Intent) {
+			result.Reply = fallbackPersonalityOnly(result.Intent, in.DisplayName, now, tz)
 			return result
 		}
 		if canonical != "" {
@@ -117,9 +117,9 @@ func (e *Executor) finalize(
 	return result
 }
 
-func isGreetingIntent(intent IntentKind) bool {
+func isPersonalityOnlyIntent(intent IntentKind) bool {
 	switch intent {
-	case IntentGreeting, IntentMorningGreeting, IntentEveningGreeting, IntentGoodNightGreeting:
+	case IntentGreeting, IntentMorningGreeting, IntentEveningGreeting, IntentGoodNightGreeting, IntentThanks:
 		return true
 	default:
 		return false
@@ -139,6 +139,8 @@ func kindForIntent(intent IntentKind, isError bool) personality.Kind {
 		return personality.KindEveningGreeting
 	case IntentGoodNightGreeting:
 		return personality.KindGoodNight
+	case IntentThanks:
+		return personality.KindThanks
 	case IntentCompleteTask:
 		return personality.KindTaskComplete
 	case IntentCreateTask, IntentCreateReminder, IntentCreateEvent:
@@ -148,6 +150,13 @@ func kindForIntent(intent IntentKind, isError bool) personality.Kind {
 	default:
 		return personality.KindChat
 	}
+}
+
+func fallbackPersonalityOnly(intent IntentKind, displayName string, now time.Time, tz string) string {
+	if intent == IntentThanks {
+		return "You're welcome — always happy to help."
+	}
+	return fallbackGreeting(displayName, now, tz)
 }
 
 func fallbackGreeting(displayName string, now time.Time, tz string) string {

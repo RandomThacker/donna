@@ -10,33 +10,37 @@ export type ChatIntentSuggestion = {
 
 /** Short labels for the chat suggestion strip — keep in sync with commandGuides. */
 const LABELS: Record<string, string> = {
-  greeting: "Say hello",
+  greeting: "Hey",
+  "query-due-today": "Due today",
+  "query-backlog": "Backlog",
+  "query-today": "What's today",
+  "query-tomorrow": "What's tomorrow",
+  "morning-brief": "Morning brief",
+  "upcoming-meetings": "Meetings",
+  "create-task": "Create a task",
+  "create-reminder": "Create a reminder",
+  "complete-task": "Complete task",
+  "create-event": "Create an event",
+  thanks: "Thank you",
   "morning-greeting": "Morning hi",
   "evening-greeting": "Evening hi",
   "goodnight-greeting": "Good night",
-  "morning-brief": "Morning brief",
-  "create-task": "Create a task",
-  "complete-task": "Complete a task",
-  "create-reminder": "Create a reminder",
-  "create-event": "Create an event",
-  "query-today": "What's today",
-  "query-tomorrow": "What's tomorrow",
-  "query-due-today": "Due today",
-  "query-backlog": "Backlog",
   "evening-review": "Evening review",
-  "upcoming-meetings": "Meetings",
 };
 
 /** Pill order in the chat strip (anything else follows in guide order). */
 const ORDER = [
   "greeting",
-  "morning-greeting",
-  "evening-greeting",
-  "goodnight-greeting",
   "query-due-today",
   "query-backlog",
   "query-today",
   "query-tomorrow",
+  "morning-brief",
+  "upcoming-meetings",
+  "create-task",
+  "create-reminder",
+  "complete-task",
+  "create-event",
 ] as const;
 
 export const chatIntentSuggestions: ChatIntentSuggestion[] = (() => {

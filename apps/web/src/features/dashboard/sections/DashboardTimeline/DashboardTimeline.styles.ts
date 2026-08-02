@@ -12,5 +12,22 @@ export const timelineStyles = {
   title: "text-sm text-donna-text",
   meta: "mt-0.5 truncate text-[0.65rem] uppercase tracking-[0.14em] text-donna-faint",
   state: "space-y-2 text-sm text-donna-muted",
+  empty: [
+    "grid h-full min-h-[12rem] place-items-center px-2 py-6 text-center",
+  ].join(" "),
+  emptyInner: "flex max-w-[16rem] flex-col items-center",
+  emptyIcon: [
+    "mb-4 grid h-11 w-11 place-items-center rounded-2xl",
+    "bg-donna-accent-soft text-donna-accent ring-1 ring-donna-accent/20",
+  ].join(" "),
+  emptyTitle: "font-display text-xl tracking-tight text-donna-text",
+  emptyBody: "mt-2 text-sm leading-relaxed text-donna-muted",
+  emptyCta: [
+    "mt-5 inline-flex items-center gap-1.5 rounded-full",
+    "bg-donna-accent px-3.5 py-2 text-xs font-medium text-donna-on-accent",
+    "transition-[transform,opacity] duration-200 hover:opacity-95 active:scale-[0.98]",
+    "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2",
+    "focus-visible:outline-donna-accent",
+  ].join(" "),
   link: "font-medium text-donna-accent hover:underline",
 } as const;

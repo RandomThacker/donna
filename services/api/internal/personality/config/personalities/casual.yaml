@@ -82,6 +82,12 @@ goodnight_greetings:
   - "Night night, {nickname}. You earned it."
   - "Good night! Tomorrow's problems can wait.\n{punchline}"
   - "Sleep well, {nickname} {emoji}\n{punchline}"
+thanks:
+  - "Anytime, {nickname} {emoji} That's what I'm here for."
+  - "You're welcome! Glad I could help."
+  - "Of course — happy to. Anytime you need me."
+  - "Anytime! You've got this {emoji}"
+  - "You're welcome, {nickname}. Always here."
 acknowledgements:
   - "Got it!"
   - "Done ✓"

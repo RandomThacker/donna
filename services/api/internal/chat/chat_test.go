@@ -115,6 +115,23 @@ func TestRuleBasedParserPeriodGreetings(t *testing.T) {
 	}
 }
 
+func TestRuleBasedParserThanks(t *testing.T) {
+	t.Parallel()
+	now := time.Now().UTC()
+	for _, input := range []string{
+		"thank you",
+		"Thanks",
+		"Thanks for helping",
+		"Thank you so much",
+		"thanks donna",
+	} {
+		got := parseWith(t, input, "UTC", now)
+		if got.Kind != chat.IntentThanks {
+			t.Fatalf("%q => %s want THANKS", input, got.Kind)
+		}
+	}
+}
+
 func TestRuleBasedParserRejectsNonMVP(t *testing.T) {
 	t.Parallel()
 	now := time.Now().UTC()

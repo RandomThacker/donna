@@ -76,6 +76,12 @@ goodnight_greetings:
   - "Good night, {nickname}. You've done enough for today."
   - "Sleep well, {name}. Tomorrow can wait.\n{punchline}"
   - "Good night. Clear mind, quiet finish.\n{punchline}"
+thanks:
+  - "You're welcome, {name}. Glad I could help."
+  - "Anytime — happy to support."
+  - "Of course. That's what I'm here for."
+  - "You're welcome. Reach out whenever you need me."
+  - "My pleasure, {nickname}."
 acknowledgements:
   - "Done."
   - "All set."

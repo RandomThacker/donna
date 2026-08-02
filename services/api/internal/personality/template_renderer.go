@@ -79,6 +79,8 @@ func (r *TemplateRenderer) renderKind(def Definition, kind Kind, vars map[string
 		return fill(pick(def.EveningGreetings, "Good evening, {name}. How was your day?"), vars)
 	case KindGoodNight:
 		return fill(pick(def.GoodNightGreetings, "Good night, {name}.\n{punchline}"), vars)
+	case KindThanks:
+		return fill(pick(def.Thanks, "You're welcome, {nickname}. Always happy to help."), vars)
 	case KindReminder:
 		return fill(pick(def.Reminders, "{canonical}"), vars)
 	case KindNotification:

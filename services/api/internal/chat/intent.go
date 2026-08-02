@@ -24,6 +24,7 @@ const (
 	IntentMorningGreeting        IntentKind = "MORNING_GREETING"
 	IntentEveningGreeting        IntentKind = "EVENING_GREETING"
 	IntentGoodNightGreeting      IntentKind = "GOOD_NIGHT_GREETING"
+	IntentThanks                 IntentKind = "THANKS"
 	IntentUnknown                IntentKind = "UNKNOWN"
 )
 
@@ -95,7 +96,8 @@ Try something like
 • What do I have today?
 • What do I have tomorrow?
 • What's due today?
-• Show backlog`
+• Show backlog
+• Thank you`
 
 // CommandRequest is POST /chat/command.
 type CommandRequest struct {
