@@ -22,10 +22,10 @@ export function CreateChooserModal({
       title="Create"
       description="Add something to your timeline."
     >
-      <div className="grid gap-2">
+      <div className="grid gap-2.5">
         <button
           type="button"
-          className="rounded-xl border border-donna-border bg-donna-surface-2 px-4 py-3 text-left text-donna-text transition-colors hover:border-donna-accent/40 hover:bg-donna-accent-soft"
+          className="rounded-xl border border-donna-border bg-donna-surface-2 px-4 py-3.5 text-left text-donna-text transition-colors hover:border-donna-accent/40 hover:bg-donna-accent-soft active:scale-[0.99]"
           onClick={onEvent}
         >
           <p className="font-medium">Event</p>
@@ -35,7 +35,7 @@ export function CreateChooserModal({
         </button>
         <button
           type="button"
-          className="rounded-xl border border-donna-border bg-donna-surface-2 px-4 py-3 text-left text-donna-text transition-colors hover:border-donna-accent/40 hover:bg-donna-accent-soft"
+          className="rounded-xl border border-donna-border bg-donna-surface-2 px-4 py-3.5 text-left text-donna-text transition-colors hover:border-donna-accent/40 hover:bg-donna-accent-soft active:scale-[0.99]"
           onClick={onReminder}
         >
           <p className="font-medium">Reminder</p>

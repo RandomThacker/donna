@@ -19,7 +19,7 @@ const PRESET_VALUES = new Set(["", "FREQ=DAILY", "FREQ=WEEKLY", "FREQ=MONTHLY"])
 const CUSTOM_SELECT = "__custom__";
 
 export const formFieldClass =
-  "w-full rounded-xl border border-donna-border bg-donna-surface-2 px-3 py-2 text-sm text-donna-text outline-none transition-colors placeholder:text-donna-faint focus:border-donna-accent/50 disabled:opacity-50";
+  "w-full min-w-0 rounded-xl border border-donna-border bg-donna-surface-2 px-3 py-2.5 text-base text-donna-text outline-none transition-colors placeholder:text-donna-faint focus:border-donna-accent/50 disabled:opacity-50 sm:py-2 sm:text-sm";
 
 type ParsedRecurrence = {
   selectValue: string;

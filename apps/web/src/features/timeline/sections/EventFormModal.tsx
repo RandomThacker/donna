@@ -165,7 +165,7 @@ export function EventFormModal({
       title={editing ? "Edit event" : "Create event"}
       description="Donna-owned event — shows on Calendar and notifies before start."
     >
-      <div className="space-y-3">
+      <div className="space-y-3.5">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-donna-muted">
             Title
@@ -200,8 +200,8 @@ export function EventFormModal({
             onChange={(e) => setDate(e.target.value)}
           />
         </label>
-        <div className="grid grid-cols-2 gap-3">
-          <label className="block">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 sm:gap-3">
+          <label className="block min-w-0">
             <span className="mb-1 block text-xs font-medium text-donna-muted">
               Start
             </span>
@@ -212,7 +212,7 @@ export function EventFormModal({
               onChange={(e) => setStartTime(e.target.value)}
             />
           </label>
-          <label className="block">
+          <label className="block min-w-0">
             <span className="mb-1 block text-xs font-medium text-donna-muted">
               End
             </span>
@@ -237,10 +237,10 @@ export function EventFormModal({
         </label>
         <RecurrenceField value={recurrence} onChange={setRecurrence} />
         {error ? <p className="text-sm text-rose-400">{error}</p> : null}
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="sticky bottom-0 -mx-1 flex justify-end gap-2 border-t border-donna-hairline bg-donna-surface px-1 pt-3 pb-1">
           <button
             type="button"
-            className="rounded-full px-4 py-2 text-sm text-donna-muted hover:text-donna-text"
+            className="min-h-11 rounded-full px-4 py-2.5 text-sm text-donna-muted hover:text-donna-text sm:min-h-0 sm:py-2"
             onClick={onClose}
           >
             Cancel
@@ -248,7 +248,7 @@ export function EventFormModal({
           <button
             type="button"
             disabled={saving}
-            className="rounded-full bg-donna-accent px-4 py-2 text-sm font-medium text-donna-on-accent disabled:opacity-50"
+            className="min-h-11 rounded-full bg-donna-accent px-5 py-2.5 text-sm font-medium text-donna-on-accent disabled:opacity-50 sm:min-h-0 sm:py-2"
             onClick={() => void submit()}
           >
             {saving ? "Saving…" : "Save"}

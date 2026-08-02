@@ -1,5 +1,5 @@
 export const confirmDialogStyles = {
-  root: "z-[60]",
+  root: "z-[80]",
   actions: "flex flex-wrap justify-end gap-2",
   cancel: [
     "rounded-full px-4 py-2 text-sm text-donna-muted",
