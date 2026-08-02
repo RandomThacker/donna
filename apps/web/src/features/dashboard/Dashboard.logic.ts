@@ -37,11 +37,6 @@ export const dashboardData: DashboardData = {
     { id: "mock-3", time: "14:00", title: "Client Meeting" },
     { id: "mock-4", time: "17:00", title: "Guitar Class" },
   ],
-  insights: [
-    { id: "1", text: "Two-hour focus window after lunch." },
-    { id: "2", text: "80% of this week's goals done." },
-    { id: "3", text: "Tomorrow looks busy — keep tonight light." },
-  ],
   tasks: [
     { id: "t1", label: "Wire Google Calendar adapter", done: false },
     { id: "t2", label: "Review yesterday's notes", done: true },

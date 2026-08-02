@@ -60,7 +60,7 @@ export function Dashboard() {
             <div className={styles.bento}>
               <DashboardGreeting greeting={greeting} />
               <DashboardFocus />
-              <DashboardInsights insights={data.insights} />
+              <DashboardInsights />
               <DashboardTimeline />
               <DashboardQuickTasks />
             </div>

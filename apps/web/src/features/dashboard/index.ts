@@ -4,7 +4,6 @@ export type {
   DashboardData,
   DashboardFocus,
   DashboardGreeting,
-  DashboardInsight,
   DashboardNavItem,
   DashboardPhone,
   DashboardTask,
