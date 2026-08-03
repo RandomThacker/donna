@@ -12,10 +12,12 @@ import (
 )
 
 // ActiveCalendarOccurrenceProviders are calendar account providers queried for
-// Occurrence scheduling. Microsoft auth is disabled in product, so only Google
-// is active; add microsoft/ics here later without introducing a second query.
+// Occurrence scheduling / notification enqueue. Still one SQL query via
+// SharedCalendarOccurrenceProvider — providers are filtered with ANY($4).
 var ActiveCalendarOccurrenceProviders = []string{
 	constant.AuthProviderGoogle,
+	constant.AuthProviderICS,
+	constant.AuthProviderMicrosoft,
 }
 
 // SharedCalendarOccurrenceProvider loads all requested calendar providers in

@@ -98,8 +98,15 @@ func TestSharedCalendarSingleQuery(t *testing.T) {
 	if afterCalls != 1 {
 		t.Fatalf("after queries = %d, want 1", afterCalls)
 	}
-	if len(got) != 1 || got[0].Title != "G" {
-		t.Fatalf("active providers should return google only, got %#v", got)
+	if len(got) != 2 {
+		t.Fatalf("active providers should return google+microsoft, got %#v", got)
+	}
+	titles := map[string]bool{}
+	for _, o := range got {
+		titles[o.Title] = true
+	}
+	if !titles["G"] || !titles["M"] {
+		t.Fatalf("titles = %#v", titles)
 	}
 }
 
@@ -202,7 +209,21 @@ func TestSharedCalendarMultiProviderFilterInSQL(t *testing.T) {
 func TestSharedCalendarDefaultsToActiveProviders(t *testing.T) {
 	t.Parallel()
 	p := NewSharedCalendarOccurrenceProvider(&memCalendarEvents{}, nil, nil)
-	if len(p.providers) != 1 || p.providers[0] != constant.AuthProviderGoogle {
+	if len(p.providers) != 3 {
 		t.Fatalf("providers = %#v", p.providers)
+	}
+	want := map[string]bool{
+		constant.AuthProviderGoogle:    true,
+		constant.AuthProviderICS:       true,
+		constant.AuthProviderMicrosoft: true,
+	}
+	for _, got := range p.providers {
+		if !want[got] {
+			t.Fatalf("unexpected provider %q in %#v", got, p.providers)
+		}
+		delete(want, got)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing providers %#v", want)
 	}
 }

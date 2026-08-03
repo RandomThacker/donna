@@ -37,7 +37,7 @@ Provider filtering stays in SQL — never fetch providers that were not requeste
 
 ### Shared Occurrence provider
 
-`SharedCalendarOccurrenceProvider` issues **one** `ListCalendarOccurrences` call for `ActiveCalendarOccurrenceProviders` (currently `["google"]`), then maps rows to Occurrences in memory.
+`SharedCalendarOccurrenceProvider` issues **one** `ListCalendarOccurrences` call for `ActiveCalendarOccurrenceProviders` (currently `["google","ics","microsoft"]`), then maps rows to Occurrences in memory.
 
 `OccurrenceService` wiring:
 
@@ -100,5 +100,5 @@ Instrumentation (`occurrence calendar query consolidated`):
 
 ## Follow-ups
 
-1. Enable `microsoft` / `ics` in `ActiveCalendarOccurrenceProviders` when auth returns  
+1. ~~Enable `microsoft` / `ics` in `ActiveCalendarOccurrenceProviders`~~ — done (ICS work calendars were silently skipped for notifications)
 2. Optional further consolidation of Donna tables is out of scope (different schemas)
