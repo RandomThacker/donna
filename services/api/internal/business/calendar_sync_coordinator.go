@@ -247,14 +247,12 @@ func (c *CalendarSyncCoordinator) finishAccount(accountID uuid.UUID, slot *infli
 }
 
 func (c *CalendarSyncCoordinator) observePipeline(result CalendarPipelineResult, err error) {
-	c.metrics.IncEventCreated(result.EventsCreated)
-	c.metrics.IncEventUpdates(result.EventsUpdated)
-	c.metrics.IncEventDeleted(result.EventsDeleted)
-	c.metrics.IncEventSkipped(result.EventsSkipped)
+	// Per-event create/update/skip/delete counters are recorded in syncSourceEvents.
 	if result.DurationMs > 0 {
 		c.metrics.ObserveSyncDuration(time.Duration(result.DurationMs) * time.Millisecond)
 	}
 	_ = err
+	_ = result
 }
 
 func (c *CalendarSyncCoordinator) recordOutcome(

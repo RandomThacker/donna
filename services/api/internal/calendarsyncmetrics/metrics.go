@@ -8,27 +8,38 @@ import (
 	"time"
 )
 
-// Names match the Phase 1 sprint contract.
+// Names match the Phase 1 sprint + reason-split observability contract.
 const (
-	NameSyncRequestedTotal  = "calendar_sync_requested_total"
-	NameSyncSkippedTotal    = "calendar_sync_skipped_total"
-	NameEventUpdatesTotal   = "calendar_event_updates_total"
-	NameEventSkippedTotal   = "calendar_event_skipped_total"
-	NameEventCreatedTotal   = "calendar_event_created_total"
-	NameEventDeletedTotal   = "calendar_event_deleted_total"
-	NameSyncDurationMS      = "calendar_sync_duration_ms"
+	NameSyncRequestedTotal     = "calendar_sync_requested_total"
+	NameSyncSkippedTotal       = "calendar_sync_skipped_total"
+	NameEventSkipETagTotal     = "calendar_event_skip_etag_total"
+	NameEventSkipUpdatedAtTotal = "calendar_event_skip_updated_at_total"
+	NameEventSkipHashTotal     = "calendar_event_skip_hash_total"
+	NameEventUpdateTotal       = "calendar_event_update_total"
+	NameEventCreateTotal       = "calendar_event_create_total"
+	NameEventDeleteTotal       = "calendar_event_delete_total"
+	NameSyncDurationMS         = "calendar_sync_duration_ms"
+
+	// Decision reason labels (logs + metric routing).
+	ReasonETag               = "etag"
+	ReasonProviderUpdatedAt  = "provider_updated_at"
+	ReasonContentHash        = "content_hash"
+	ReasonETagChanged        = "etag_changed"
+	ReasonResurrect          = "resurrect"
 )
 
 // Registry is a process-wide set of calendar sync counters.
 type Registry struct {
-	syncRequested atomic.Int64
-	syncSkipped   atomic.Int64
-	eventUpdates  atomic.Int64
-	eventSkipped  atomic.Int64
-	eventCreated  atomic.Int64
-	eventDeleted  atomic.Int64
-	durationSumMS atomic.Int64
-	durationCount atomic.Int64
+	syncRequested      atomic.Int64
+	syncSkipped        atomic.Int64
+	eventSkipETag      atomic.Int64
+	eventSkipUpdatedAt atomic.Int64
+	eventSkipHash      atomic.Int64
+	eventUpdate        atomic.Int64
+	eventCreate        atomic.Int64
+	eventDelete        atomic.Int64
+	durationSumMS      atomic.Int64
+	durationCount      atomic.Int64
 }
 
 // Global is the default process registry.
@@ -45,32 +56,46 @@ func (r *Registry) IncSyncRequested() { r.syncRequested.Add(1) }
 // IncSyncSkipped increments calendar_sync_skipped_total.
 func (r *Registry) IncSyncSkipped() { r.syncSkipped.Add(1) }
 
-// IncEventUpdates increments calendar_event_updates_total by n.
-func (r *Registry) IncEventUpdates(n int) {
+// IncEventSkipETag increments calendar_event_skip_etag_total.
+func (r *Registry) IncEventSkipETag() { r.eventSkipETag.Add(1) }
+
+// IncEventSkipUpdatedAt increments calendar_event_skip_updated_at_total.
+func (r *Registry) IncEventSkipUpdatedAt() { r.eventSkipUpdatedAt.Add(1) }
+
+// IncEventSkipHash increments calendar_event_skip_hash_total.
+func (r *Registry) IncEventSkipHash() { r.eventSkipHash.Add(1) }
+
+// IncEventUpdate increments calendar_event_update_total.
+func (r *Registry) IncEventUpdate() { r.eventUpdate.Add(1) }
+
+// IncEventCreate increments calendar_event_create_total by n.
+func (r *Registry) IncEventCreate(n int) {
 	if n > 0 {
-		r.eventUpdates.Add(int64(n))
+		r.eventCreate.Add(int64(n))
 	}
 }
 
-// IncEventSkipped increments calendar_event_skipped_total by n.
-func (r *Registry) IncEventSkipped(n int) {
+// IncEventDelete increments calendar_event_delete_total by n.
+func (r *Registry) IncEventDelete(n int) {
 	if n > 0 {
-		r.eventSkipped.Add(int64(n))
+		r.eventDelete.Add(int64(n))
 	}
 }
 
-// IncEventCreated increments calendar_event_created_total by n.
-func (r *Registry) IncEventCreated(n int) {
-	if n > 0 {
-		r.eventCreated.Add(int64(n))
+// ObserveEventDecision increments the counter for a skip/update reason.
+func (r *Registry) ObserveEventDecision(skipped bool, reason string) {
+	if skipped {
+		switch reason {
+		case ReasonETag:
+			r.IncEventSkipETag()
+		case ReasonProviderUpdatedAt:
+			r.IncEventSkipUpdatedAt()
+		case ReasonContentHash:
+			r.IncEventSkipHash()
+		}
+		return
 	}
-}
-
-// IncEventDeleted increments calendar_event_deleted_total by n.
-func (r *Registry) IncEventDeleted(n int) {
-	if n > 0 {
-		r.eventDeleted.Add(int64(n))
-	}
+	r.IncEventUpdate()
 }
 
 // ObserveSyncDuration records calendar_sync_duration_ms.
@@ -81,27 +106,31 @@ func (r *Registry) ObserveSyncDuration(d time.Duration) {
 
 // Snapshot is a point-in-time view of counters.
 type Snapshot struct {
-	SyncRequestedTotal int64 `json:"calendar_sync_requested_total"`
-	SyncSkippedTotal   int64 `json:"calendar_sync_skipped_total"`
-	EventUpdatesTotal  int64 `json:"calendar_event_updates_total"`
-	EventSkippedTotal  int64 `json:"calendar_event_skipped_total"`
-	EventCreatedTotal  int64 `json:"calendar_event_created_total"`
-	EventDeletedTotal  int64 `json:"calendar_event_deleted_total"`
-	SyncDurationSumMS  int64 `json:"calendar_sync_duration_ms_sum"`
-	SyncDurationCount  int64 `json:"calendar_sync_duration_ms_count"`
+	SyncRequestedTotal      int64 `json:"calendar_sync_requested_total"`
+	SyncSkippedTotal        int64 `json:"calendar_sync_skipped_total"`
+	EventSkipETagTotal      int64 `json:"calendar_event_skip_etag_total"`
+	EventSkipUpdatedAtTotal int64 `json:"calendar_event_skip_updated_at_total"`
+	EventSkipHashTotal      int64 `json:"calendar_event_skip_hash_total"`
+	EventUpdateTotal        int64 `json:"calendar_event_update_total"`
+	EventCreateTotal        int64 `json:"calendar_event_create_total"`
+	EventDeleteTotal        int64 `json:"calendar_event_delete_total"`
+	SyncDurationSumMS       int64 `json:"calendar_sync_duration_ms_sum"`
+	SyncDurationCount       int64 `json:"calendar_sync_duration_ms_count"`
 }
 
 // Snapshot returns current counter values.
 func (r *Registry) Snapshot() Snapshot {
 	return Snapshot{
-		SyncRequestedTotal: r.syncRequested.Load(),
-		SyncSkippedTotal:   r.syncSkipped.Load(),
-		EventUpdatesTotal:  r.eventUpdates.Load(),
-		EventSkippedTotal:  r.eventSkipped.Load(),
-		EventCreatedTotal:  r.eventCreated.Load(),
-		EventDeletedTotal:  r.eventDeleted.Load(),
-		SyncDurationSumMS:  r.durationSumMS.Load(),
-		SyncDurationCount:  r.durationCount.Load(),
+		SyncRequestedTotal:      r.syncRequested.Load(),
+		SyncSkippedTotal:        r.syncSkipped.Load(),
+		EventSkipETagTotal:      r.eventSkipETag.Load(),
+		EventSkipUpdatedAtTotal: r.eventSkipUpdatedAt.Load(),
+		EventSkipHashTotal:      r.eventSkipHash.Load(),
+		EventUpdateTotal:        r.eventUpdate.Load(),
+		EventCreateTotal:        r.eventCreate.Load(),
+		EventDeleteTotal:        r.eventDelete.Load(),
+		SyncDurationSumMS:       r.durationSumMS.Load(),
+		SyncDurationCount:       r.durationCount.Load(),
 	}
 }
 
@@ -109,10 +138,12 @@ func (r *Registry) Snapshot() Snapshot {
 func (r *Registry) Reset() {
 	r.syncRequested.Store(0)
 	r.syncSkipped.Store(0)
-	r.eventUpdates.Store(0)
-	r.eventSkipped.Store(0)
-	r.eventCreated.Store(0)
-	r.eventDeleted.Store(0)
+	r.eventSkipETag.Store(0)
+	r.eventSkipUpdatedAt.Store(0)
+	r.eventSkipHash.Store(0)
+	r.eventUpdate.Store(0)
+	r.eventCreate.Store(0)
+	r.eventDelete.Store(0)
 	r.durationSumMS.Store(0)
 	r.durationCount.Store(0)
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/RandomThacker/donna/services/api/internal/apperr"
 	"github.com/RandomThacker/donna/services/api/internal/calendarprovider"
+	"github.com/RandomThacker/donna/services/api/internal/calendarsyncmetrics"
 	"github.com/RandomThacker/donna/services/api/internal/constant"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 	"github.com/RandomThacker/donna/services/api/internal/idgen"
@@ -238,33 +239,37 @@ func (s *CalendarService) syncSourceEvents(
 				}
 				if delErr == nil {
 					out.RemovedCount++
+					calendarsyncmetrics.Global.IncEventDelete(1)
 				}
 				continue
 			}
-			_, created, skipped, skipReason, upsertErr := s.upsertEvent(ctx, eventsRepo, source, remote, now)
+			_, created, skipped, decisionReason, upsertErr := s.upsertEvent(ctx, eventsRepo, source, remote, now)
 			if upsertErr != nil {
 				return upsertErr
 			}
 			if created {
 				out.CreatedCount++
+				calendarsyncmetrics.Global.IncEventCreate(1)
 			} else if skipped {
 				out.SkippedCount++
+				calendarsyncmetrics.Global.ObserveEventDecision(true, decisionReason)
 				if s.log != nil {
-					s.log.Debug(ctx, "calendar UpdateFromSync skipped",
+					s.log.Info(ctx, "calendar event skipped",
 						"event_id", remote.ID,
 						"calendar_source_id", source.ID.String(),
 						"skipped", true,
-						"reason", skipReason,
+						"reason", decisionReason,
 					)
 				}
 			} else {
 				out.UpdatedCount++
+				calendarsyncmetrics.Global.ObserveEventDecision(false, decisionReason)
 				if s.log != nil {
-					s.log.Info(ctx, "calendar UpdateFromSync applied",
+					s.log.Info(ctx, "calendar event updated",
 						"event_id", remote.ID,
 						"calendar_source_id", source.ID.String(),
 						"skipped", false,
-						"reason", eventSkipReasonChanged,
+						"reason", decisionReason,
 					)
 				}
 			}
@@ -277,6 +282,7 @@ func (s *CalendarService) syncSourceEvents(
 				return delErr
 			}
 			out.RemovedCount += int(removed)
+			calendarsyncmetrics.Global.IncEventDelete(int(removed))
 		}
 		return nil
 	})
@@ -335,7 +341,8 @@ func (s *CalendarService) upsertEvent(
 			mapped.RecurringEventID = parentID
 		}
 
-		if skip, reason := shouldSkipEventUpdate(existing, mapped); skip {
+		skip, reason := shouldSkipEventUpdate(existing, mapped)
+		if skip {
 			return existing, false, true, reason, nil
 		}
 
@@ -345,7 +352,7 @@ func (s *CalendarService) upsertEvent(
 		}
 
 		updated, uErr := repo.UpdateFromSync(ctx, mapped)
-		return updated, false, false, eventSkipReasonChanged, uErr
+		return updated, false, false, reason, uErr
 	}
 }
 

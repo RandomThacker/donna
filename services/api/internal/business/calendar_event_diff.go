@@ -8,28 +8,32 @@ import (
 	"strings"
 	"time"
 
+	"github.com/RandomThacker/donna/services/api/internal/calendarsyncmetrics"
 	"github.com/RandomThacker/donna/services/api/internal/entity"
 )
 
+// Event decision reasons — logged on every skip/update and used for metric routing.
 const (
-	eventSkipReasonUpdatedAt = "updated_at"
-	eventSkipReasonHash      = "hash"
-	eventSkipReasonChanged   = "changed"
+	eventReasonETag              = calendarsyncmetrics.ReasonETag
+	eventReasonProviderUpdatedAt = calendarsyncmetrics.ReasonProviderUpdatedAt
+	eventReasonContentHash       = calendarsyncmetrics.ReasonContentHash
+	eventReasonETagChanged       = calendarsyncmetrics.ReasonETagChanged
+	eventReasonResurrect         = calendarsyncmetrics.ReasonResurrect
 )
 
 // shouldSkipEventUpdate decides whether UpdateFromSync can be skipped.
 //
 // Rules (do not trust ETag alone — ICS publishers are unreliable):
 //  1. Soft-deleted rows always update (resurrect).
-//  2. ETag changed → update.
+//  2. ETag changed → update (reason=etag_changed).
 //  3. ETag same → confirm with provider_updated_at when present;
-//     same timestamps skip; disagreement falls through to content hash.
+//     same timestamps skip (reason=etag); disagreement falls through to content hash.
 //  4. ETag missing → provider_updated_at (same → skip) else content hash.
 //
 // Hash is cheap relative to rewriting large JSONB rows.
 func shouldSkipEventUpdate(existing, mapped entity.CalendarEvent) (skip bool, reason string) {
 	if existing.DeletedAt != nil {
-		return false, eventSkipReasonChanged
+		return false, eventReasonResurrect
 	}
 
 	existingETag := strings.TrimSpace(derefString(existing.ProviderETag))
@@ -38,12 +42,12 @@ func shouldSkipEventUpdate(existing, mapped entity.CalendarEvent) (skip bool, re
 
 	if etagComparable {
 		if existingETag != mappedETag {
-			return false, eventSkipReasonChanged
+			return false, eventReasonETagChanged
 		}
 		// ETag matches — confirm with updated_at when available; never skip on ETag alone.
 		if existing.ProviderUpdatedAt != nil && mapped.ProviderUpdatedAt != nil {
 			if existing.ProviderUpdatedAt.UTC().Equal(mapped.ProviderUpdatedAt.UTC()) {
-				return true, eventSkipReasonUpdatedAt
+				return true, eventReasonETag
 			}
 			return skipByContentHash(existing, mapped)
 		}
@@ -53,7 +57,7 @@ func shouldSkipEventUpdate(existing, mapped entity.CalendarEvent) (skip bool, re
 	// ETag missing on either side → updated_at, then hash.
 	if existing.ProviderUpdatedAt != nil && mapped.ProviderUpdatedAt != nil {
 		if existing.ProviderUpdatedAt.UTC().Equal(mapped.ProviderUpdatedAt.UTC()) {
-			return true, eventSkipReasonUpdatedAt
+			return true, eventReasonProviderUpdatedAt
 		}
 		return skipByContentHash(existing, mapped)
 	}
@@ -63,9 +67,9 @@ func shouldSkipEventUpdate(existing, mapped entity.CalendarEvent) (skip bool, re
 
 func skipByContentHash(existing, mapped entity.CalendarEvent) (skip bool, reason string) {
 	if eventContentHash(existing) == eventContentHash(mapped) {
-		return true, eventSkipReasonHash
+		return true, eventReasonContentHash
 	}
-	return false, eventSkipReasonChanged
+	return false, eventReasonContentHash
 }
 
 // providerIdentityChanged reports whether etag or provider_updated_at changed.

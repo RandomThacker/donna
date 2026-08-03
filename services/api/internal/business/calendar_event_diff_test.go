@@ -19,7 +19,7 @@ func TestShouldUpdateWhenETagChanged(t *testing.T) {
 	mapped := existing
 	mapped.ProviderETag = &etag2
 	skip, reason := shouldSkipEventUpdate(existing, mapped)
-	if skip || reason != eventSkipReasonChanged {
+	if skip || reason != eventReasonETagChanged {
 		t.Fatalf("skip=%v reason=%q", skip, reason)
 	}
 }
@@ -35,7 +35,7 @@ func TestShouldNotTrustETagAloneWhenContentDiffers(t *testing.T) {
 	mapped := existing
 	mapped.Title = "B" // same etag, no updated_at → hash must catch it
 	skip, reason := shouldSkipEventUpdate(existing, mapped)
-	if skip || reason != eventSkipReasonChanged {
+	if skip || reason != eventReasonContentHash {
 		t.Fatalf("skip=%v reason=%q", skip, reason)
 	}
 }
@@ -51,9 +51,9 @@ func TestShouldSkipWhenETagAndUpdatedAtAgree(t *testing.T) {
 		AttendeesSummary: []byte(`[]`),
 	}
 	mapped := existing
-	mapped.Title = "B" // content differs; etag+updated_at agree → skip
+	mapped.Title = "B" // content differs; etag+updated_at agree → skip (reason=etag)
 	skip, reason := shouldSkipEventUpdate(existing, mapped)
-	if !skip || reason != eventSkipReasonUpdatedAt {
+	if !skip || reason != eventReasonETag {
 		t.Fatalf("skip=%v reason=%q", skip, reason)
 	}
 }
@@ -73,7 +73,7 @@ func TestShouldHashWhenETagSameButUpdatedAtDiffers(t *testing.T) {
 	sameContent := existing
 	sameContent.ProviderUpdatedAt = &ts2
 	skip, reason := shouldSkipEventUpdate(existing, sameContent)
-	if !skip || reason != eventSkipReasonHash {
+	if !skip || reason != eventReasonContentHash {
 		t.Fatalf("unchanged content: skip=%v reason=%q", skip, reason)
 	}
 
@@ -81,7 +81,7 @@ func TestShouldHashWhenETagSameButUpdatedAtDiffers(t *testing.T) {
 	changed.ProviderUpdatedAt = &ts2
 	changed.Title = "Standup Renamed"
 	skip, reason = shouldSkipEventUpdate(existing, changed)
-	if skip || reason != eventSkipReasonChanged {
+	if skip || reason != eventReasonContentHash {
 		t.Fatalf("changed content: skip=%v reason=%q", skip, reason)
 	}
 }
@@ -95,7 +95,7 @@ func TestShouldSkipEventUpdateByUpdatedAtWhenETagMissing(t *testing.T) {
 		Title: "B", Status: constant.CalendarEventStatusConfirmed, ProviderUpdatedAt: &ts,
 	}
 	skip, reason := shouldSkipEventUpdate(existing, mapped)
-	if !skip || reason != eventSkipReasonUpdatedAt {
+	if !skip || reason != eventReasonProviderUpdatedAt {
 		t.Fatalf("skip=%v reason=%q", skip, reason)
 	}
 }
@@ -113,7 +113,7 @@ func TestShouldHashWhenUpdatedAtDiffersAndETagMissing(t *testing.T) {
 	changed.ProviderUpdatedAt = &ts2
 	changed.Title = "Renamed"
 	skip, reason := shouldSkipEventUpdate(existing, changed)
-	if skip || reason != eventSkipReasonChanged {
+	if skip || reason != eventReasonContentHash {
 		t.Fatalf("skip=%v reason=%q", skip, reason)
 	}
 }
@@ -131,7 +131,7 @@ func TestShouldSkipEventUpdateByHash(t *testing.T) {
 		ProviderPayload: []byte(`{"noise":true}`),
 	}
 	skip, reason := shouldSkipEventUpdate(existing, mapped)
-	if !skip || reason != eventSkipReasonHash {
+	if !skip || reason != eventReasonContentHash {
 		t.Fatalf("skip=%v reason=%q", skip, reason)
 	}
 }
@@ -147,7 +147,7 @@ func TestShouldNotSkipWhenSoftDeleted(t *testing.T) {
 		Title: "A", Status: constant.CalendarEventStatusConfirmed, ProviderETag: &etag,
 	}
 	skip, reason := shouldSkipEventUpdate(existing, mapped)
-	if skip || reason != eventSkipReasonChanged {
+	if skip || reason != eventReasonResurrect {
 		t.Fatalf("skip=%v reason=%q", skip, reason)
 	}
 }
