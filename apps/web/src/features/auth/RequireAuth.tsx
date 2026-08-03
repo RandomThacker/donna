@@ -23,7 +23,7 @@ export function RequireAuth({ children }: { children: ReactNode }) {
     }
   }, [router, status]);
 
-  // App startup freshness: incremental sync when last success is older than 2 minutes.
+  // App startup freshness: sync when last success is older than 15 minutes.
   useEffect(() => {
     if (status !== "authenticated") {
       return;

@@ -21,7 +21,7 @@ export function syncCalendarSources(signal?: AbortSignal): Promise<CalendarSyncR
 }
 
 /**
- * Startup / on-demand freshness: full pipeline when last success is older than 2 minutes.
+ * Startup / on-demand freshness: full pipeline when last success is older than 15 minutes.
  */
 export function ensureCalendarSourcesFresh(
   signal?: AbortSignal,

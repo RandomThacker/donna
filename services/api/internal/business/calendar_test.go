@@ -623,7 +623,7 @@ func TestEnsureFreshSkipsWhenRecent(t *testing.T) {
 	api := &mockCalendarProvider{}
 	svc := newCalendarServiceForTest(t, accounts, &mockCalendarSecretRepo{}, sources, api, mockTokenRefresher{}, key)
 
-	result, err := svc.EnsureFresh(context.Background(), userID, 2*time.Minute)
+	result, err := svc.EnsureFresh(context.Background(), userID, 15*time.Minute)
 	if err != nil {
 		t.Fatal(err)
 	}

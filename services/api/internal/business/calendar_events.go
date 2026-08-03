@@ -120,7 +120,9 @@ func (s *CalendarService) SyncEvents(ctx context.Context, userID uuid.UUID) (Cal
 			}
 			result.CreatedCount += partial.CreatedCount
 			result.UpdatedCount += partial.UpdatedCount
+			result.SkippedCount += partial.SkippedCount
 			result.RemovedCount += partial.RemovedCount
+			result.ScannedCount += partial.ScannedCount
 		}
 	}
 	_ = failures
@@ -145,8 +147,10 @@ func (s *CalendarService) SyncEvents(ctx context.Context, userID uuid.UUID) (Cal
 		s.log.Info(ctx, "calendar events synced",
 			constant.LogAttrUserID, userID.String(),
 			"sources", result.SourceCount,
+			"scanned", result.ScannedCount,
 			"created", result.CreatedCount,
 			"updated", result.UpdatedCount,
+			"skipped", result.SkippedCount,
 			"removed", result.RemovedCount,
 			"duration_ms", result.DurationMs,
 		)
@@ -155,8 +159,10 @@ func (s *CalendarService) SyncEvents(ctx context.Context, userID uuid.UUID) (Cal
 }
 
 type partialCounts struct {
+	ScannedCount int
 	CreatedCount int
 	UpdatedCount int
+	SkippedCount int
 	RemovedCount int
 }
 
@@ -221,6 +227,7 @@ func (s *CalendarService) syncSourceEvents(
 		eventsRepo := s.events.WithTx(tx)
 		keepIDs := make([]string, 0, len(listed.Events))
 		for _, remote := range listed.Events {
+			out.ScannedCount++
 			if remote.ID != "" {
 				keepIDs = append(keepIDs, remote.ID)
 			}
@@ -234,14 +241,32 @@ func (s *CalendarService) syncSourceEvents(
 				}
 				continue
 			}
-			_, created, upsertErr := s.upsertEvent(ctx, eventsRepo, source, remote, now)
+			_, created, skipped, skipReason, upsertErr := s.upsertEvent(ctx, eventsRepo, source, remote, now)
 			if upsertErr != nil {
 				return upsertErr
 			}
 			if created {
 				out.CreatedCount++
+			} else if skipped {
+				out.SkippedCount++
+				if s.log != nil {
+					s.log.Debug(ctx, "calendar UpdateFromSync skipped",
+						"event_id", remote.ID,
+						"calendar_source_id", source.ID.String(),
+						"skipped", true,
+						"reason", skipReason,
+					)
+				}
 			} else {
 				out.UpdatedCount++
+				if s.log != nil {
+					s.log.Info(ctx, "calendar UpdateFromSync applied",
+						"event_id", remote.ID,
+						"calendar_source_id", source.ID.String(),
+						"skipped", false,
+						"reason", eventSkipReasonChanged,
+					)
+				}
 			}
 		}
 		// ReplaceAll providers (ICS) return the full feed truth — soft-delete missing UIDs.
@@ -278,10 +303,10 @@ func (s *CalendarService) upsertEvent(
 	source entity.CalendarSource,
 	remote calendarprovider.RemoteEvent,
 	now time.Time,
-) (entity.CalendarEvent, bool, error) {
+) (entity.CalendarEvent, bool, bool, string, error) {
 	mapped, err := mapRemoteEventEntity(source, remote, now)
 	if err != nil {
-		return entity.CalendarEvent{}, false, err
+		return entity.CalendarEvent{}, false, false, "", err
 	}
 
 	existing, err := repo.GetBySourceAndProviderEvent(ctx, source.ID, remote.ID)
@@ -289,7 +314,7 @@ func (s *CalendarService) upsertEvent(
 	case errors.Is(err, apperr.ErrNotFound):
 		id, idErr := idgen.NewUUIDv7()
 		if idErr != nil {
-			return entity.CalendarEvent{}, false, idErr
+			return entity.CalendarEvent{}, false, false, "", idErr
 		}
 		mapped.ID = id
 		mapped.PublicID = idgen.PublicID(constant.PublicIDPrefixCalendarEvent, id)
@@ -298,9 +323,9 @@ func (s *CalendarService) upsertEvent(
 			mapped.RecurringEventID = parentID
 		}
 		created, cErr := repo.Create(ctx, mapped)
-		return created, true, cErr
+		return created, true, false, "", cErr
 	case err != nil:
-		return entity.CalendarEvent{}, false, err
+		return entity.CalendarEvent{}, false, false, "", err
 	default:
 		mapped.ID = existing.ID
 		mapped.PublicID = existing.PublicID
@@ -309,8 +334,18 @@ func (s *CalendarService) upsertEvent(
 		if parentID, resolveErr := s.resolveRecurringParent(ctx, repo, source.ID, remote.RecurringEventID); resolveErr == nil {
 			mapped.RecurringEventID = parentID
 		}
+
+		if skip, reason := shouldSkipEventUpdate(existing, mapped); skip {
+			return existing, false, true, reason, nil
+		}
+
+		// Preserve provider_payload unless etag or provider_updated_at changed.
+		if !providerIdentityChanged(existing, mapped) {
+			mapped.ProviderPayload = existing.ProviderPayload
+		}
+
 		updated, uErr := repo.UpdateFromSync(ctx, mapped)
-		return updated, false, uErr
+		return updated, false, false, eventSkipReasonChanged, uErr
 	}
 }
 

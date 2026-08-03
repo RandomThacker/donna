@@ -85,7 +85,7 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	if calendarParts.service != nil && calendarParts.integrations != nil {
 		calendarParts.integrations.SetOnAccountReady(calendarParts.service.BootstrapCalendarSyncJob)
 		calendarParts.integrations.SetSyncAccount(func(ctx context.Context, accountID uuid.UUID) (business.CalendarPipelineResult, error) {
-			return calendarParts.service.SyncPipelineForAccount(ctx, accountID, constant.CalendarSyncTriggerManual)
+			return calendarParts.coordinator.SyncAccount(ctx, accountID, constant.CalendarSyncTriggerManual, "ics_or_oauth_connect")
 		})
 		authParts.service.SetLoginCalendarLinker(calendarParts.integrations)
 	}
@@ -312,10 +312,10 @@ func Run(ctx context.Context, cfg *config.Config, logFactory *logger.Factory) er
 	appLog.Info(ctx, "automation scheduler started")
 	go notificationDispatcher.Run(runCtx)
 	appLog.Info(ctx, "notification dispatcher started")
-	if calendarParts.service != nil {
+	if calendarParts.service != nil && calendarParts.coordinator != nil {
 		jobsRepo := repository.NewSchedulerJobRepository(pool)
 		platformJobs := []scheduler.Job{
-			calendarsync.NewJob(calendarParts.service),
+			calendarsync.NewJob(calendarParts.coordinator, calendarParts.service),
 		}
 		if err := scheduler.ValidateJobs(platformJobs); err != nil {
 			return fmt.Errorf("scheduler: %w", err)
@@ -563,10 +563,12 @@ func wireCalendar(
 		SealKey:     auth.sealKey,
 		Log:         calendarLog,
 	})
+	coordinator := business.NewCalendarSyncCoordinator(svc, calendarLog, nil)
 
 	out := calendarWire{
-		handler: handler.NewCalendarHandler(svc, calendarLog),
-		service: svc,
+		handler:     handler.NewCalendarHandler(svc, coordinator, calendarLog),
+		service:     svc,
+		coordinator: coordinator,
 	}
 
 	integrations := business.NewIntegrationService(business.IntegrationServiceDeps{
@@ -594,6 +596,7 @@ func wireCalendar(
 type calendarWire struct {
 	handler            *handler.CalendarHandler
 	service            *business.CalendarService
+	coordinator        *business.CalendarSyncCoordinator
 	integrations       *business.IntegrationService
 	integrationHandler *handler.IntegrationHandler
 }

@@ -18,13 +18,14 @@ import (
 
 // CalendarHandler maps calendar HTTP endpoints to the calendar business layer.
 type CalendarHandler struct {
-	svc *business.CalendarService
-	log *logger.Logger
+	svc  *business.CalendarService
+	sync *business.CalendarSyncCoordinator
+	log  *logger.Logger
 }
 
 // NewCalendarHandler constructs a CalendarHandler.
-func NewCalendarHandler(svc *business.CalendarService, log *logger.Logger) *CalendarHandler {
-	return &CalendarHandler{svc: svc, log: log}
+func NewCalendarHandler(svc *business.CalendarService, sync *business.CalendarSyncCoordinator, log *logger.Logger) *CalendarHandler {
+	return &CalendarHandler{svc: svc, sync: sync, log: log}
 }
 
 // SyncSources handles POST /calendar/sync (orchestrated sources + events sync).
@@ -35,7 +36,7 @@ func (h *CalendarHandler) SyncSources(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.SyncSources(c.Request.Context(), userID)
+	result, err := h.sync.SyncUser(c.Request.Context(), userID, constant.CalendarSyncTriggerManual, "manual_sync_now")
 	if err != nil {
 		h.writeError(c, err)
 		return
@@ -51,7 +52,7 @@ func (h *CalendarHandler) EnsureFreshSources(c *gin.Context) {
 		return
 	}
 
-	result, err := h.svc.EnsureFresh(c.Request.Context(), userID, constant.CalendarSyncStaleAfter)
+	result, err := h.sync.EnsureFresh(c.Request.Context(), userID, constant.CalendarSyncStaleAfter)
 	if err != nil {
 		h.writeError(c, err)
 		return
@@ -171,6 +172,8 @@ func calendarPipelineResponse(result business.CalendarPipelineResult) model.Cale
 		SourcesDeleted:     result.SourcesDeleted,
 		EventsCreated:      result.EventsCreated,
 		EventsUpdated:      result.EventsUpdated,
+		EventsSkipped:      result.EventsSkipped,
+		EventsScanned:      result.EventsScanned,
 		EventsDeleted:      result.EventsDeleted,
 		Failures:           failures,
 		Sources:            model.CalendarSourcesFromEntities(result.Sources),

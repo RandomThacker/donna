@@ -11,7 +11,6 @@ import { dedupeHolidayEvents } from "./Calendar.layout";
 import type { CalendarEvent } from "./Calendar.types";
 import { endOfZonedDay, resolveCalendarTimeZone, startOfZonedDay } from "./Calendar.timezone";
 import { calendarQueryKeys } from "./Calendar.utils";
-import { useCalendarFreshness } from "./useCalendarFreshness";
 
 function normalizeEvents(raw: CalendarEvent[]): CalendarEvent[] {
   return raw.filter((event) => event.status !== "cancelled");
@@ -21,9 +20,6 @@ function normalizeEvents(raw: CalendarEvent[]): CalendarEvent[] {
 export function useCalendarDayEvents(day = new Date()) {
   const { user } = useAuth();
   const timeZone = resolveCalendarTimeZone(user?.timezone);
-
-  // Sync from Microsoft/Google into Donna before trusting local reads.
-  const freshnessQuery = useCalendarFreshness();
 
   const range = useMemo(() => {
     const from = startOfZonedDay(day, timeZone);
@@ -94,6 +90,7 @@ export function useCalendarDayEvents(day = new Date()) {
     timeZone,
     isLoading: sourcesQuery.isLoading || eventsQuery.isLoading,
     isError: sourcesQuery.isError || eventsQuery.isError,
-    isSyncing: freshnessQuery.isFetching,
+    // Provider sync is manual / EnsureFresh / scheduler — not dashboard-driven.
+    isSyncing: false,
   };
 }

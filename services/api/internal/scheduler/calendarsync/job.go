@@ -14,12 +14,13 @@ import (
 // Implements scheduler.Job and scheduler.RecurringJob so cadence stays in
 // scheduler_jobs.payload and future integrations share the same Runner.
 type Job struct {
-	calendar *business.CalendarService
+	sync     *business.CalendarSyncCoordinator
+	calendar *business.CalendarService // used for ScheduleNext bootstrap helpers
 }
 
 // NewJob constructs a CalendarSync Job handler.
-func NewJob(calendar *business.CalendarService) *Job {
-	return &Job{calendar: calendar}
+func NewJob(sync *business.CalendarSyncCoordinator, calendar *business.CalendarService) *Job {
+	return &Job{sync: sync, calendar: calendar}
 }
 
 var (
@@ -34,13 +35,13 @@ func (j *Job) Type() string {
 
 // Run syncs calendar sources and events for the job's connected account.
 func (j *Job) Run(ctx context.Context, job entity.SchedulerJob) error {
-	if j.calendar == nil {
-		return fmt.Errorf("calendar service is not configured")
+	if j.sync == nil {
+		return fmt.Errorf("calendar sync coordinator is not configured")
 	}
 	if job.ConnectedAccountID == nil {
 		return fmt.Errorf("missing connected_account_id")
 	}
-	result, err := j.calendar.SyncSourcesForAccount(ctx, *job.ConnectedAccountID)
+	result, err := j.sync.SyncAccount(ctx, *job.ConnectedAccountID, constant.CalendarSyncTriggerScheduler, "background_scheduler")
 	if err != nil {
 		return err
 	}

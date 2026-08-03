@@ -38,7 +38,9 @@ type CalendarEventSyncResult struct {
 	Events       []entity.CalendarEvent
 	CreatedCount int
 	UpdatedCount int
+	SkippedCount int
 	RemovedCount int
+	ScannedCount int
 	SyncedAt     time.Time
 	DurationMs   int
 	SourceCount  int
@@ -202,17 +204,20 @@ func (s *CalendarService) ListSources(ctx context.Context, userID uuid.UUID) (Ca
 }
 
 // SyncSources is POST /calendar/sync — full orchestration (sources + events).
+// HTTP handlers should call CalendarSyncCoordinator.SyncUser instead.
 func (s *CalendarService) SyncSources(ctx context.Context, userID uuid.UUID) (CalendarPipelineResult, error) {
 	return s.SyncPipeline(ctx, userID, constant.CalendarSyncTriggerManual)
 }
 
 // SyncSourcesForAccount runs the full pipeline for a connected account (scheduler).
+// Prefer CalendarSyncCoordinator.SyncAccount from jobs and integrations.
 func (s *CalendarService) SyncSourcesForAccount(ctx context.Context, accountID uuid.UUID) (CalendarPipelineResult, error) {
 	return s.SyncPipelineForAccount(ctx, accountID, constant.CalendarSyncTriggerScheduler)
 }
 
 // EnsureFresh runs the full pipeline only when any syncable account is stale.
 // Used for app startup and AI workflows — always read Donna DB afterward.
+// Prefer CalendarSyncCoordinator.EnsureFresh from HTTP handlers.
 func (s *CalendarService) EnsureFresh(ctx context.Context, userID uuid.UUID, maxAge time.Duration) (CalendarPipelineResult, error) {
 	if maxAge <= 0 {
 		maxAge = constant.CalendarSyncStaleAfter

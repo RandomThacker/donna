@@ -34,8 +34,10 @@ type CalendarPipelineResult struct {
 	SourcesCreated     int
 	SourcesUpdated     int
 	SourcesDeleted     int
+	EventsScanned      int
 	EventsCreated      int
 	EventsUpdated      int
+	EventsSkipped      int
 	EventsDeleted      int
 	Failures           []CalendarSyncFailure
 	Sources            []entity.CalendarSource
@@ -79,8 +81,10 @@ func (s *CalendarService) SyncPipeline(ctx context.Context, userID uuid.UUID, tr
 		combined.SourcesCreated += partial.SourcesCreated
 		combined.SourcesUpdated += partial.SourcesUpdated
 		combined.SourcesDeleted += partial.SourcesDeleted
+		combined.EventsScanned += partial.EventsScanned
 		combined.EventsCreated += partial.EventsCreated
 		combined.EventsUpdated += partial.EventsUpdated
+		combined.EventsSkipped += partial.EventsSkipped
 		combined.EventsDeleted += partial.EventsDeleted
 		combined.Failures = append(combined.Failures, partial.Failures...)
 		if partial.Incremental {
@@ -250,16 +254,20 @@ func (s *CalendarService) runPipeline(ctx context.Context, account entity.Connec
 				}
 				continue
 			}
+			result.EventsScanned += partial.ScannedCount
 			result.EventsCreated += partial.CreatedCount
 			result.EventsUpdated += partial.UpdatedCount
+			result.EventsSkipped += partial.SkippedCount
 			result.EventsDeleted += partial.RemovedCount
 			if s.log != nil {
 				s.log.Info(ctx, "calendar events phase complete for source",
 					constant.LogAttrUserID, account.UserID.String(),
 					"calendar_source_id", source.ID.String(),
 					"provider_calendar_id", source.ProviderCalendarID,
+					"scanned", partial.ScannedCount,
 					"created", partial.CreatedCount,
 					"updated", partial.UpdatedCount,
+					"skipped", partial.SkippedCount,
 					"deleted", partial.RemovedCount,
 				)
 			}
@@ -352,7 +360,9 @@ func (s *CalendarService) finishPipeline(
 			"sources_deleted", result.SourcesDeleted,
 			"events_created", result.EventsCreated,
 			"events_updated", result.EventsUpdated,
+			"events_skipped", result.EventsSkipped,
 			"events_deleted", result.EventsDeleted,
+			"events_scanned", result.EventsScanned,
 			"failures", len(result.Failures),
 		)
 	}

@@ -42,6 +42,8 @@ type CalendarSyncResponse struct {
 	SourcesDeleted     int                           `json:"sources_deleted"`
 	EventsCreated      int                           `json:"events_created"`
 	EventsUpdated      int                           `json:"events_updated"`
+	EventsSkipped      int                           `json:"events_skipped"`
+	EventsScanned      int                           `json:"events_scanned"`
 	EventsDeleted      int                           `json:"events_deleted"`
 	Failures           []CalendarSyncFailureResponse `json:"failures"`
 	Sources            []CalendarSourceResponse      `json:"sources"`

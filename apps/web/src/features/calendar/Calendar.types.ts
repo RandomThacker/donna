@@ -127,6 +127,8 @@ export type CalendarSyncResult = {
   sources_deleted: number;
   events_created: number;
   events_updated: number;
+  events_skipped: number;
+  events_scanned: number;
   events_deleted: number;
   failures: CalendarSyncFailure[];
   sources: CalendarSource[];
