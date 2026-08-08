@@ -27,6 +27,14 @@ const calendarEventColumnsAliased = `
 	e.provider_event_id, e.provider_etag, e.provider_updated_at, e.provider_payload, e.origin,
 	e.created_at, e.updated_at, e.deleted_at`
 
+// Sync decision lookup: fields required by shouldSkipEventUpdate / content hash /
+// resurrection / identity preserve — deliberately omits provider_payload.
+const calendarEventSyncDecisionColumns = `
+	id, public_id, calendar_source_id, title, description, location,
+	starts_at, ends_at, is_all_day, status, visibility, timezone, organizer_summary,
+	attendees_summary, recurrence_rule, recurring_event_id, provider_event_id,
+	provider_etag, provider_updated_at, created_at, deleted_at`
+
 const (
 	sqlInsertCalendarEvent = `
 INSERT INTO calendar_events (
@@ -43,6 +51,13 @@ RETURNING` + calendarEventColumns
 
 	sqlSelectCalendarEventBySourceProvider = `
 SELECT` + calendarEventColumns + `
+FROM calendar_events
+WHERE calendar_source_id = $1 AND provider_event_id = $2
+ORDER BY deleted_at NULLS FIRST
+LIMIT 1`
+
+	sqlSelectCalendarEventSyncDecisionBySourceProvider = `
+SELECT` + calendarEventSyncDecisionColumns + `
 FROM calendar_events
 WHERE calendar_source_id = $1 AND provider_event_id = $2
 ORDER BY deleted_at NULLS FIRST
@@ -146,6 +161,9 @@ WHERE s.connected_account_id = $1
 type CalendarEventRepository interface {
 	Create(ctx context.Context, event entity.CalendarEvent) (entity.CalendarEvent, error)
 	GetBySourceAndProviderEvent(ctx context.Context, sourceID uuid.UUID, providerEventID string) (entity.CalendarEvent, error)
+	// GetForSyncDecision returns a narrow projection for calendar sync skip/update
+	// decisions. ProviderPayload is never loaded.
+	GetForSyncDecision(ctx context.Context, sourceID uuid.UUID, providerEventID string) (entity.CalendarEvent, error)
 	ListByUserInRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEvent, error)
 	ListByUserInRangeWithProvider(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEventWithProvider, error)
 	// ListForSchedulerByUserInRange returns a narrow projection for Occurrence scheduling.
@@ -245,6 +263,21 @@ func (r *calendarEventRepository) GetBySourceAndProviderEvent(
 			return entity.CalendarEvent{}, apperr.ErrNotFound
 		}
 		return entity.CalendarEvent{}, fmt.Errorf("get calendar event: %w", err)
+	}
+	return event, nil
+}
+
+func (r *calendarEventRepository) GetForSyncDecision(
+	ctx context.Context,
+	sourceID uuid.UUID,
+	providerEventID string,
+) (entity.CalendarEvent, error) {
+	event, err := scanCalendarEventSyncDecision(r.q.QueryRow(ctx, sqlSelectCalendarEventSyncDecisionBySourceProvider, sourceID, providerEventID))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return entity.CalendarEvent{}, apperr.ErrNotFound
+		}
+		return entity.CalendarEvent{}, fmt.Errorf("get calendar event sync decision: %w", err)
 	}
 	return event, nil
 }
@@ -473,6 +506,34 @@ func scanCalendarEvent(row scannable) (entity.CalendarEvent, error) {
 		&e.Origin,
 		&e.CreatedAt,
 		&e.UpdatedAt,
+		&e.DeletedAt,
+	)
+	return e, err
+}
+
+func scanCalendarEventSyncDecision(row scannable) (entity.CalendarEvent, error) {
+	var e entity.CalendarEvent
+	err := row.Scan(
+		&e.ID,
+		&e.PublicID,
+		&e.CalendarSourceID,
+		&e.Title,
+		&e.Description,
+		&e.Location,
+		&e.StartsAt,
+		&e.EndsAt,
+		&e.IsAllDay,
+		&e.Status,
+		&e.Visibility,
+		&e.Timezone,
+		&e.OrganizerSummary,
+		&e.AttendeesSummary,
+		&e.RecurrenceRule,
+		&e.RecurringEventID,
+		&e.ProviderEventID,
+		&e.ProviderETag,
+		&e.ProviderUpdatedAt,
+		&e.CreatedAt,
 		&e.DeletedAt,
 	)
 	return e, err

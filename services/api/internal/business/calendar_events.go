@@ -315,7 +315,7 @@ func (s *CalendarService) upsertEvent(
 		return entity.CalendarEvent{}, false, false, "", err
 	}
 
-	existing, err := repo.GetBySourceAndProviderEvent(ctx, source.ID, remote.ID)
+	existing, err := repo.GetForSyncDecision(ctx, source.ID, remote.ID)
 	switch {
 	case errors.Is(err, apperr.ErrNotFound):
 		id, idErr := idgen.NewUUIDv7()
@@ -347,8 +347,13 @@ func (s *CalendarService) upsertEvent(
 		}
 
 		// Preserve provider_payload unless etag or provider_updated_at changed.
+		// Narrow decision lookup omits payload — fetch the full row only when needed.
 		if !providerIdentityChanged(existing, mapped) {
-			mapped.ProviderPayload = existing.ProviderPayload
+			full, fullErr := repo.GetBySourceAndProviderEvent(ctx, source.ID, remote.ID)
+			if fullErr != nil {
+				return entity.CalendarEvent{}, false, false, "", fullErr
+			}
+			mapped.ProviderPayload = full.ProviderPayload
 		}
 
 		updated, uErr := repo.UpdateFromSync(ctx, mapped)
@@ -366,7 +371,7 @@ func (s *CalendarService) resolveRecurringParent(
 	if providerRecurringID == "" {
 		return nil, nil
 	}
-	parent, err := repo.GetBySourceAndProviderEvent(ctx, sourceID, providerRecurringID)
+	parent, err := repo.GetForSyncDecision(ctx, sourceID, providerRecurringID)
 	if err != nil {
 		return nil, err
 	}
