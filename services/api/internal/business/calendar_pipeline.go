@@ -39,6 +39,7 @@ type CalendarPipelineResult struct {
 	EventsUpdated      int
 	EventsSkipped      int
 	EventsDeleted      int
+	EventsLookup       int
 	Failures           []CalendarSyncFailure
 	Sources            []entity.CalendarSource
 	Incremental        bool
@@ -86,6 +87,7 @@ func (s *CalendarService) SyncPipeline(ctx context.Context, userID uuid.UUID, tr
 		combined.EventsUpdated += partial.EventsUpdated
 		combined.EventsSkipped += partial.EventsSkipped
 		combined.EventsDeleted += partial.EventsDeleted
+		combined.EventsLookup += partial.EventsLookup
 		combined.Failures = append(combined.Failures, partial.Failures...)
 		if partial.Incremental {
 			combined.Incremental = true
@@ -259,6 +261,7 @@ func (s *CalendarService) runPipeline(ctx context.Context, account entity.Connec
 			result.EventsUpdated += partial.UpdatedCount
 			result.EventsSkipped += partial.SkippedCount
 			result.EventsDeleted += partial.RemovedCount
+			result.EventsLookup += partial.LookupCount
 			if s.log != nil {
 				s.log.Info(ctx, "calendar events phase complete for source",
 					constant.LogAttrUserID, account.UserID.String(),
@@ -269,6 +272,7 @@ func (s *CalendarService) runPipeline(ctx context.Context, account entity.Connec
 					"updated", partial.UpdatedCount,
 					"skipped", partial.SkippedCount,
 					"deleted", partial.RemovedCount,
+					"sync_lookup_count", partial.LookupCount,
 				)
 			}
 		}
@@ -363,6 +367,7 @@ func (s *CalendarService) finishPipeline(
 			"events_skipped", result.EventsSkipped,
 			"events_deleted", result.EventsDeleted,
 			"events_scanned", result.EventsScanned,
+			"sync_lookup_count", result.EventsLookup,
 			"failures", len(result.Failures),
 		)
 	}

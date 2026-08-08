@@ -3,6 +3,7 @@ package business_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
@@ -21,10 +22,11 @@ import (
 )
 
 type mockEventRepo struct {
-	byKey            map[string]entity.CalendarEvent
-	updateCalls      int
-	decisionGetCalls int
-	fullGetCalls     int
+	byKey             map[string]entity.CalendarEvent
+	updateCalls       int
+	decisionGetCalls  int
+	batchDecisionCalls int
+	fullGetCalls      int
 }
 
 func (m *mockEventRepo) key(sourceID uuid.UUID, providerID string) string {
@@ -58,13 +60,38 @@ func (m *mockEventRepo) GetForSyncDecision(_ context.Context, sourceID uuid.UUID
 	if !ok {
 		return entity.CalendarEvent{}, apperr.ErrNotFound
 	}
-	// Simulate narrow projection: never return provider_payload.
+	return stripSyncDecision(event), nil
+}
+
+func (m *mockEventRepo) GetForSyncDecisionByProviderEventIDs(
+	_ context.Context,
+	sourceID uuid.UUID,
+	providerEventIDs []string,
+) (map[string]entity.CalendarEvent, error) {
+	m.batchDecisionCalls++
+	out := make(map[string]entity.CalendarEvent)
+	for _, providerEventID := range providerEventIDs {
+		if providerEventID == "" {
+			continue
+		}
+		event, ok := m.byKey[m.key(sourceID, providerEventID)]
+		if !ok {
+			continue
+		}
+		// Prefer live row when both live + soft-deleted exist under same key
+		// (mock stores one row per key; matches DISTINCT ON deleted_at NULLS FIRST).
+		out[providerEventID] = stripSyncDecision(event)
+	}
+	return out, nil
+}
+
+func stripSyncDecision(event entity.CalendarEvent) entity.CalendarEvent {
 	event.ProviderPayload = nil
 	event.UserID = uuid.Nil
 	event.Origin = ""
 	event.ProviderRecurringEventID = nil
 	event.UpdatedAt = time.Time{}
-	return event, nil
+	return event
 }
 
 func (m *mockEventRepo) ListByUserInRange(_ context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEvent, error) {
@@ -489,14 +516,18 @@ func TestSyncEventsSkipsUnchangedWithoutUpdate(t *testing.T) {
 	if first.CreatedCount != 1 || events.updateCalls != 0 {
 		t.Fatalf("first = %+v updates=%d", first, events.updateCalls)
 	}
-	if events.decisionGetCalls != 1 || events.fullGetCalls != 0 {
-		t.Fatalf("create path gets: decision=%d full=%d", events.decisionGetCalls, events.fullGetCalls)
+	if events.batchDecisionCalls != 1 || events.decisionGetCalls != 0 || events.fullGetCalls != 0 {
+		t.Fatalf("create path lookups: batch=%d single=%d full=%d", events.batchDecisionCalls, events.decisionGetCalls, events.fullGetCalls)
+	}
+	if first.LookupCount != 1 {
+		t.Fatalf("lookup count = %d", first.LookupCount)
 	}
 
 	api.eventsByCal["primary"] = calendarprovider.ListEventsResult{
 		NextSyncToken: "tok-2", Incremental: true,
 		Events: []calendarprovider.RemoteEvent{remote},
 	}
+	events.batchDecisionCalls = 0
 	events.decisionGetCalls = 0
 	events.fullGetCalls = 0
 	second, err := svc.SyncEvents(context.Background(), userID)
@@ -506,11 +537,14 @@ func TestSyncEventsSkipsUnchangedWithoutUpdate(t *testing.T) {
 	if second.SkippedCount != 1 || second.UpdatedCount != 0 || events.updateCalls != 0 {
 		t.Fatalf("second = %+v updates=%d", second, events.updateCalls)
 	}
-	if events.decisionGetCalls != 1 {
-		t.Fatalf("skip path decision gets = %d", events.decisionGetCalls)
+	if events.batchDecisionCalls != 1 || events.decisionGetCalls != 0 {
+		t.Fatalf("skip path batch=%d single=%d", events.batchDecisionCalls, events.decisionGetCalls)
 	}
 	if events.fullGetCalls != 0 {
 		t.Fatalf("skip path must not load full row (provider_payload); fullGetCalls=%d", events.fullGetCalls)
+	}
+	if second.LookupCount != 1 {
+		t.Fatalf("second lookup count = %d", second.LookupCount)
 	}
 }
 
@@ -685,7 +719,7 @@ func TestSyncEventsChangeDetectionViaNarrowLookup(t *testing.T) {
 	}}
 	svc := newEventSyncService(t, accounts, secrets, sources, events, api, key)
 
-	// New event → INSERT (decision miss only; no full get).
+	// New event → INSERT (batch miss only; no full get).
 	created, err := svc.SyncEvents(context.Background(), userID)
 	if err != nil {
 		t.Fatal(err)
@@ -693,9 +727,12 @@ func TestSyncEventsChangeDetectionViaNarrowLookup(t *testing.T) {
 	if created.CreatedCount != 1 || events.fullGetCalls != 0 {
 		t.Fatalf("create = %+v fullGets=%d", created, events.fullGetCalls)
 	}
+	if events.batchDecisionCalls != 1 || events.decisionGetCalls != 0 {
+		t.Fatalf("create lookups batch=%d single=%d", events.batchDecisionCalls, events.decisionGetCalls)
+	}
 
 	// ETag change → UPDATE (identity changed → no full get for payload preserve).
-	events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0
+	events.batchDecisionCalls, events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0, 0
 	etagB := "etag-b"
 	changedETag := base
 	changedETag.ETag = etagB
@@ -710,12 +747,12 @@ func TestSyncEventsChangeDetectionViaNarrowLookup(t *testing.T) {
 	if etagSync.UpdatedCount != 1 || etagSync.SkippedCount != 0 || events.updateCalls != 1 {
 		t.Fatalf("etag update = %+v updates=%d", etagSync, events.updateCalls)
 	}
-	if events.fullGetCalls != 0 {
-		t.Fatalf("etag-changed update should use mapped payload; fullGets=%d", events.fullGetCalls)
+	if events.batchDecisionCalls != 1 || events.fullGetCalls != 0 {
+		t.Fatalf("etag-changed: batch=%d fullGets=%d", events.batchDecisionCalls, events.fullGetCalls)
 	}
 
 	// provider_updated_at change with same etag + same content → SKIP via hash (no UPDATE).
-	events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0
+	events.batchDecisionCalls, events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0, 0
 	sameContentNewerTS := changedETag
 	sameContentNewerTS.UpdatedAt = updatedAt.Add(time.Minute)
 	api.eventsByCal["primary"] = calendarprovider.ListEventsResult{
@@ -730,7 +767,7 @@ func TestSyncEventsChangeDetectionViaNarrowLookup(t *testing.T) {
 	}
 
 	// Content hash change (same etag, different updated_at + title) → UPDATE.
-	events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0
+	events.batchDecisionCalls, events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0, 0
 	contentChanged := sameContentNewerTS
 	contentChanged.Title = "Standup Renamed"
 	contentChanged.UpdatedAt = updatedAt.Add(2 * time.Minute)
@@ -744,7 +781,6 @@ func TestSyncEventsChangeDetectionViaNarrowLookup(t *testing.T) {
 	if hashUpdate.UpdatedCount != 1 || events.updateCalls != 1 {
 		t.Fatalf("hash update = %+v updates=%d", hashUpdate, events.updateCalls)
 	}
-	// Same etag as stored after previous etag-b write; updated_at differs → identity changed → no full get.
 	if events.fullGetCalls != 0 {
 		t.Fatalf("content update with changed updated_at should not full-get; fullGets=%d", events.fullGetCalls)
 	}
@@ -759,7 +795,7 @@ func TestSyncEventsChangeDetectionViaNarrowLookup(t *testing.T) {
 	row.DeletedAt = &deletedAt
 	row.Status = constant.CalendarEventStatusCancelled
 	events.byKey[events.key(sourceID, "evt-1")] = row
-	events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0
+	events.batchDecisionCalls, events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0, 0
 	resurrect := contentChanged
 	resurrect.Status = "confirmed"
 	api.eventsByCal["primary"] = calendarprovider.ListEventsResult{
@@ -779,7 +815,7 @@ func TestSyncEventsChangeDetectionViaNarrowLookup(t *testing.T) {
 
 	// No etag / updated_at: content change requires UPDATE while identity is unchanged →
 	// full-row fetch preserves prior provider_payload.
-	events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0
+	events.batchDecisionCalls, events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0, 0
 	row = events.byKey[events.key(sourceID, "evt-1")]
 	row.ProviderETag = nil
 	row.ProviderUpdatedAt = nil
@@ -800,8 +836,8 @@ func TestSyncEventsChangeDetectionViaNarrowLookup(t *testing.T) {
 	if preserve.UpdatedCount != 1 || events.updateCalls != 1 {
 		t.Fatalf("identity-stable update = %+v updates=%d", preserve, events.updateCalls)
 	}
-	if events.fullGetCalls != 1 {
-		t.Fatalf("expected one full get to preserve payload; fullGets=%d", events.fullGetCalls)
+	if events.batchDecisionCalls != 1 || events.fullGetCalls != 1 {
+		t.Fatalf("expected batch + one full get to preserve payload; batch=%d fullGets=%d", events.batchDecisionCalls, events.fullGetCalls)
 	}
 	preserved, err := events.GetBySourceAndProviderEvent(context.Background(), sourceID, "evt-1")
 	if err != nil {
@@ -865,9 +901,12 @@ func TestSyncEventsRecurringParentUsesNarrowLookup(t *testing.T) {
 	if result.CreatedCount != 2 {
 		t.Fatalf("created = %+v", result)
 	}
-	// Parent lookup for instance uses GetForSyncDecision (2 creates + 1 parent decision get).
-	if events.decisionGetCalls < 3 {
-		t.Fatalf("expected parent narrow lookup; decisionGets=%d", events.decisionGetCalls)
+	// Prefetch includes series + instance IDs; parent created mid-batch is written into the map.
+	if events.batchDecisionCalls != 1 {
+		t.Fatalf("expected one batch prefetch; batch=%d", events.batchDecisionCalls)
+	}
+	if events.decisionGetCalls != 0 {
+		t.Fatalf("recurring parent should resolve from map; singleGets=%d", events.decisionGetCalls)
 	}
 	if events.fullGetCalls != 0 {
 		t.Fatalf("recurring create path must not full-get; fullGets=%d", events.fullGetCalls)
@@ -882,5 +921,72 @@ func TestSyncEventsRecurringParentUsesNarrowLookup(t *testing.T) {
 	}
 	if inst.RecurringEventID == nil || *inst.RecurringEventID != parent.ID {
 		t.Fatalf("instance parent = %#v want %s", inst.RecurringEventID, parent.ID)
+	}
+}
+
+func TestSyncEventsBatchPrefetchOneLookupForManyEvents(t *testing.T) {
+	key, err := seal.KeyFromSecret("calendar-events-test-secret-key!!")
+	if err != nil {
+		t.Fatal(err)
+	}
+	userID := uuid.MustParse("01900000-0000-7000-8000-000000000861")
+	accountID := uuid.MustParse("01900000-0000-7000-8000-000000000862")
+	sourceID := uuid.MustParse("01900000-0000-7000-8000-000000000863")
+	accounts := &mockEventAccountRepo{account: entity.ConnectedAccount{
+		ID: accountID, UserID: userID, Provider: constant.AuthProviderGoogle,
+		Status: constant.ConnectedAccountStatusActive, Scopes: []string{constant.GoogleScopeCalendar},
+		CredentialsRef: "cred_events",
+	}}
+	secrets := &mockCalendarSecretRepo{secret: entity.CredentialSecret{
+		Ref: "cred_events", Ciphertext: sealedCred(t, key, "access", "refresh", time.Now().Add(time.Hour).Unix()),
+	}}
+	sources := &mockEventSourceRepo{sources: []entity.CalendarSource{{
+		ID: sourceID, UserID: userID, ConnectedAccountID: accountID,
+		ProviderCalendarID: "primary", SyncEnabled: true,
+	}}}
+	events := &mockEventRepo{byKey: map[string]entity.CalendarEvent{}}
+	start := time.Date(2026, 7, 25, 10, 0, 0, 0, time.UTC)
+	const n = 100
+	remotes := make([]calendarprovider.RemoteEvent, 0, n)
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("evt-%03d", i)
+		etag := fmt.Sprintf("etag-%03d", i)
+		ts := start.Add(time.Duration(i) * time.Minute)
+		remotes = append(remotes, calendarprovider.RemoteEvent{
+			ID: id, Title: id, StartsAt: ts, EndsAt: ts.Add(time.Hour),
+			Status: "confirmed", ETag: etag, UpdatedAt: ts,
+			Raw: map[string]any{"id": id},
+		})
+	}
+	api := &mockCalendarProvider{eventsByCal: map[string]calendarprovider.ListEventsResult{
+		"primary": {NextSyncToken: "bulk-1", Events: remotes},
+	}}
+	svc := newEventSyncService(t, accounts, secrets, sources, events, api, key)
+
+	first, err := svc.SyncEvents(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.CreatedCount != n || first.LookupCount != 1 {
+		t.Fatalf("first = %+v", first)
+	}
+	if events.batchDecisionCalls != 1 || events.decisionGetCalls != 0 {
+		t.Fatalf("create bulk lookups batch=%d single=%d", events.batchDecisionCalls, events.decisionGetCalls)
+	}
+
+	api.eventsByCal["primary"] = calendarprovider.ListEventsResult{
+		NextSyncToken: "bulk-2", Incremental: true, Events: remotes,
+	}
+	events.batchDecisionCalls, events.decisionGetCalls, events.fullGetCalls, events.updateCalls = 0, 0, 0, 0
+	second, err := svc.SyncEvents(context.Background(), userID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second.SkippedCount != n || second.UpdatedCount != 0 || second.LookupCount != 1 {
+		t.Fatalf("second = %+v", second)
+	}
+	if events.batchDecisionCalls != 1 || events.decisionGetCalls != 0 || events.fullGetCalls != 0 || events.updateCalls != 0 {
+		t.Fatalf("skip bulk: batch=%d single=%d full=%d updates=%d",
+			events.batchDecisionCalls, events.decisionGetCalls, events.fullGetCalls, events.updateCalls)
 	}
 }

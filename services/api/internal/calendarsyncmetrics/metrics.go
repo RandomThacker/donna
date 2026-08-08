@@ -19,6 +19,7 @@ const (
 	NameEventCreateTotal       = "calendar_event_create_total"
 	NameEventDeleteTotal       = "calendar_event_delete_total"
 	NameSyncDurationMS         = "calendar_sync_duration_ms"
+	NameSyncLookupTotal        = "calendar_sync_lookup_total"
 
 	// Decision reason labels (logs + metric routing).
 	ReasonETag               = "etag"
@@ -38,6 +39,7 @@ type Registry struct {
 	eventUpdate        atomic.Int64
 	eventCreate        atomic.Int64
 	eventDelete        atomic.Int64
+	syncLookup         atomic.Int64
 	durationSumMS      atomic.Int64
 	durationCount      atomic.Int64
 }
@@ -82,6 +84,13 @@ func (r *Registry) IncEventDelete(n int) {
 	}
 }
 
+// IncSyncLookup increments calendar_sync_lookup_total (batch decision SELECTs).
+func (r *Registry) IncSyncLookup(n int) {
+	if n > 0 {
+		r.syncLookup.Add(int64(n))
+	}
+}
+
 // ObserveEventDecision increments the counter for a skip/update reason.
 func (r *Registry) ObserveEventDecision(skipped bool, reason string) {
 	if skipped {
@@ -114,6 +123,7 @@ type Snapshot struct {
 	EventUpdateTotal        int64 `json:"calendar_event_update_total"`
 	EventCreateTotal        int64 `json:"calendar_event_create_total"`
 	EventDeleteTotal        int64 `json:"calendar_event_delete_total"`
+	SyncLookupTotal         int64 `json:"calendar_sync_lookup_total"`
 	SyncDurationSumMS       int64 `json:"calendar_sync_duration_ms_sum"`
 	SyncDurationCount       int64 `json:"calendar_sync_duration_ms_count"`
 }
@@ -129,6 +139,7 @@ func (r *Registry) Snapshot() Snapshot {
 		EventUpdateTotal:        r.eventUpdate.Load(),
 		EventCreateTotal:        r.eventCreate.Load(),
 		EventDeleteTotal:        r.eventDelete.Load(),
+		SyncLookupTotal:         r.syncLookup.Load(),
 		SyncDurationSumMS:       r.durationSumMS.Load(),
 		SyncDurationCount:       r.durationCount.Load(),
 	}
@@ -144,6 +155,7 @@ func (r *Registry) Reset() {
 	r.eventUpdate.Store(0)
 	r.eventCreate.Store(0)
 	r.eventDelete.Store(0)
+	r.syncLookup.Store(0)
 	r.durationSumMS.Store(0)
 	r.durationCount.Store(0)
 }

@@ -124,6 +124,7 @@ func (s *CalendarService) SyncEvents(ctx context.Context, userID uuid.UUID) (Cal
 			result.SkippedCount += partial.SkippedCount
 			result.RemovedCount += partial.RemovedCount
 			result.ScannedCount += partial.ScannedCount
+			result.LookupCount += partial.LookupCount
 		}
 	}
 	_ = failures
@@ -153,6 +154,7 @@ func (s *CalendarService) SyncEvents(ctx context.Context, userID uuid.UUID) (Cal
 			"updated", result.UpdatedCount,
 			"skipped", result.SkippedCount,
 			"removed", result.RemovedCount,
+			"sync_lookup_count", result.LookupCount,
 			"duration_ms", result.DurationMs,
 		)
 	}
@@ -165,6 +167,7 @@ type partialCounts struct {
 	UpdatedCount int
 	SkippedCount int
 	RemovedCount int
+	LookupCount  int
 }
 
 func (s *CalendarService) syncSourceEvents(
@@ -224,8 +227,21 @@ func (s *CalendarService) syncSourceEvents(
 		return out, fmt.Errorf("list calendar events from provider: %w", listErr)
 	}
 
+	prefetchIDs := collectSyncPrefetchProviderIDs(listed.Events)
+
 	txErr := s.tx.WithinTx(ctx, func(ctx context.Context, tx pgx.Tx) error {
 		eventsRepo := s.events.WithTx(tx)
+		existingByProviderID := map[string]entity.CalendarEvent{}
+		if len(prefetchIDs) > 0 {
+			var prefetchErr error
+			existingByProviderID, prefetchErr = eventsRepo.GetForSyncDecisionByProviderEventIDs(ctx, source.ID, prefetchIDs)
+			if prefetchErr != nil {
+				return prefetchErr
+			}
+			out.LookupCount = 1
+			calendarsyncmetrics.Global.IncSyncLookup(1)
+		}
+
 		keepIDs := make([]string, 0, len(listed.Events))
 		for _, remote := range listed.Events {
 			out.ScannedCount++
@@ -243,7 +259,7 @@ func (s *CalendarService) syncSourceEvents(
 				}
 				continue
 			}
-			_, created, skipped, decisionReason, upsertErr := s.upsertEvent(ctx, eventsRepo, source, remote, now)
+			_, created, skipped, decisionReason, upsertErr := s.upsertEvent(ctx, eventsRepo, source, remote, now, existingByProviderID)
 			if upsertErr != nil {
 				return upsertErr
 			}
@@ -303,21 +319,45 @@ func (s *CalendarService) syncSourceEvents(
 	return out, nil
 }
 
+func collectSyncPrefetchProviderIDs(remotes []calendarprovider.RemoteEvent) []string {
+	if len(remotes) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(remotes))
+	ids := make([]string, 0, len(remotes))
+	add := func(id string) {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return
+		}
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	for _, remote := range remotes {
+		add(remote.ID)
+		add(remote.RecurringEventID)
+	}
+	return ids
+}
+
 func (s *CalendarService) upsertEvent(
 	ctx context.Context,
 	repo repository.CalendarEventRepository,
 	source entity.CalendarSource,
 	remote calendarprovider.RemoteEvent,
 	now time.Time,
+	existingByProviderID map[string]entity.CalendarEvent,
 ) (entity.CalendarEvent, bool, bool, string, error) {
 	mapped, err := mapRemoteEventEntity(source, remote, now)
 	if err != nil {
 		return entity.CalendarEvent{}, false, false, "", err
 	}
 
-	existing, err := repo.GetForSyncDecision(ctx, source.ID, remote.ID)
-	switch {
-	case errors.Is(err, apperr.ErrNotFound):
+	existing, ok := existingByProviderID[remote.ID]
+	if !ok {
 		id, idErr := idgen.NewUUIDv7()
 		if idErr != nil {
 			return entity.CalendarEvent{}, false, false, "", idErr
@@ -325,40 +365,54 @@ func (s *CalendarService) upsertEvent(
 		mapped.ID = id
 		mapped.PublicID = idgen.PublicID(constant.PublicIDPrefixCalendarEvent, id)
 		mapped.CreatedAt = now
-		if parentID, resolveErr := s.resolveRecurringParent(ctx, repo, source.ID, remote.RecurringEventID); resolveErr == nil {
+		if parentID, resolveErr := s.resolveRecurringParent(ctx, repo, source.ID, remote.RecurringEventID, existingByProviderID); resolveErr == nil {
 			mapped.RecurringEventID = parentID
 		}
 		created, cErr := repo.Create(ctx, mapped)
+		if cErr == nil && remote.ID != "" {
+			// Keep same-batch recurring children from needing another SELECT.
+			existingByProviderID[remote.ID] = syncDecisionProjection(created)
+		}
 		return created, true, false, "", cErr
-	case err != nil:
-		return entity.CalendarEvent{}, false, false, "", err
-	default:
-		mapped.ID = existing.ID
-		mapped.PublicID = existing.PublicID
-		mapped.CreatedAt = existing.CreatedAt
-		mapped.RecurringEventID = existing.RecurringEventID
-		if parentID, resolveErr := s.resolveRecurringParent(ctx, repo, source.ID, remote.RecurringEventID); resolveErr == nil {
-			mapped.RecurringEventID = parentID
-		}
-
-		skip, reason := shouldSkipEventUpdate(existing, mapped)
-		if skip {
-			return existing, false, true, reason, nil
-		}
-
-		// Preserve provider_payload unless etag or provider_updated_at changed.
-		// Narrow decision lookup omits payload — fetch the full row only when needed.
-		if !providerIdentityChanged(existing, mapped) {
-			full, fullErr := repo.GetBySourceAndProviderEvent(ctx, source.ID, remote.ID)
-			if fullErr != nil {
-				return entity.CalendarEvent{}, false, false, "", fullErr
-			}
-			mapped.ProviderPayload = full.ProviderPayload
-		}
-
-		updated, uErr := repo.UpdateFromSync(ctx, mapped)
-		return updated, false, false, reason, uErr
 	}
+
+	mapped.ID = existing.ID
+	mapped.PublicID = existing.PublicID
+	mapped.CreatedAt = existing.CreatedAt
+	mapped.RecurringEventID = existing.RecurringEventID
+	if parentID, resolveErr := s.resolveRecurringParent(ctx, repo, source.ID, remote.RecurringEventID, existingByProviderID); resolveErr == nil {
+		mapped.RecurringEventID = parentID
+	}
+
+	skip, reason := shouldSkipEventUpdate(existing, mapped)
+	if skip {
+		return existing, false, true, reason, nil
+	}
+
+	// Preserve provider_payload unless etag or provider_updated_at changed.
+	// Prefetch omits payload — fetch the full row only when needed.
+	if !providerIdentityChanged(existing, mapped) {
+		full, fullErr := repo.GetBySourceAndProviderEvent(ctx, source.ID, remote.ID)
+		if fullErr != nil {
+			return entity.CalendarEvent{}, false, false, "", fullErr
+		}
+		mapped.ProviderPayload = full.ProviderPayload
+	}
+
+	updated, uErr := repo.UpdateFromSync(ctx, mapped)
+	if uErr == nil && remote.ID != "" {
+		existingByProviderID[remote.ID] = syncDecisionProjection(updated)
+	}
+	return updated, false, false, reason, uErr
+}
+
+func syncDecisionProjection(event entity.CalendarEvent) entity.CalendarEvent {
+	event.ProviderPayload = nil
+	event.UserID = uuid.Nil
+	event.Origin = ""
+	event.ProviderRecurringEventID = nil
+	event.UpdatedAt = time.Time{}
+	return event
 }
 
 func (s *CalendarService) resolveRecurringParent(
@@ -366,11 +420,20 @@ func (s *CalendarService) resolveRecurringParent(
 	repo repository.CalendarEventRepository,
 	sourceID uuid.UUID,
 	providerRecurringID string,
+	existingByProviderID map[string]entity.CalendarEvent,
 ) (*uuid.UUID, error) {
 	providerRecurringID = strings.TrimSpace(providerRecurringID)
 	if providerRecurringID == "" {
 		return nil, nil
 	}
+	if parent, ok := existingByProviderID[providerRecurringID]; ok {
+		if parent.DeletedAt != nil {
+			return nil, nil
+		}
+		id := parent.ID
+		return &id, nil
+	}
+	// Fallback when parent was not in the prefetch set (should be rare).
 	parent, err := repo.GetForSyncDecision(ctx, sourceID, providerRecurringID)
 	if err != nil {
 		return nil, err
@@ -378,6 +441,7 @@ func (s *CalendarService) resolveRecurringParent(
 	if parent.DeletedAt != nil {
 		return nil, nil
 	}
+	existingByProviderID[providerRecurringID] = parent
 	id := parent.ID
 	return &id, nil
 }

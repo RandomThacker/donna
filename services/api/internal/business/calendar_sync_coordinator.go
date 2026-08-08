@@ -313,6 +313,7 @@ func (c *CalendarSyncCoordinator) logSyncFinished(ctx context.Context, result Ca
 		"events_updated", result.EventsUpdated,
 		"events_skipped", result.EventsSkipped,
 		"events_deleted", result.EventsDeleted,
+		"sync_lookup_count", result.EventsLookup,
 		"duration_ms", result.DurationMs,
 	)
 }

@@ -63,6 +63,15 @@ WHERE calendar_source_id = $1 AND provider_event_id = $2
 ORDER BY deleted_at NULLS FIRST
 LIMIT 1`
 
+	// DISTINCT ON picks the live row first (deleted_at NULLS FIRST), matching the
+	// single-row GetForSyncDecision ORDER BY deleted_at NULLS FIRST LIMIT 1.
+	sqlSelectCalendarEventSyncDecisionByProviderEventIDs = `
+SELECT DISTINCT ON (provider_event_id)` + calendarEventSyncDecisionColumns + `
+FROM calendar_events
+WHERE calendar_source_id = $1
+  AND provider_event_id = ANY($2::text[])
+ORDER BY provider_event_id, deleted_at NULLS FIRST`
+
 	sqlSelectCalendarEventsByUserRange = `
 SELECT` + calendarEventColumnsAliased + `
 FROM calendar_events e
@@ -164,6 +173,15 @@ type CalendarEventRepository interface {
 	// GetForSyncDecision returns a narrow projection for calendar sync skip/update
 	// decisions. ProviderPayload is never loaded.
 	GetForSyncDecision(ctx context.Context, sourceID uuid.UUID, providerEventID string) (entity.CalendarEvent, error)
+	// GetForSyncDecisionByProviderEventIDs batch-loads narrow sync-decision rows for
+	// one source. For each provider_event_id, prefers the live row (deleted_at IS NULL)
+	// over soft-deleted duplicates — same semantics as GetForSyncDecision.
+	// ProviderPayload is never loaded. Empty ids returns an empty map without querying.
+	GetForSyncDecisionByProviderEventIDs(
+		ctx context.Context,
+		sourceID uuid.UUID,
+		providerEventIDs []string,
+	) (map[string]entity.CalendarEvent, error)
 	ListByUserInRange(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEvent, error)
 	ListByUserInRangeWithProvider(ctx context.Context, userID uuid.UUID, from, to time.Time) ([]entity.CalendarEventWithProvider, error)
 	// ListForSchedulerByUserInRange returns a narrow projection for Occurrence scheduling.
@@ -280,6 +298,54 @@ func (r *calendarEventRepository) GetForSyncDecision(
 		return entity.CalendarEvent{}, fmt.Errorf("get calendar event sync decision: %w", err)
 	}
 	return event, nil
+}
+
+func (r *calendarEventRepository) GetForSyncDecisionByProviderEventIDs(
+	ctx context.Context,
+	sourceID uuid.UUID,
+	providerEventIDs []string,
+) (map[string]entity.CalendarEvent, error) {
+	out := make(map[string]entity.CalendarEvent)
+	if len(providerEventIDs) == 0 {
+		return out, nil
+	}
+	// Deduplicate while preserving a stable query size bound.
+	seen := make(map[string]struct{}, len(providerEventIDs))
+	ids := make([]string, 0, len(providerEventIDs))
+	for _, id := range providerEventIDs {
+		if id == "" {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if len(ids) == 0 {
+		return out, nil
+	}
+
+	rows, err := r.q.Query(ctx, sqlSelectCalendarEventSyncDecisionByProviderEventIDs, sourceID, ids)
+	if err != nil {
+		return nil, fmt.Errorf("list calendar event sync decisions: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		event, scanErr := scanCalendarEventSyncDecision(rows)
+		if scanErr != nil {
+			return nil, scanErr
+		}
+		if event.ProviderEventID == nil || *event.ProviderEventID == "" {
+			continue
+		}
+		out[*event.ProviderEventID] = event
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list calendar event sync decisions: %w", err)
+	}
+	return out, nil
 }
 
 func (r *calendarEventRepository) ListByUserInRange(

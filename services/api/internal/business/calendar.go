@@ -41,6 +41,7 @@ type CalendarEventSyncResult struct {
 	SkippedCount int
 	RemovedCount int
 	ScannedCount int
+	LookupCount  int
 	SyncedAt     time.Time
 	DurationMs   int
 	SourceCount  int
